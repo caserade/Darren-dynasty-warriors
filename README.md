@@ -10,6 +10,8 @@ Both games share sound, difficulty, a few controller buttons and story progress 
 
 ## Play
 
+- Windows desktop app: unzip `Darren-Snowday-Windows.zip` and double-click
+  `Darren Snowday.exe` (no Node or Python needed). Built from `desktop-app/`; see its README.
 - Windows: double-click `PLAY-3D.cmd` or `PLAY-PIXEL.cmd`.
 - Mac: double-click `PLAY-3D.command` or `PLAY-PIXEL.command` (the first time, right-click and
   choose Open).

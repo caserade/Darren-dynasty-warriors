@@ -1,0 +1,16 @@
+{
+  "name": "darren-snowday-desktop",
+  "productName": "Darren's Snowday Search",
+  "version": "1.0.0",
+  "description": "Windows desktop app for Darren's Snowday Search (pixel and 3D games in one window)",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "node build-windows.cjs"
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "electron": "44.4.5"
+  }
+}

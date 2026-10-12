@@ -1,3 +1,34 @@
+TEST RESULTS · CLAUDE UPDATE 5 (WINDOWS DESKTOP APP) · 2026-10-12
+Environment: Linux cloud container, Node 22.22, Electron 44.4.5 under Xvfb, driven by
+Playwright 1.56, software WebGL (SwiftShader). This isn't a Windows PC or a real GPU.
+
+DESKTOP APP (tests/desktop-app.cjs) — 12 of 12 pass, twice: run from the checkout and
+as a packaged Linux build of the same app (same folder layout as the Windows zip)
+  Opens on the start screen and its art loads; key 1 opens the pixel game; its title
+  shows and a new game starts with the HUD; the 3D valley loads all models and animation
+  clips; both games see the same saves; all four 3D models arrive byte-complete; no page
+  errors or missing files; a web address can't replace the game in the window; a path
+  outside the game folder is refused; saves are still there after closing and reopening.
+  Chromium reports streamed .glb reads from the app as "net::ERR_ABORTED" although every
+  byte arrives (the same harmless line the browser runs logged); the test checks the
+  byte counts instead of counting those lines.
+  Screenshots: qa-screenshots/desktop-0*.png.
+
+WINDOWS BUILD
+  Built on Linux with @electron/packager 20.3.0 for win32 x64 (no Wine). Checked the .exe's
+  resources: Darren's icon (7 sizes) and the name/version details are in it. The zip
+  holds the app, resources/app.asar (start screen and main.cjs only) and resources/game
+  (a copy of dist/).
+
+EXISTING SUITE (npm test) — all pass; dist/ is unchanged by this update
+  (it rewrites previews/Darren-Storybook-Weight-Levels.png; restored afterwards)
+
+NOT TESTED
+  A real Windows PC: double-clicking the .exe, the SmartScreen prompt, the window and
+  menu on Windows, full screen, and the save folder location. A real GPU and frame rate.
+  A physical controller (the browser runs only simulated one; the app uses the same
+  Chromium Gamepad support).
+
 TEST RESULTS · CLAUDE UPDATE 4 (SMALLER 3D MODELS, MAC LAUNCHERS) · 2026-10-12
 Environment: Linux cloud container, Node 22.22, headless Chromium (Playwright 1.56),
 software WebGL (SwiftShader). This isn't a real GPU or a real Mac.

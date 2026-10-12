@@ -258,3 +258,30 @@ MAC LAUNCHERS
   "access privileges" (the zip lost the executable mark), open Terminal and run
   `chmod +x ` followed by dragging the launcher into the window, then press Return.
 - README.md and START-HERE.txt describe both.
+
+CLAUDE UPDATE 5 · WINDOWS DESKTOP APP · 2026-10-12
+
+WHAT'S NEW
+- A Windows app: Darren-Snowday-Windows.zip. Unzip it and double-click
+  "Darren Snowday.exe". It needs nothing else installed (no Node.js, Python or browser);
+  it brings its own copy of Chromium through Electron 44.4.5.
+- One window plays both games. It opens on a start screen with Darren's art and two
+  choices, Pixel adventure and 3D adventure (mouse, keys 1/2, or a controller's
+  left/right and A). The games' own links between each other still work.
+- Menu: Game > Choose a game (Ctrl+H), Pixel adventure (Ctrl+1), 3D adventure (Ctrl+2),
+  Quit; View > Full screen (F11), Reload, zoom; Test > Developer tools, Open save folder.
+- Both games are served from one fixed address inside the app (snowday://game/), so
+  they share saves exactly as with the launchers, and saves stay between runs. They are
+  stored in %APPDATA%\Darren's Snowday Search, separate from browser saves.
+- Only one copy of the app runs at a time (a second double-click brings the first window
+  forward), so two copies never write the same saves. Web links open in the normal browser.
+- The .exe has Darren's icon and its own name and details. It is not code-signed, so
+  Windows SmartScreen warns the first time ("More info", then "Run anyway").
+
+FILES
+- desktop-app/: main.cjs (window, menu, file serving), home/ (start screen and icon),
+  icon.ico, build-windows.cjs (npm run build:win), package.json and package-lock.json,
+  README.md. Builds go to desktop-app/out/ (ignored by git).
+- tests/desktop-app.cjs: launches the app and checks it (not part of npm test).
+- The games in dist/ are unchanged; the build copies them into the app.
+- The PLAY-* launchers still work as before.

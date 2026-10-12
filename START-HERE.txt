@@ -11,6 +11,15 @@ PUT THIS ON YOUR WINDOWS DESKTOP
 4. The resulting folder is Desktop\Darren-Dynasty-Warriors-Game.
    Windows may keep your Desktop under OneDrive; either Desktop location works.
 
+WINDOWS DESKTOP APP (no Node.js or Python needed)
+Unzip Darren-Snowday-Windows.zip (right-click, Extract All) and double-click
+"Darren Snowday.exe" inside the extracted folder. Keep the folder together. A start
+screen picks the pixel or the 3D game; Ctrl+H returns to it, F11 is full screen.
+The first time, Windows may say "Windows protected your PC" because the app is not
+signed: click "More info", then "Run anyway". Saves made in the app are kept in
+%APPDATA%\Darren's Snowday Search and are separate from browser saves.
+The app is built from desktop-app/ (see desktop-app/README.md).
+
 PLAY LOCALLY
 Double-click PLAY-3D.cmd for the 3D exploration game, or PLAY-PIXEL.cmd for the
 pixel game. The launchers use Node.js if installed, otherwise Python 3. If
