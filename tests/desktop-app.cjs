@@ -3,7 +3,7 @@
 // and the playwright package. Run: node tests/desktop-app.cjs [path-to-packaged-executable]
 // Without an argument it runs the app from the checkout (desktop-app/ + dist/). Pass the
 // executable of a Linux build (DESKTOP_PLATFORM=linux npm run build:win) to check the
-// packaged folder layout. It cannot run the Windows .exe itself.
+// packaged folder layout. The packaged executable can also be tested on Windows.
 const { _electron: electron } = require('playwright');
 const path = require('node:path'),
   fs = require('node:fs'),
@@ -18,14 +18,15 @@ function rec(check, ok, note = '') {
   if (!ok) fails++;
   console.log(ok ? 'PASS' : 'FAIL', 'desktop ·', check, note);
 }
-async function launch() {
+async function launch(env = {}) {
   const args = ['--no-sandbox', '--user-data-dir=' + profile, '--ignore-gpu-blocklist'];
   const app = await electron.launch(
     packaged
-      ? { executablePath: packaged, args }
+      ? { executablePath: packaged, args, env: { ...process.env, ...env } }
       : {
           executablePath: require(path.join(appDir, 'node_modules', 'electron')),
           args: [appDir, ...args],
+          env: { ...process.env, ...env },
         }
   );
   const p = await app.firstWindow();
@@ -122,6 +123,7 @@ const tag = packaged ? 'packaged' : 'checkout';
     (await p.evaluate(() => localStorage.getItem('desktop-test-marker'))) === 'kept'
   );
   await app.close();
+
   fs.rmSync(profile, { recursive: true, force: true });
   console.log(fails ? fails + ' failed' : 'all desktop checks passed');
   process.exit(fails ? 1 : 0);

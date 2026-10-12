@@ -9,8 +9,8 @@ const path = require('node:path');
 const SCHEME = 'snowday';
 const HOST = 'game';
 const ORIGIN = SCHEME + '://' + HOST;
-// Packaged: the build copies dist/ to resources/game. From a checkout: ../dist.
-const gameRoot = app.isPackaged
+// Packaged builds always serve their bundled game. Checkouts serve ../dist.
+const bundledRoot = app.isPackaged
   ? path.join(process.resourcesPath, 'game')
   : path.join(__dirname, '..', 'dist');
 const homeRoot = path.join(__dirname, 'home');
@@ -40,7 +40,7 @@ protocol.registerSchemesAsPrivileged([
 function resolveFile(pathname) {
   // /__desktop/ is the app's own start page; everything else is the game's dist/ folder.
   const desktop = pathname === '/__desktop' || pathname.startsWith('/__desktop/');
-  const root = desktop ? homeRoot : gameRoot;
+  const root = desktop ? homeRoot : bundledRoot;
   const rel = desktop ? pathname.slice('/__desktop'.length) : pathname;
   let file = path.resolve(root, '.' + rel);
   if (file !== root && !file.startsWith(root + path.sep)) return null;
@@ -78,7 +78,6 @@ function serve(request) {
 
 let win = null;
 const go = (p) => win && win.loadURL(ORIGIN + p);
-
 function buildMenu() {
   const toggleFull = () => win && win.setFullScreen(!win.isFullScreen());
   Menu.setApplicationMenu(
