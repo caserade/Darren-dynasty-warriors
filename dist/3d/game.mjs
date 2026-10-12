@@ -5,6 +5,7 @@ import { buildRig, Animator } from './anim.mjs';
 import { buildClips } from './clips.mjs';
 import { ScarfRibbon } from './ribbon.mjs';
 import { WeaponTrail } from './trail.mjs';
+import { addMetalShine } from './look.mjs';
 
 const $ = (id) => document.getElementById(id),
   canvas = $('view'),
@@ -1801,6 +1802,8 @@ async function boot() {
             o.material.map.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
         }
       });
+      // Tormund's silver armour, sword and gold trim need something to reflect (studio pass 3).
+      if (i === 1) addMetalShine(root, renderer);
       scene.add(root);
       // Authored clips (clips.mjs) replace the supplied ones of the same name; anything not yet
       // authored keeps the supplied clip.
@@ -1827,7 +1830,8 @@ async function boot() {
       // Darren's paws (studio pass 5; his hand bones hold forearm and paw, the paw is the far end).
       const trails =
         i === 1
-          ? [new WeaponTrail(scene, rig, rig.role.handL, 0.2, 0.82, 0xffd77a)]
+          ? // From the blade's base to its point (markers built into his model, studio pass 3).
+            [WeaponTrail.between(scene, root, 'blade_base', 'blade_tip', 0xffd77a)]
           : i === 2
             ? [new WeaponTrail(scene, rig, rig.role.handL, 0.3, 0.62, 0xbfe4ff)]
             : [rig.role.handL, rig.role.handR].map(

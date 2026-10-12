@@ -1678,10 +1678,12 @@ function across(fore, blade) {
     a = fore.map((x, i) => x - d * b[i]);
   return Math.hypot(...a) < 1e-3 ? [b[1], -b[0], b[2]] : a;
 }
+// Since studio pass 3 the sword comes out of the thumb side of his fist (the paw's rest forward
+// axis), so the blade is steered with face; every move's blade directions are unchanged.
 const T_SWORD = (arm, fore, blade) => ({
   armL: { aim: arm },
   foreL: { aim: fore },
-  handL: { aim: across(fore, blade), up: blade },
+  handL: { aim: across(fore, blade), face: blade },
 });
 const T_SHIELD = (arm, fore, face) => ({
   armR: { aim: arm },

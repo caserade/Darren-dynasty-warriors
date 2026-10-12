@@ -27,6 +27,7 @@
       import { buildRig, Animator, applyPose, mix } from '/anim.mjs';
       import { LIBRARY } from '/clips.mjs';
       import { buildClips } from '/clips.mjs';
+      import { addMetalShine } from '/look.mjs';
       const q = new URLSearchParams(location.search);
       const name = q.get('hero') || 'Darren';
       const canvas = document.getElementById('c');
@@ -68,6 +69,8 @@
           o.userData.mat = o.material;
         }
       });
+      // Same look as in the game (game.mjs gives Tormund the metal shine).
+      if (name === 'Tormund') addMetalShine(root, renderer);
       const rig = buildRig(root, name);
       const authored = buildClips(rig);
       const names = new Set(authored.map((c) => c.name));
@@ -90,8 +93,22 @@
           for (let k = 0; k < 4; k++) if (j.getComponent(i, k) === bi) v += w.getComponent(i, k);
           col.set([v, 0.15 * (1 - v), 1 - v], i * 3);
         }
-        g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+        setDebugColors(g, col);
         return new THREE.MeshBasicMaterial({ vertexColors: true });
+      }
+      // Debug views paint their own vertex colours; the model's own (baked shading) come back after.
+      function setDebugColors(g, col) {
+        if (!('ownColor' in g.userData)) g.userData.ownColor = g.attributes.color || null;
+        g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      }
+      function restoreColors() {
+        for (const m of meshes) {
+          const g = m.geometry;
+          if (!('ownColor' in g.userData)) continue;
+          if (g.userData.ownColor) g.setAttribute('color', g.userData.ownColor);
+          else g.deleteAttribute('color');
+          delete g.userData.ownColor;
+        }
       }
       // Colours each vertex by how much the current pose stretches (red) or squashes (blue) the
       // edges around it; grey = unchanged. Called after the pose is set (see shot()).
@@ -131,7 +148,7 @@
             i * 3
           );
         }
-        g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+        setDebugColors(g, col);
       }
       // The painted colours with no lighting (albedo), or the metal map as grey (white = metal).
       function flatMaterial(m, mode) {
@@ -216,6 +233,7 @@
         //         target: [x, z] to look at instead of the middle, bind: true for the unposed model }
         shot(o = {}) {
           const mode = o.mode || 'tex';
+          restoreColors();
           for (const m of meshes)
             m.material =
               mode === 'clay'
