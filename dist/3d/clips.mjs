@@ -2472,6 +2472,167 @@ function tormundSword() {
   };
 }
 
+// ---- Bucky: a heavy beaver with the mallet in his LEFT paw ----
+const B_MAL = (arm, fore, axis) => ({
+  armL: { aim: arm },
+  foreL: { aim: fore },
+  handL: { aim: across(fore, axis), up: axis },
+});
+const B_FREE = (arm, fore, hand) => ({
+  armR: { aim: arm },
+  foreR: { aim: fore },
+  handR: { aim: hand || fore },
+});
+// Mallet resting on his left shoulder, free paw hanging, feet planted wide.
+const B_BASE = {
+  hips: { p: [0, -0.02, 0] },
+  spine: [-3, 0, 0],
+  chest: [-2, 0, 0],
+  neck: [4, 0, 0],
+  head: [2, 0, 0],
+  ...B_MAL([0.45, -0.65, 0.45], [-0.15, 0.85, 0.35], [-0.05, 0.55, -0.85]),
+  ...B_FREE([-0.4, -0.92, 0.1], [-0.15, -0.9, 0.35], [-0.05, -0.8, 0.6]),
+  legL: [-2, 0, 6],
+  shinL: [6, 0, 0],
+  footL: [-4, 0, 0],
+  legR: [-2, 0, -6],
+  shinR: [6, 0, 0],
+  footR: [-4, 0, 0],
+};
+function buckyArms(kind, s, c) {
+  switch (kind) {
+    case 'idle':
+      return {
+        ...B_MAL([0.45, -0.65, 0.45 + 0.03 * s], [-0.15, 0.85, 0.35], [-0.05, 0.55, -0.85]),
+        ...B_FREE([-0.4, -0.92, 0.1 + 0.04 * s], [-0.15, -0.9, 0.35], [-0.05, -0.8, 0.6]),
+      };
+    case 'walk':
+      return {
+        ...B_MAL(
+          [0.45, -0.65, 0.45 - 0.08 * s],
+          [-0.15, 0.85, 0.35],
+          [-0.05 + 0.1 * s, 0.55, -0.85]
+        ),
+        ...B_FREE([-0.42, -0.9, 0.1 + 0.4 * s], [-0.2, -0.8, 0.5 + 0.4 * s], [-0.05, -0.7, 0.7]),
+      };
+    case 'run':
+      // Mallet carried across his chest, free paw pumping.
+      return {
+        ...B_MAL([0.4, -0.6, 0.6 - 0.15 * s], [-0.6, 0.45, 0.6], [-0.75, 0.6, 0.3]),
+        ...B_FREE([-0.45, -0.75, 0.2 + 0.6 * s], [-0.2, -0.3, 0.9 + 0.3 * s], [-0.05, 0, 1]),
+      };
+    case 'air':
+      return {
+        ...B_MAL([0.8, -0.1 + 0.4 * s, 0.1], [0.6, 0.6, 0.4], [0.3, 0.9, -0.3]),
+        ...B_FREE([-0.85, -0.1 + 0.4 * s, 0.1], [-0.7, 0.3 * s, 0.6]),
+      };
+    case 'land':
+      return {
+        ...B_MAL([0.7, -0.6, 0.4], [0.3, -0.5, 0.8], [0.1, 0.8, 0.6]),
+        ...B_FREE([-0.7, -0.6, 0.4], [-0.3, -0.7, 0.6]),
+      };
+    case 'roll':
+      return {
+        ...B_MAL([0.5, -0.5, 0.6], [0, 0.4, 0.9], [0.2, 0.6, -0.8]),
+        ...B_FREE([-0.5, -0.5, 0.6], [0, -0.3, 0.95]),
+      };
+    case 'hurt':
+      return s > 0
+        ? {
+            ...B_MAL([0.85, -0.3, -0.2], [0.6, 0.5, -0.3], [0.2, 0.9, -0.3]),
+            ...B_FREE([-0.85, -0.2, 0.4], [-0.5, 0.4, 0.7]),
+          }
+        : {
+            ...B_MAL([0.7, -0.6, -0.4], [0.4, -0.6, 0.6], [0.3, 0.6, 0.7]),
+            ...B_FREE([-0.7, -0.6, -0.4], [-0.3, -0.6, 0.7]),
+          };
+    case 'down':
+      return {
+        ...B_MAL([0.9, 0.2, 0.3], [0.7, 0.6, 0.3], [0.3, -0.2, 1]),
+        ...B_FREE([-0.9, 0.2, 0.3], [-0.7, 0.6, 0.3]),
+      };
+  }
+  return {};
+}
+function buckyLocomotion() {
+  const L = bipedLocomotion({
+    h: 0.55,
+    len: 0.5,
+    weight: 1.4,
+    rollH: 0.45,
+    rollPivot: [0.45, 0.15],
+    lieH: 0.42,
+    sitH: 0.38,
+    arms: buckyArms,
+    // A rolling waddle: short steps, lots of side-to-side, the belly leading.
+    walk: {
+      dur: 0.95,
+      thigh: 20,
+      knee: 34,
+      toe: 8,
+      bob: 0.03,
+      drop: 0.015,
+      yaw: 6,
+      roll: 6,
+      lean: -2,
+    },
+    run: {
+      dur: 0.6,
+      thigh: 36,
+      knee: 70,
+      toe: 18,
+      bob: 0.07,
+      drop: 0.05,
+      yaw: 8,
+      roll: 7,
+      lean: 8,
+    },
+    // Hip-bump dodge: a heavy hop forward that leads with the belly and swings the hips out.
+    dodge: {
+      dur: 0.55,
+      keys: [
+        [0, {}],
+        [
+          0.08,
+          seq(
+            crouch(0.5, 0.5, 10),
+            { spine: [16, 0, 0], chest: [8, 0, 0] },
+            buckyArms('land', 1, 0)
+          ),
+          0.6,
+        ],
+        [
+          0.22,
+          seq(
+            {
+              hips: { r: [-16, 30, 18], p: [0.08, 0.16, 0.08] },
+              spine: [-18, -12, -10],
+              chest: [-8, -8, -6],
+              head: [10, 10, 0],
+            },
+            legs([20, 40, -20, 10], [-10, 30, -20, 10]),
+            buckyArms('air', 0.4, 0),
+            { tail1: [-25, -20, 0], tail2: [-10, -10, 0] }
+          ),
+          0.6,
+        ],
+        [
+          0.4,
+          seq(
+            crouch(0.6, 0.5, 12),
+            { hips: { r: [6, 10, -6] }, spine: [14, 0, 0], head: [-10, 0, 0] },
+            buckyArms('land', 1, 0),
+            { tail1: [15, 0, 0] }
+          ),
+          0.4,
+        ],
+        [0.55, {}],
+      ],
+    },
+  });
+  return L;
+}
+
 // ---- Darren · Polka Scarf (timed to moves.mjs) ----
 // The scarf's free end is in his right paw; the ribbon itself is simulated in game.mjs (ScarfRibbon),
 // so these clips only have to swing the paw on clean arcs. A lash = wind back, whip the paw through
@@ -3075,6 +3236,7 @@ export const LIBRARY = {
     clips: () => ({ ...darrenLocomotion(), ...darrenPaws(), ...darrenScarf() }),
   },
   Tormund: { base: T_BASE, clips: () => ({ ...tormundLocomotion(), ...tormundSword() }) },
+  Bucky: { base: B_BASE, clips: () => ({ ...buckyLocomotion() }) },
 };
 
 // Builds every authored clip for one rig. Specs with fn/keys and dur become AnimationClips.
