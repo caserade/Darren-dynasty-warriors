@@ -252,7 +252,117 @@ const SCARF = {
   },
 };
 
-// Tormund and Bucky keep their first three-hit strings until their own passes.
+// ---- Tormund · Sword and Shield: a steady knight; reach with the blade, the shield to bully ----
+// The sword is in his left paw and the shield on his right. Holding Charge from neutral keeps his
+// Crescent cleave power move (ChargeAttack in sim.mjs).
+const TORMUND = {
+  name: 'Sword and Shield',
+  normal: [
+    {
+      anim: 'TorN1',
+      dur: 0.5,
+      chain: 0.28,
+      lunge: [[0, 0.16, 3.4]],
+      hits: [{ t: 0.17, r: 2.4, arc: 2.2, dmg: 18, kb: 4 }],
+    },
+    {
+      anim: 'TorN2',
+      dur: 0.5,
+      chain: 0.28,
+      lunge: [[0, 0.15, 3.2]],
+      hits: [{ t: 0.16, r: 2.4, arc: 2.4, dmg: 18, kb: 5 }],
+    },
+    {
+      anim: 'TorN3',
+      dur: 0.56,
+      chain: 0.34,
+      lunge: [[0.04, 0.2, 5]],
+      hits: [{ t: 0.19, r: 1.9, arc: 1.5, dmg: 20, kb: 10 }],
+    },
+    {
+      anim: 'TorN4',
+      dur: 0.58,
+      chain: 0.36,
+      lunge: [[0.06, 0.24, 4.5]],
+      hits: [{ t: 0.22, r: 3, arc: 0.8, dmg: 26, kb: 7, off: 0.4 }],
+    },
+    {
+      anim: 'TorN5',
+      dur: 0.86,
+      chain: 0.72,
+      lunge: [[0.05, 0.3, 2.5]],
+      hits: [{ t: 0.32, r: 2.9, arc: TAU, dmg: 30, kb: 12, down: true, ring: 2.9 }],
+    },
+  ],
+  charge: [
+    null,
+    {
+      anim: 'TorC2',
+      dur: 0.8,
+      armor: true,
+      lunge: [[0.1, 0.5, 8.5]],
+      hits: [
+        { t: 0.22, r: 1.8, arc: 1.6, dmg: 12, kb: 9 },
+        { t: 0.36, r: 1.8, arc: 1.6, dmg: 12, kb: 9 },
+        { t: 0.5, r: 2, arc: 1.8, dmg: 16, kb: 14, down: true },
+      ],
+    },
+    {
+      anim: 'TorC3',
+      dur: 0.7,
+      lunge: [[0, 0.16, 3]],
+      hits: [{ t: 0.22, r: 2.5, arc: 1.8, dmg: 22, kb: 2, launch: 10 }],
+    },
+    {
+      anim: 'TorC4',
+      dur: 0.92,
+      armor: true,
+      lunge: [[0.2, 0.42, 3]],
+      hits: [{ t: 0.46, r: 2.6, arc: 1.2, dmg: 44, kb: 10, down: true, ring: 2.2, off: 0.8 }],
+    },
+    {
+      anim: 'TorC5',
+      dur: 0.8,
+      hits: [
+        { t: 0.26, r: 3.2, arc: TAU, dmg: 18, kb: 6, down: true },
+        { t: 0.42, r: 3.2, arc: TAU, dmg: 18, kb: 9, ring: 3.2 },
+      ],
+    },
+    {
+      anim: 'TorC6',
+      dur: 1.15,
+      armor: true,
+      lunge: [[0.12, 0.62, 4]],
+      hop: { t: 0.12, vy: 7 },
+      // Lands at about 0.9 s.
+      hits: [{ t: 0.88, r: 3.6, arc: TAU, dmg: 42, kb: 14, down: true, ring: 3.6 }],
+    },
+  ],
+  jump: {
+    anim: 'TorJump',
+    dur: 0.6,
+    dive: -14,
+    hits: [{ t: 0.3, r: 2.6, arc: TAU, dmg: 26, kb: 9, down: true, ring: 2.6 }],
+  },
+  dash: {
+    anim: 'TorDash',
+    dur: 0.62,
+    armor: true,
+    lunge: [[0, 0.4, 9]],
+    hits: [{ t: 0.18, r: 1.9, arc: 1.6, dmg: 22, kb: 13, down: true }],
+  },
+  special: {
+    anim: 'TorSpecial',
+    name: 'GOLDEN CRESCENT',
+    dur: 2.4,
+    inv: [0, 2.4],
+    steer: 1.2,
+    pulse: { from: 0.3, to: 1.7, every: 0.2, r: 3.4, dmg: 10, kb: 5 },
+    hits: [{ t: 2.05, r: 6.5, arc: 1.4, dmg: 46, kb: 16, down: true, ring: 6 }],
+  },
+};
+
+// Bucky keeps his first three-hit string until his own passes.
 const legacy = (dmg, clipPrefix = 'Attack') => ({
   name: 'Standard',
   normal: [
@@ -281,7 +391,7 @@ const legacy = (dmg, clipPrefix = 'Attack') => ({
 export const MOVESETS = {
   paws: PAWS,
   scarf: SCARF,
-  tormund: legacy([18, 20, 30]),
+  tormund: TORMUND,
   bucky: legacy([20, 22, 34]),
 };
 // Which moveset a hero uses (Darren's depends on his chosen weapon style).

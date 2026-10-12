@@ -4,7 +4,7 @@ export const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 export const CAST = ['Darren', 'Tormund', 'Bucky'];
 export const KITS = [
   { attack: 'Paw combo', charge: 'Packed snowball', color: 0xe64b42, speed: 5.8 },
-  { attack: 'Knight’s three cuts', charge: 'Crescent cleave', color: 0xe5bc61, speed: 5.5 },
+  { attack: 'Sword and shield', charge: 'Crescent cleave', color: 0xe5bc61, speed: 5.5 },
   { attack: 'Mallet combo', charge: 'Timber quake', color: 0x518fcb, speed: 5.1 },
 ];
 const TAU = Math.PI * 2,

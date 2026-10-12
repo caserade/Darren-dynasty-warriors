@@ -1759,6 +1759,592 @@ function tormundLocomotion() {
   });
 }
 
+// ---- Tormund · Sword and Shield attacks (timed to moves.mjs) ----
+// A blade direction plus where the sword arm reaches; the shield on its forearm.
+const TSw = (arm, fore, blade) => T_SWORD(arm, fore, blade);
+const lerpV = (a, b, t) => a.map((x, i) => lerp(x, b[i], t));
+const TG_SW = [
+  [0.35, -0.8, 0.3],
+  [0.05, -0.15, 1],
+  [0.1, 0.65, 0.75],
+];
+const TSh = (arm, fore, face) => T_SHIELD(arm, fore, face);
+const T_GUARD = {
+  ...crouch(0.18, 0.75, 6),
+  hips: { r: [4, 18, 0], p: [0, -0.06, 0] },
+  spine: [5, 0, 0],
+  chest: [4, -6, 0],
+  head: [-6, -10, 0],
+  ...TSw([0.35, -0.8, 0.3], [0.05, -0.15, 1], [0.1, 0.65, 0.75]),
+  ...TSh([-0.15, -0.8, 0.55], [0.8, 0, 0.6], [0.3, 0.05, 1]),
+};
+const TG = (p = {}) => mix(T_GUARD, p);
+// A stride for charging/ramming: legs pump at rate k strides per second.
+const pump = (t, k, amp = 40) => {
+  const s = sin(TAU * k * t),
+    c = cos(TAU * k * t);
+  return legs(
+    [amp * s, 30 + 50 * Math.max(0, c), 0, 4],
+    [-amp * s, 30 + 50 * Math.max(0, -c), 0, 4]
+  );
+};
+function tormundSword() {
+  const M = MOVESETS.tormund,
+    N = M.normal,
+    Cc = M.charge;
+  return {
+    // Rising slash: from low across his right hip up and out to his left.
+    TorN1: {
+      dur: N[0].dur,
+      keys: [
+        [0, TG()],
+        [
+          0.07,
+          TG({
+            hips: { r: [0, -16, 0] },
+            chest: [6, -18, 0],
+            ...TSw([-0.3, -0.75, 0.55], [-0.7, -0.55, 0.4], [-0.55, -0.7, 0.45]),
+          }),
+          0.8,
+        ],
+        [
+          0.17,
+          TG({
+            hips: { r: [-4, 26, 0], p: [0, -0.06, 0.08] },
+            chest: [-6, 22, 0],
+            head: [-2, -24, 0],
+            ...legs([30, 30, 0, 6], [-12, 24, 0, 6]),
+            ...TSw([0.65, 0.35, 0.65], [0.55, 0.7, 0.45], [0.55, 0.65, 0.5]),
+            tail1: [0, -20, 0],
+          }),
+          0.8,
+        ],
+        [
+          0.3,
+          TG({
+            hips: { r: [-2, 30, 0], p: [0, -0.06, 0.07] },
+            chest: [-4, 26, 0],
+            ...legs([28, 30, 0, 6], [-10, 24, 0, 6]),
+            ...TSw([0.75, 0.55, 0.1], [0.4, 0.9, -0.1], [0.3, 0.8, -0.5]),
+          }),
+          0.4,
+        ],
+        [N[0].dur, TG()],
+      ],
+    },
+    // Backhand: from high on his left, flat across to his right.
+    TorN2: {
+      dur: N[1].dur,
+      keys: [
+        [0, TG({ ...TSw([0.75, 0.55, 0.1], [0.4, 0.9, -0.1], [0.3, 0.8, -0.5]) })],
+        [
+          0.07,
+          TG({
+            hips: { r: [0, 30, 0] },
+            chest: [0, 20, 0],
+            ...TSw([0.85, 0.2, -0.3], [0.6, 0.3, -0.7], [0.4, 0.15, -0.9]),
+          }),
+          0.8,
+        ],
+        [
+          0.16,
+          TG({
+            hips: { r: [2, -16, 0], p: [0, -0.07, 0.08] },
+            chest: [4, -24, 0],
+            head: [-4, 16, 0],
+            ...legs([26, 34, 0, 6], [-14, 22, 0, 6]),
+            ...TSw([-0.1, 0.05, 1], [-0.65, 0.05, 0.75], [-0.85, 0.05, 0.5]),
+            tail1: [0, 24, 0],
+          }),
+          0.8,
+        ],
+        [
+          0.28,
+          TG({
+            hips: { r: [2, -22, 0] },
+            chest: [4, -28, 0],
+            ...TSw([-0.45, -0.2, 0.75], [-0.9, -0.2, 0.2], [-0.8, -0.25, -0.5]),
+          }),
+          0.4,
+        ],
+        [N[1].dur, TG()],
+      ],
+    },
+    // Shield bash: steps in shoulder-first and punches the shield out.
+    TorN3: {
+      dur: N[2].dur,
+      keys: [
+        [0, TG({ ...TSw([-0.45, -0.2, 0.75], [-0.9, -0.2, 0.2], [-0.8, -0.25, -0.5]) })],
+        [
+          0.08,
+          TG({
+            hips: { r: [0, 34, 0] },
+            chest: [0, 20, 0],
+            ...TSh([-0.5, -0.5, -0.3], [0.2, -0.1, 0.95], [0.6, 0, 0.8]),
+            ...TSw([0.6, -0.6, -0.3], [0.3, -0.4, 0.8], [0.3, 0.6, 0.7]),
+          }),
+          0.7,
+        ],
+        [
+          0.19,
+          TG({
+            hips: { r: [8, -8, 0], p: [0, -0.1, 0.12] },
+            spine: [10, 0, 0],
+            chest: [6, -20, 0],
+            head: [-12, 10, 0],
+            ...legs([38, 40, 0, 6], [-20, 20, 0, 6]),
+            ...TSh([-0.05, -0.05, 1], [0.25, 0.05, 1], [0, 0.05, 1]),
+            ...TSw([0.6, -0.6, -0.3], [0.3, -0.5, 0.8], [0.2, 0.6, 0.7]),
+          }),
+          0.3,
+        ],
+        [
+          0.34,
+          TG({
+            hips: { r: [6, -4, 0], p: [0, -0.09, 0.1] },
+            spine: [8, 0, 0],
+            ...legs([34, 38, 0, 6], [-18, 20, 0, 6]),
+            ...TSh([-0.1, -0.25, 0.95], [0.4, 0, 0.9], [0.1, 0, 1]),
+          }),
+          0.4,
+        ],
+        [N[2].dur, TG()],
+      ],
+    },
+    // Thrust: drives the sword point straight out, long step.
+    TorN4: {
+      dur: N[3].dur,
+      keys: [
+        [0, TG()],
+        [
+          0.1,
+          TG({
+            hips: { r: [0, -26, 0], p: [0, -0.08, -0.04] },
+            chest: [0, -14, 0],
+            ...TSw([0.6, -0.3, -0.6], [0.4, -0.1, 0.9], [0, 0.05, 1]),
+          }),
+          0.6,
+        ],
+        [
+          0.22,
+          TG({
+            hips: { r: [8, -34, 0], p: [0, -0.14, 0.18] },
+            spine: [8, 0, 0],
+            chest: [6, -18, 0],
+            head: [-12, 30, 0],
+            ...legs([50, 50, 0, 6], [-30, 14, 0, 6]),
+            ...TSw([0.1, 0, 1], [0.12, -0.05, 1], [-0.12, 0.1, 1]),
+            ...TSh([-0.6, -0.5, -0.4], [0.2, -0.5, 0.8], [0, 0, 1]),
+            tail1: [10, 20, 0],
+          }),
+          0.2,
+        ],
+        [
+          0.36,
+          TG({
+            hips: { r: [6, -30, 0], p: [0, -0.12, 0.16] },
+            ...legs([46, 48, 0, 6], [-26, 16, 0, 6]),
+            ...TSw([0.15, -0.05, 1], [0.15, -0.1, 1], [-0.1, 0.05, 1]),
+          }),
+          0.5,
+        ],
+        [N[3].dur, TG()],
+      ],
+    },
+    // Spinning cleave: one full turn with the blade out flat, finishing low.
+    TorN5: {
+      dur: N[4].dur,
+      fn: spinKeys(0.1, 0.42, 1, (u, t) => {
+        const e = sin(PI * clamp01((t - 0.02) / 0.7)),
+          low = smooth(clamp01((t - 0.3) / 0.12)) * (1 - smooth(clamp01((t - 0.55) / 0.3)));
+        return TG({
+          hips: { r: [6 * e, 0, 0], p: [0, -0.1 * e - 0.06 * low, 0] },
+          spine: [8 * e, 0, -6 * e],
+          chest: [0, 10 * e, -6 * e],
+          head: [0, -14 * e, 0],
+          ...legs([24 * e, 40 * e, 0, 14 * e], [10 * e, 40 * e, 0, 14 * e]),
+          ...TSw(
+            lerpV(TG_SW[0], [1, 0.1 - 0.3 * low, 0.15], e),
+            lerpV(TG_SW[1], [0.95, 0.05 - 0.3 * low, 0.3], e),
+            lerpV(TG_SW[2], [0.25, -0.1 * low, 1], e)
+          ),
+          ...TSh([-0.5, -0.7, 0.3], [0.6, -0.2, 0.7], [0, 0, 1]),
+          tail1: [8 * e, -30 * e, 0],
+          tail2: [0, -15 * e, 0],
+        });
+      }),
+    },
+    // C2 shield charge: shoulder down behind the shield, running three hits through the crowd.
+    TorC2: {
+      dur: Cc[1].dur,
+      fn: (p, t) => {
+        const e = smooth(clamp01(t / 0.1)) * (1 - smooth(clamp01((t - 0.55) / 0.22)));
+        return TG(
+          seq(
+            {
+              hips: { r: [18 * e, 30 * e, 0], p: [0, -0.1 * e, 0] },
+              spine: [14 * e, 0, 0],
+              chest: [6 * e, -10 * e, 0],
+              head: [-22 * e, -14 * e, 0],
+              ...TSh([-0.1, -0.15, 1], [0.75, 0, 0.65], [0.05, 0.05, 1]),
+              ...TSw([0.5, -0.7, -0.4], [0.3, -0.6, 0.6], [0.2, 0.1, -1]),
+              tail1: [20 * e, 0, 0],
+            },
+            mix(
+              legs([0, 0], [0, 0]),
+              (() => {
+                const l = pump(t, 3.2, 40 * e);
+                for (const k of Object.keys(l)) l[k] = l[k].map((x) => x * e);
+                return l;
+              })()
+            )
+          )
+        );
+      },
+    },
+    // C3 launcher cut: dips low, then a vertical upward slash that lifts him onto his toes.
+    TorC3: {
+      dur: Cc[2].dur,
+      keys: [
+        [0, TG()],
+        [
+          0.1,
+          TG({
+            ...crouch(0.6, 0.75, 6),
+            spine: [20, 0, 0],
+            chest: [10, 0, 0],
+            ...TSw([0.25, -0.9, 0.35], [0.1, -0.7, 0.7], [0.1, -0.5, 0.85]),
+          }),
+          0.7,
+        ],
+        [
+          0.22,
+          TG({
+            hips: { r: [-10, 4, 0], p: [0, 0.04, 0.06] },
+            spine: [-10, 0, 0],
+            chest: [-10, 6, 0],
+            head: [-20, 0, 0],
+            ...legs([20, 6, -30, 6], [-14, 6, -30, 6]),
+            ...TSw([0.25, 0.95, 0.25], [0.1, 1, 0.1], [0.05, 0.6, -0.8]),
+            tail1: [-20, 0, 0],
+          }),
+          0.4,
+        ],
+        [
+          0.42,
+          TG({
+            hips: { r: [-4, 4, 0] },
+            ...TSw([0.35, 0.8, 0.3], [0.2, 0.9, 0.2], [0.1, 0.2, -1]),
+          }),
+          0.4,
+        ],
+        [Cc[2].dur, TG()],
+      ],
+    },
+    // C4 guard-break: heaves the sword high behind his head, then chops straight down.
+    TorC4: {
+      dur: Cc[3].dur,
+      keys: [
+        [0, TG()],
+        [
+          0.34,
+          TG({
+            hips: { r: [-8, 6, 0], p: [0, -0.02, -0.04] },
+            spine: [-12, 0, 0],
+            chest: [-12, 0, 0],
+            head: [-10, 0, 0],
+            ...TSw([0.15, 0.95, -0.2], [-0.1, 0.4, -0.9], [0, 0.3, -1]),
+            ...TSh([-0.4, -0.5, 0.6], [0.6, 0.1, 0.75], [0.1, 0.2, 1]),
+            tail1: [-20, 0, 0],
+          }),
+          0.15,
+        ],
+        [
+          0.46,
+          TG({
+            ...crouch(0.6, 0.75, 8),
+            hips: { r: [20, 0, 0], p: [0, -0.1, 0.16] },
+            spine: [16, 0, 0],
+            chest: [10, 0, 0],
+            head: [-22, 0, 0],
+            ...TSw([0.08, -0.25, 1], [0, -0.55, 0.85], [0, -0.55, 0.85]),
+            ...TSh([-0.5, -0.6, 0.2], [0.5, -0.4, 0.75], [0.2, 0, 1]),
+            tail1: [20, 0, 0],
+          }),
+          0.1,
+        ],
+        [
+          0.7,
+          TG({
+            ...crouch(0.5, 0.75, 8),
+            hips: { r: [16, 0, 0], p: [0, -0.08, 0.14] },
+            spine: [12, 0, 0],
+            ...TSw([0.15, -0.4, 0.9], [0.05, -0.7, 0.7], [0, -0.75, 0.6]),
+          }),
+          0.4,
+        ],
+        [Cc[3].dur, TG()],
+      ],
+    },
+    // C5 sweeping arc: drops into a low crouch and cuts a full circle at ankle height, twice.
+    TorC5: {
+      dur: Cc[4].dur,
+      fn: spinKeys(0.14, 0.5, 2, (u, t) => {
+        const e = smooth(clamp01(t / 0.12)) * (1 - smooth(clamp01((t - 0.55) / 0.22)));
+        return TG({
+          ...crouch(0.7 * e, 0.75, 14),
+          hips: { r: [14 * e, 0, 0], p: [0, -0.12 * e, 0] },
+          spine: [12 * e, 0, -8 * e],
+          head: [-14 * e, 0, 0],
+          ...TSw(
+            lerpV(TG_SW[0], [1, -0.35, 0.1], e),
+            lerpV(TG_SW[1], [0.9, -0.5, 0.3], e),
+            lerpV(TG_SW[2], [0.2, -0.3, 1], e)
+          ),
+          ...TSh([-0.6, -0.6, 0.2], [0.4, -0.3, 0.8], [0, 0, 1]),
+          tail1: [10 * e, -30 * e, 0],
+        });
+      }),
+    },
+    // C6 leaping cleave: a big jump with the sword raised, crashing down in a crescent at the landing.
+    TorC6: {
+      dur: Cc[5].dur,
+      keys: [
+        [0, TG()],
+        [
+          0.1,
+          TG({
+            ...crouch(0.65, 0.75, 6),
+            spine: [18, 0, 0],
+            ...TSw([0.6, -0.6, -0.4], [0.3, -0.5, -0.7], [0.1, 0, -1]),
+          }),
+          0.6,
+        ],
+        [
+          0.3,
+          TG({
+            hips: { r: [-10, 0, 0] },
+            spine: [-10, 0, 0],
+            head: [-14, 0, 0],
+            ...legs([40, 70, 0, 6], [20, 60, 0, 6]),
+            ...TSw([0.25, 0.95, -0.1], [0.1, 0.5, -0.85], [0, 0.2, -1]),
+            ...TSh([-0.7, -0.3, 0.3], [0.3, 0, 0.9], [0, 0.2, 1]),
+          }),
+          0.6,
+        ],
+        [
+          0.74,
+          TG({
+            hips: { r: [-14, 0, 0] },
+            spine: [-14, 0, 0],
+            chest: [-8, 0, 0],
+            ...legs([30, 50, 0, 6], [10, 40, 0, 6]),
+            ...TSw([0.1, 1, -0.3], [-0.1, 0.3, -0.95], [0, -0.1, -1]),
+          }),
+          0.3,
+        ],
+        [
+          0.88,
+          TG({
+            ...crouch(0.75, 0.75, 10),
+            hips: { r: [24, 0, 0], p: [0, -0.18, 0.14] },
+            spine: [18, 0, 0],
+            chest: [10, 0, 0],
+            head: [-26, 0, 0],
+            ...TSw([0.05, -0.35, 1], [0, -0.7, 0.7], [0, -0.75, 0.65]),
+            ...TSh([-0.7, -0.4, 0.2], [0.3, -0.3, 0.9], [0, 0, 1]),
+            tail1: [25, 0, 0],
+          }),
+          0.1,
+        ],
+        [
+          1.0,
+          TG({
+            ...crouch(0.6, 0.75, 10),
+            hips: { r: [18, 0, 0], p: [0, -0.14, 0.12] },
+            spine: [14, 0, 0],
+            ...TSw([0.1, -0.5, 0.85], [0, -0.8, 0.6], [0, -0.85, 0.5]),
+          }),
+          0.4,
+        ],
+        [Cc[5].dur, TG()],
+      ],
+    },
+    // Jump attack, plunge: flips the sword point-down and drives it into the snow on landing.
+    TorJump: {
+      dur: M.jump.dur,
+      keys: [
+        [
+          0,
+          {
+            ...legs([30, 50, 0], [20, 40, 0]),
+            ...TSw([0.4, 0.5, 0.3], [0.2, 0.9, 0.2], [0.1, 0.2, 1]),
+          },
+        ],
+        [
+          0.14,
+          {
+            spine: [10, 0, 0],
+            head: [-10, 0, 0],
+            ...legs([40, 70, 0, 8], [30, 60, 0, 8]),
+            ...TSw([0.3, 0.9, 0.1], [0.1, 1, -0.1], [0.05, -1, 0.15]),
+            ...TSh([-0.6, -0.3, 0.5], [0.4, 0, 0.9], [0, 0, 1]),
+          },
+          0.6,
+        ],
+        [
+          0.3,
+          {
+            ...crouch(0.7, 0.75, 10),
+            spine: [24, 0, 0],
+            chest: [10, 0, 0],
+            head: [-26, 0, 0],
+            ...TSw([0.15, -0.6, 0.75], [0.05, -0.95, 0.3], [0, -1, 0.1]),
+            ...TSh([-0.6, -0.4, 0.5], [0.4, -0.3, 0.85], [0, 0, 1]),
+          },
+          0.2,
+        ],
+        [
+          0.48,
+          {
+            ...crouch(0.6, 0.75, 10),
+            spine: [20, 0, 0],
+            ...TSw([0.2, -0.6, 0.7], [0.05, -0.95, 0.3], [0, -1, 0.1]),
+          },
+          0.5,
+        ],
+        [M.jump.dur, TG()],
+      ],
+    },
+    // Dash attack, shield ram: a low running shove behind the shield.
+    TorDash: {
+      dur: M.dash.dur,
+      fn: (p, t) => {
+        const e = smooth(clamp01(t / 0.08)) * (1 - smooth(clamp01((t - 0.36) / 0.22))),
+          hit = Math.exp(-(((t - 0.18) / 0.07) ** 2));
+        const l = pump(t, 3.4, 38);
+        for (const k of Object.keys(l)) l[k] = l[k].map((x) => x * e);
+        return TG({
+          hips: { r: [20 * e, 32 * e, 0], p: [0, -0.1 * e, 0] },
+          spine: [10 * e + 6 * hit, 0, 0],
+          chest: [6 * e, -12 * e, 0],
+          head: [-24 * e, -16 * e, 0],
+          ...l,
+          ...TSh([-0.05, -0.1 * (1 - hit), 1], [0.75 - 0.1 * hit, 0.05, 0.65], [0.05, 0.1, 1]),
+          ...TSw([0.5, -0.7, -0.4], [0.3, -0.6, 0.6], [0.2, 0.1, -1]),
+        });
+      },
+    },
+    // Golden Crescent: a whirlwind of crescent cuts, then sword high and one great cleave forward.
+    TorSpecial: {
+      dur: M.special.dur,
+      fn: (p, t) => {
+        const up = smooth(clamp01(t / 0.25)),
+          stop = smooth(clamp01((t - 1.7) / 0.15)),
+          raise = smooth(clamp01((t - 1.72) / 0.26)) * (1 - smooth(clamp01((t - 1.98) / 0.07))),
+          slam = smooth(clamp01((t - 1.98) / 0.07)),
+          rest = smooth(clamp01((t - 2.2) / 0.2)),
+          // Three whole turns that ease in and out, so he ends facing forward for the cleave.
+          spinA = 360 * 3 * smooth(clamp01((t - 0.12) / 1.62)),
+          w = up * (1 - stop),
+          hold = slam * (1 - rest),
+          arm = (a, b, c, g) => lerp(lerp(lerp(a, b, raise), c, slam), g, rest),
+          swordOut = [1 - stop, 0.15, 0.1],
+          blade = [0.25 * (1 - stop), 0.2, 1];
+        return spinPose(
+          TG({
+            ...crouch(0.35 * w + 0.65 * hold, 0.75, 14),
+            hips: { r: [6 * w - 10 * raise + 22 * hold, 0, 0], p: [0, -0.12 * hold, 0.14 * hold] },
+            spine: [6 * w - 14 * raise + 16 * hold, 0, -8 * w],
+            head: [-12 * raise - 20 * hold, 0, 0],
+            ...TSw(
+              [
+                arm(swordOut[0], 0.15, 0.08, 0.35),
+                arm(swordOut[1], 0.95, -0.25, -0.8),
+                arm(swordOut[2], -0.2, 1, 0.3),
+              ],
+              [
+                arm(0.95 * (1 - stop), 0, 0, 0.05),
+                arm(0.1, 0.4, -0.55, -0.15),
+                arm(0.3, -0.9, 0.85, 1),
+              ],
+              [
+                arm(blade[0], 0, 0, 0.1),
+                arm(blade[1], 0.3, -0.55, 0.65),
+                arm(blade[2], -1, 0.85, 0.75),
+              ]
+            ),
+            ...TSh([-0.6, -0.5, 0.3], [0.5, -0.2, 0.8], [0, 0, 1]),
+            tail1: [10 * w, -30 * w, 0],
+          }),
+          -spinA
+        );
+      },
+    },
+    // Charging the Crescent cleave: sword drawn back low behind him, shield up.
+    Charge: {
+      dur: 0.5,
+      loop: true,
+      fn: (p) =>
+        TG({
+          ...crouch(0.4, 0.75, 10),
+          hips: { r: [6, 30, 0], p: [0, -0.08, -0.02] },
+          chest: [4, 10, 0],
+          head: [-6, -30, 0],
+          ...TSw([0.75, -0.45, -0.45], [0.5, -0.2, -0.85], [0.3 + 0.03 * S(p, 2), 0.2, -0.9]),
+          ...TSh([-0.1, -0.5, 0.85], [0.7, 0.1, 0.7], [0.25, 0.05, 1]),
+        }),
+    },
+    // Crescent cleave (hold move): impact at 0.42 of 1.05 s, a wide golden arc in front.
+    ChargeAttack: {
+      dur: 1.05,
+      keys: [
+        [
+          0,
+          TG({
+            ...crouch(0.4, 0.75, 10),
+            hips: { r: [6, 30, 0] },
+            ...TSw([0.75, -0.45, -0.45], [0.5, -0.2, -0.85], [0.3, 0.2, -0.9]),
+          }),
+        ],
+        [
+          0.3,
+          TG({
+            ...crouch(0.45, 0.75, 10),
+            hips: { r: [6, 40, 0], p: [0, -0.1, -0.04] },
+            chest: [0, 14, 0],
+            ...TSw([0.95, 0.1, -0.3], [0.6, 0.2, -0.8], [0.3, 0.3, -0.9]),
+          }),
+          0.8,
+        ],
+        [
+          0.42,
+          TG({
+            ...crouch(0.5, 0.75, 12),
+            hips: { r: [10, -24, 0], p: [0, -0.12, 0.12] },
+            chest: [6, -26, 0],
+            head: [-10, 20, 0],
+            ...TSw([-0.3, 0.05, 1], [-0.8, 0.05, 0.6], [-0.9, 0.1, 0.4]),
+            tail1: [0, 30, 0],
+          }),
+          0.8,
+        ],
+        [
+          0.62,
+          TG({
+            ...crouch(0.4, 0.75, 12),
+            hips: { r: [8, -34, 0], p: [0, -0.1, 0.1] },
+            chest: [6, -30, 0],
+            ...TSw([-0.85, -0.1, 0.3], [-0.9, -0.2, -0.4], [-0.6, -0.1, -0.8]),
+          }),
+          0.4,
+        ],
+        [1.05, TG()],
+      ],
+    },
+  };
+}
+
 // ---- Darren · Polka Scarf (timed to moves.mjs) ----
 // The scarf's free end is in his right paw; the ribbon itself is simulated in game.mjs (ScarfRibbon),
 // so these clips only have to swing the paw on clean arcs. A lash = wind back, whip the paw through
@@ -2361,7 +2947,7 @@ export const LIBRARY = {
     base: D_STANCE,
     clips: () => ({ ...darrenLocomotion(), ...darrenPaws(), ...darrenScarf() }),
   },
-  Tormund: { base: T_BASE, clips: () => ({ ...tormundLocomotion() }) },
+  Tormund: { base: T_BASE, clips: () => ({ ...tormundLocomotion(), ...tormundSword() }) },
 };
 
 // Builds every authored clip for one rig. Specs with fn/keys and dur become AnimationClips.

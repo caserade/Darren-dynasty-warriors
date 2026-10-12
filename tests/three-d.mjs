@@ -240,6 +240,48 @@ test('Scarf finishers and the hold-charge Polka Snare drag foes in; Polka Cyclon
   // Every foe on his level (this spot is a slope) took the cyclone's hits.
   assert(ring.filter((o) => Math.abs(o.y - g.player.y) < 1.6).every((o) => o.hp < 500));
 });
+test("Tormund's five-hit sword string, his finishers, plunge and shield ram", () => {
+  const g = fresh();
+  g.switchTo(1);
+  place(g, 40, 52);
+  for (const a of g.actors) if (a !== g.player) Object.assign(a, { x: 10, z: 10 });
+  const names = [];
+  for (let i = 0; i < 5; i++) {
+    assert(g.attack());
+    const q = g.player.action;
+    names.push(q.name);
+    while (g.player.action === q) tick(g, 1 / 60);
+  }
+  assert.deepEqual(names, ['TorN1', 'TorN2', 'TorN3', 'TorN4', 'TorN5']);
+  for (let n = 1; n <= 5; n++) {
+    const h = fresh();
+    h.switchTo(1);
+    for (let i = 0; i < n; i++) {
+      assert(h.attack());
+      while (!(h.player.action?.type === 'normal' && h.player.action.index === i)) tick(h, 1 / 60);
+    }
+    assert(h.chargeStart());
+    const q = h.player.action;
+    while (h.player.action === q) tick(h, 1 / 60);
+    assert.equal(h.player.action.name, 'TorC' + (n + 1));
+  }
+  tick(g, 1.5);
+  assert(g.jump());
+  tick(g, 0.2);
+  assert(g.attack());
+  assert.equal(g.player.action.name, 'TorJump');
+  tick(g, 1.5);
+  // The shield ram shrugs off a light hit (armor) and knocks grunts flat.
+  tick(g, 1.2, { x: 1, z: 0 });
+  const e = foe(g, 'gopher', g.player.x + 1.6, g.player.z);
+  e.hp = e.max = 500;
+  assert(g.attack());
+  assert.equal(g.player.action.name, 'TorDash');
+  g.hurtHero(8, Math.PI / 2);
+  assert.equal(g.player.action?.name, 'TorDash');
+  tick(g, 0.3);
+  assert(e.hp < 500 && e.state === 'down');
+});
 for (let i = 0; i < 3; i++)
   test(CAST[i] + ' charged attack reaches a practice post once', () => {
     const g = fresh();
@@ -367,8 +409,8 @@ function foe(g, type, x, z) {
   g.enemies.push(e);
   return e;
 }
-function fight(g, limit = 120) {
-  let route = null; // simple bot: walk to the nearest active foe and combo it
+function fight(g, limit = 120, boss = null) {
+  let route = null; // simple bot: walk to the nearest active foe and combo it (or go and find the boss)
   for (let t = 0; t < limit; t += 1 / 60) {
     const a = g.player;
     let e = g.engaged && !g.engaged.dead ? g.engaged : null;
@@ -383,6 +425,7 @@ function fight(g, limit = 120) {
         }
       }
     }
+    if (!e && boss && !boss.dead) e = boss;
     if (!e) {
       if (t > 1) return t;
       g.update(1 / 60);
@@ -675,7 +718,7 @@ test('Whole adventure with enemies: three camp bosses, the Baron, Ruffy home, th
       assert(b, 'no boss for ' + o.label);
       for (let k = 0; k < 4 && !g.bosses[b.camp]; k++) {
         near(g, b.x + 2.5, b.z + 2.5);
-        fight(g, 300);
+        fight(g, 300, b);
       }
       assert(g.bosses[b.camp], 'could not beat ' + b.name);
       continue;
