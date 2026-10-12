@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { buildManifest } = require('./game-manifest.cjs');
 const { createUpdater } = require('./updater.cjs');
+const { runtimeSettings } = require('./update-settings.cjs');
 
 const SCHEME = 'snowday';
 const HOST = 'game';
@@ -33,9 +34,7 @@ function updateConfig() {
         ? path.join(process.resourcesPath, 'update-config.json')
         : path.join(__dirname, 'update-config.json')
     ) || {};
-  if (process.env.SNOWDAY_UPDATE_URL) cfg.baseUrl = process.env.SNOWDAY_UPDATE_URL;
-  if (process.env.SNOWDAY_UPDATE_TOKEN) cfg.token = process.env.SNOWDAY_UPDATE_TOKEN;
-  return process.env.SNOWDAY_NO_UPDATES === '1' ? {} : cfg;
+  return runtimeSettings(cfg);
 }
 let updater = null;
 

@@ -5,9 +5,11 @@
 // icon and file details into the .exe itself).
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const { execFileSync } = require('node:child_process');
-const { packager } = require('@electron/packager');
 const { gameManifest } = require('../tools/publish-game-update.cjs');
+const { publicSettings } = require('./update-settings.cjs');
+const { assertBuildEnvironment, assertSafeTree, stageApp } = require('./package-security.cjs');
 
 const here = __dirname;
 const pkg = require('./package.json');
@@ -19,98 +21,113 @@ const folderName = platform === 'win32' ? 'Darren-Snowday-Windows' : 'Darren-Sno
 const exeName = 'Darren Snowday';
 
 (async () => {
-  const dest = path.join(out, folderName);
-  const zip = path.join(out, folderName + '.zip');
-  fs.rmSync(dest, { recursive: true, force: true });
-  fs.rmSync(zip, { force: true });
-  const [built] = await packager({
-    dir: here,
-    out,
-    name: exeName,
-    executableName: exeName,
-    platform,
-    arch: 'x64',
-    electronVersion: require('electron/package.json').version,
-    asar: true,
-    prune: false,
-    overwrite: true,
-    ignore: [
-      /^\/out($|\/)/,
-      /^\/node_modules($|\/)/,
-      /^\/build-windows\.cjs$/,
-      /^\/icon\.ico$/,
-      /^\/README/,
-      /^\/update-config\.json$/,
-      /^\/update-token\.txt$/,
-    ],
-    icon: path.join(here, 'icon.ico'),
-    appVersion: pkg.version,
-    appCopyright: 'Private game for Michael',
-    win32metadata: {
-      CompanyName: 'Michael (private)',
-      FileDescription: pkg.productName,
-      ProductName: pkg.productName,
-      InternalName: exeName,
-    },
-  });
-  fs.renameSync(built, dest);
-
-  // The games themselves: ../dist copied beside the app as resources/game.
-  fs.cpSync(path.join(here, '..', 'dist'), path.join(dest, 'resources', 'game'), {
-    recursive: true,
-  });
-  // What the bundled game is, so the app downloads only newer games and only changed files.
-  const manifest = gameManifest(path.join(dest, 'resources', 'game'));
-  fs.writeFileSync(path.join(dest, 'resources', 'game-manifest.json'), JSON.stringify(manifest));
-  // Where updates come from. The private repo needs a read-only key: SNOWDAY_UPDATE_TOKEN or
-  // desktop-app/update-token.txt (never committed). Without one the app reads a public repo.
-  const config = JSON.parse(fs.readFileSync(path.join(here, 'update-config.json'), 'utf8'));
-  let token = process.env.SNOWDAY_UPDATE_TOKEN || '';
+  assertBuildEnvironment();
+  // Validate before creating any distributable; never read update-token.txt.
+  assertSafeTree(here, { skip: (rel) => /^(?:node_modules|out)(?:\/|$)/.test(rel) });
+  const config = publicSettings(JSON.parse(fs.readFileSync(path.join(here, 'update-config.json'), 'utf8')));
+  assertSafeTree(path.join(here, '..', 'dist'));
+  const staging = fs.mkdtempSync(path.join(os.tmpdir(), 'snowday-package-'));
   try {
-    token = token || fs.readFileSync(path.join(here, 'update-token.txt'), 'utf8').trim();
-  } catch {}
-  if (token) config.token = token;
-  else console.log('No update key found: the app will only see updates from a public repo.');
-  fs.writeFileSync(path.join(dest, 'resources', 'update-config.json'), JSON.stringify(config));
-  console.log(`Bundled game build ${manifest.build} (${manifest.commit}) "${manifest.notes}"`);
+    const appSource = path.join(staging, 'app');
+    stageApp(here, appSource);
+    const dest = path.join(staging, folderName);
+    const zip = path.join(staging, folderName + '.zip');
+    const { packager } = require('@electron/packager');
+    const [built] = await packager({
+      dir: appSource,
+      out: path.join(staging, 'build'),
+      name: exeName,
+      executableName: exeName,
+      platform,
+      arch: 'x64',
+      electronVersion: require('electron/package.json').version,
+      asar: true,
+      prune: false,
+      overwrite: true,
+      ignore: [
+        /^\/out($|\/)/,
+        /^\/node_modules($|\/)/,
+        /^\/build-windows\.cjs$/,
+        /^\/icon\.ico$/,
+        /^\/README/,
+        /^\/update-config\.json$/,
+        /^\/update-token\.txt$/,
+      ],
+      icon: path.join(here, 'icon.ico'),
+      appVersion: pkg.version,
+      appCopyright: 'Private game for Michael',
+      win32metadata: {
+        CompanyName: 'Michael (private)',
+        FileDescription: pkg.productName,
+        ProductName: pkg.productName,
+        InternalName: exeName,
+      },
+    });
+    fs.renameSync(built, dest);
 
-  fs.writeFileSync(
-    path.join(dest, 'HOW-TO-PLAY.txt'),
-    [
-      "Darren's Snowday Search for Windows",
-      '',
-      'Double-click "Darren Snowday.exe" to play. Keep this whole folder together;',
-      'the .exe needs the files beside it. You can right-click the .exe and choose',
-      'Send to > Desktop (create shortcut) to start it from the desktop.',
-      '',
-      'Windows may say "Windows protected your PC" the first time, because the app is',
-      'not signed by a paid publisher certificate. Click "More info", then "Run anyway".',
-      '',
-      'The start screen lets you pick the pixel or the 3D adventure. Ctrl+H comes back',
-      'to it, Ctrl+1 / Ctrl+2 jump straight to a game, F11 is full screen. Controllers,',
-      'keyboard and mouse work as in the browser versions.',
-      '',
-      'Updates: the app checks for a newer game every time it starts and downloads only the',
-      'changed game files. The start screen says when it updated. You do not need to',
-      'download this folder again unless the start screen says a new copy of the app is needed.',
-      '',
-      "Saves live in %APPDATA%\\Darren's Snowday Search (Test > Open save folder).",
-      'They are separate from saves made in a web browser.',
-      '',
-    ].join('\r\n')
-  );
+    // The games themselves: ../dist copied beside the app as resources/game.
+    fs.cpSync(path.join(here, '..', 'dist'), path.join(dest, 'resources', 'game'), {
+      recursive: true,
+    });
+    // What the bundled game is, so the app downloads only newer games and only changed files.
+    const manifest = gameManifest(path.join(dest, 'resources', 'game'));
+    fs.writeFileSync(path.join(dest, 'resources', 'game-manifest.json'), JSON.stringify(manifest));
+    // Only public source settings are distributed. Authentication is supplied at launch.
+    fs.writeFileSync(path.join(dest, 'resources', 'update-config.json'), JSON.stringify(config));
+    console.log(`Bundled game build ${manifest.build} (${manifest.commit}) "${manifest.notes}"`);
 
-  try {
-    if (process.platform === 'win32')
-      execFileSync('powershell', [
-        '-NoProfile',
-        '-Command',
-        `Compress-Archive -Path '${dest}' -DestinationPath '${zip}' -Force`,
-      ]);
-    else execFileSync('zip', ['-qry', zip, folderName], { cwd: out });
-    console.log('Built ' + zip);
-  } catch {
-    console.log('Built ' + dest + ' (no zip tool found; zip that folder to share it).');
+    fs.writeFileSync(
+      path.join(dest, 'HOW-TO-PLAY.txt'),
+      [
+        "Darren's Snowday Search for Windows",
+        '',
+        'Double-click "Darren Snowday.exe" to play. Keep this whole folder together;',
+        'the .exe needs the files beside it. You can right-click the .exe and choose',
+        'Send to > Desktop (create shortcut) to start it from the desktop.',
+        '',
+        'Windows may say "Windows protected your PC" the first time, because the app is',
+        'not signed by a paid publisher certificate. Click "More info", then "Run anyway".',
+        '',
+        'The start screen lets you pick the pixel or the 3D adventure. Ctrl+H comes back',
+        'to it, Ctrl+1 / Ctrl+2 jump straight to a game, F11 is full screen. Controllers,',
+        'keyboard and mouse work as in the browser versions.',
+        '',
+        'Updates: the app checks for a newer game every time it starts and downloads only the',
+        'changed game files. The start screen says when it updated. You do not need to',
+        'download this folder again unless the start screen says a new copy of the app is needed.',
+        'This folder and ZIP contain no update key. Private updates require your own local',
+        'SNOWDAY_UPDATE_TOKEN environment variable when launching; never put a key in this folder.',
+        'Without access, the bundled game still works. Public updates require no key.',
+        '',
+        "Saves live in %APPDATA%\\Darren's Snowday Search (Test > Open save folder).",
+        'They are separate from saves made in a web browser.',
+        '',
+      ].join('\r\n')
+    );
+
+    assertSafeTree(dest);
+    try {
+      if (process.platform === 'win32')
+        execFileSync('powershell', [
+          '-NoProfile',
+          '-Command',
+          "$ErrorActionPreference = 'Stop'; Add-Type -AssemblyName System.IO.Compression.FileSystem; " +
+            `[System.IO.Compression.ZipFile]::CreateFromDirectory('${dest.replace(/'/g, "''")}', '${zip.replace(/'/g, "''")}', [System.IO.Compression.CompressionLevel]::Optimal, $true)`,
+        ]);
+      else execFileSync('zip', ['-qry', zip, folderName], { cwd: staging });
+    } catch {
+      fs.rmSync(zip, { force: true });
+      console.log('No zip tool available; the checked app folder can be zipped manually.');
+    }
+    // Only expose checked outputs. A failed guard leaves no new distributable behind.
+    fs.mkdirSync(out, { recursive: true });
+    fs.rmSync(path.join(out, folderName), { recursive: true, force: true });
+    fs.rmSync(path.join(out, folderName + '.zip'), { force: true });
+    fs.renameSync(dest, path.join(out, folderName));
+    if (fs.existsSync(zip)) fs.renameSync(zip, path.join(out, folderName + '.zip'));
+    console.log('Built ' + path.join(out, folderName));
+  } finally {
+    fs.rmSync(staging, { recursive: true, force: true });
   }
 })().catch((e) => {
   console.error(e);

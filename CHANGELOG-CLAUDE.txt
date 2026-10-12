@@ -406,10 +406,11 @@ HOW UPDATES ARE PUBLISHED
   the changelog), GitHub runs tools/publish-game-update.cjs and replaces the game-updates
   branch with latest.json + game/. Future threads only need to get their change merged
   into main; no zip rebuild and no upload.
-- The repo is private, so the app carries a read-only GitHub key (the recommended option; michael
-  is choosing on 2026-10-12). It is put into the build from desktop-app/update-token.txt or
-  SNOWDAY_UPDATE_TOKEN and is never committed. Without a key the app can only read a
-  public repo.
+- Corrected by the credential-free packaging fix: the private repo's key is never
+  carried by the app or ZIP. Supply SNOWDAY_UPDATE_TOKEN only on your own PC when
+  launching the app. Build-time keys and update-token.txt are refused. Without local
+  access, private updates fail safely and the bundled game remains playable; public
+  updates need no key. See desktop-app/README.md for local launch instructions.
 - A new app zip is needed only when desktop-app/ itself changes (raise package.json version
   and MIN_APP in tools/publish-game-update.cjs).
 
@@ -424,3 +425,17 @@ FILES
   gains 5 update checks. dist/ is unchanged.
 - This branch also carries update 5 (PR #1, the app) and update 6 (PR #2, animation) merged
   together, so merging it alone brings everything to main.
+
+CREDENTIAL-FREE PACKAGING FIX · 2026-10-12
+- Desktop shell 1.1.1 never packages a GitHub credential. Private update access comes
+  only from the user's local launch environment; public updates and bundled fallback
+  remain available. No credential was configured or used to test private updates.
+- Build-time update keys, credential-like files, unsafe config fields, recognizable
+  GitHub tokens/private keys and links fail packaging. An explicit runtime file list
+  and a temporary build directory keep stray files and failed builds out of outputs.
+- The game-update publisher and project return-ZIP staging share the guards. Return
+  archives omit nested dependencies and old app outputs. No gameplay or art changes.
+- Update manifests require shell 1.1.1 so older shells request a replacement app.
+  No binary was published; source integration and a later approved release are needed.
+- Added 10 synthetic packaging/runtime tests to npm test. No dependencies changed.
+  Windows ZIP generation uses .NET compression without PowerShell module autoloading.
