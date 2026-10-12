@@ -831,8 +831,18 @@ export class Game {
     return true;
   }
   dodge() {
-    const a = this.player;
-    if (this.paused || a.action || a.charging || a.energy < 18) return false;
+    const a = this.player,
+      inp = this.input;
+    if (this.paused || a.action || a.charging) return false;
+    // Tormund standing still raises his shield instead: a parry window that answers with a counter-cut.
+    const set = this.moveset();
+    if (set.parry && a.air <= 0 && !(inp && Math.hypot(inp.x, inp.z) > 0.2)) {
+      if (a.energy < 10) return false;
+      a.energy -= 10;
+      this.startAction('Parry', set.parry.dur);
+      return true;
+    }
+    if (a.energy < 18) return false;
     a.energy -= 18;
     this.startAction('Dodge', 0.55);
     return true;
@@ -1159,6 +1169,27 @@ export class Game {
         a.action.time <= a.action.move.inv[1])
     )
       return false;
+    const parry = this.moveset().parry;
+    if (
+      parry &&
+      a.action?.name === 'Parry' &&
+      a.action.time <= parry.window &&
+      Math.abs(angleDiff(angle, a.yaw + Math.PI)) < Math.PI * 0.6
+    ) {
+      // Blocked from the front: the attacker reels and Tormund cuts back at once.
+      for (const e of this.enemies)
+        if (!e.dead && Math.hypot(e.x - a.x, e.z - a.z) < 3.2 + e.r && !e.boss) {
+          e.state = 'hurt';
+          e.st = 0.6;
+        }
+      this.stats.parries = (this.stats.parries || 0) + 1;
+      a.mus = Math.min(100, (a.mus || 0) + 6);
+      this.emit('parry', { actor: this.selected, x: a.x, z: a.z, y: a.y + 1.3 });
+      this.emit('hitstop', { t: 0.09 });
+      this.startMove(a, parry.counter, 'counter');
+      a.inv = Math.max(a.inv, 0.35);
+      return false;
+    }
     damage = Math.max(1, Math.round(damage * (this.mode === 'cozy' ? 0.55 : 1)));
     a.hp -= damage;
     a.inv = 0.7;

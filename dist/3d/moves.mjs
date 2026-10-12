@@ -17,6 +17,7 @@
 //   lunge  [[t0, t1, speed]] forward travel     hop  { t, vy } small jump
 //   pulse  { from, to, every, r, dmg, kb, shots } repeated hits (specials)
 //   inv    [t0, t1] untouchable      armor  shrugs off staggers    steer  move while attacking
+//   parry  (moveset) { dur, window, counter }: dodge from standing blocks hits, then counters
 const TAU = Math.PI * 2;
 
 // ---- Darren · Bare Paws: a quick, bouncy brawler who fights with paws, tail and wings ----
@@ -257,6 +258,18 @@ const SCARF = {
 // Crescent cleave power move (ChargeAttack in sim.mjs).
 const TORMUND = {
   name: 'Sword and Shield',
+  // Dodge while standing still: shield up; a hit from the front inside the window is blocked and
+  // answered with the counter-cut.
+  parry: {
+    dur: 0.5,
+    window: 0.32,
+    counter: {
+      anim: 'TorCounter',
+      dur: 0.55,
+      lunge: [[0, 0.12, 3]],
+      hits: [{ t: 0.14, r: 2.6, arc: 2.6, dmg: 30, kb: 10, down: true }],
+    },
+  },
   normal: [
     {
       anim: 'TorN1',

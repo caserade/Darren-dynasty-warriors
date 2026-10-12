@@ -4,6 +4,7 @@ import { World, Game, CAST, KITS, BELLY, MOVE_WIND, clamp } from './sim.mjs';
 import { buildRig, Animator } from './anim.mjs';
 import { buildClips } from './clips.mjs';
 import { ScarfRibbon } from './ribbon.mjs';
+import { WeaponTrail } from './trail.mjs';
 
 const $ = (id) => document.getElementById(id),
   canvas = $('view'),
@@ -672,6 +673,11 @@ function events() {
     if (e.type === 'snowburst') ring(e);
     if (e.type === 'throw') tone(380, 0.2);
     if (e.type === 'hitstop') hitstop = Math.max(hitstop, e.t);
+    if (e.type === 'parry') {
+      ring({ x: e.x, z: e.z, y: e.y - 1.2, r: 1.6, strong: true, color: 0xfff1b0 });
+      floater(e.x, e.y + 0.3, e.z, 'PARRY!', 'heal');
+      tone(1180, 0.12, 0.05);
+    }
     if (e.type === 'special') {
       banner(e.name, 'SPECIAL');
       tone(196, 0.5, 0.06);
@@ -1343,6 +1349,15 @@ function heroPose(a, i, h) {
     return { ...d, key: 'land', clip: 'Land', time: an.landT, blend: 0.05 };
   return { ...d, key: 'loco', clip: 'Idle', blend: an.current === 'land' ? 0.2 : 0.18 };
 }
+// A weapon trail shows from just before a move's first hit until just after its last.
+function swinging(a) {
+  const q = a.action,
+    m = q?.move;
+  if (!m && q?.name === 'ChargeAttack') return q.time > 0.28 && q.time < 0.65;
+  if (!m) return !!(a.assist && a.assist.time > 0.1 && a.assist.time < 0.45);
+  if (m.pulse && q.time > m.pulse.from - 0.1 && q.time < m.pulse.to + 0.1) return true;
+  return (m.hits || []).some((h) => q.time > h.t - 0.12 && q.time < h.t + 0.1);
+}
 // How hard Darren's scarf is drawn out straight: peaks on each lash's hit frame, steady in spins.
 function scarfPull(a) {
   if (a.charging) return 0.25;
@@ -1394,6 +1409,7 @@ function updateScene(dt) {
       h.base.y * sq,
       (h.base.z * (1 + 0.07 * belly)) / Math.sqrt(sq)
     );
+    if (h.trail) h.trail.update(game.paused ? 0 : dt, swinging(a));
     if (h.ribbon) {
       h.ribbon.setActive(game.style === 'scarf');
       h.ribbon.floor = world.height(a.x, a.z) + 0.03;
@@ -1667,7 +1683,15 @@ async function boot() {
       const hide = [];
       if (i === 0)
         root.traverse((o) => o.isMesh && /^Scarf_(tail|polka)/.test(o.name) && hide.push(o));
+      // Sword (Tormund) and mallet head (Bucky) leave a short trail through each swing.
+      const trail =
+        i === 1
+          ? new WeaponTrail(scene, rig, rig.role.handL, 0.2, 0.82, 0xffd77a)
+          : i === 2
+            ? new WeaponTrail(scene, rig, rig.role.handL, 0.3, 0.62, 0xbfe4ff)
+            : null;
       heroes.push({
+        trail,
         ribbon: i === 0 ? new ScarfRibbon(scene, rig, hide) : null,
         root,
         animator,

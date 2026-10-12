@@ -2281,6 +2281,133 @@ function tormundSword() {
         );
       },
     },
+    // Parry: shield snaps up in front, braced on bent knees.
+    Parry: {
+      dur: M.parry.dur,
+      keys: [
+        [0, TG()],
+        [
+          0.06,
+          TG({
+            ...crouch(0.35, 0.75, 10),
+            hips: { r: [6, 26, 0], p: [0, -0.08, -0.03] },
+            chest: [6, 8, 0],
+            head: [-10, -22, 0],
+            ...TSh([-0.1, -0.25, 1], [0.75, 0.25, 0.6], [0.15, 0.15, 1]),
+            ...TSw([0.6, -0.55, -0.2], [0.3, -0.3, 0.9], [0.2, 0.5, 0.8]),
+          }),
+          0.2,
+        ],
+        [
+          0.32,
+          TG({
+            ...crouch(0.3, 0.75, 10),
+            hips: { r: [4, 24, 0], p: [0, -0.07, -0.02] },
+            chest: [4, 8, 0],
+            ...TSh([-0.1, -0.25, 1], [0.75, 0.25, 0.6], [0.15, 0.15, 1]),
+          }),
+          0.4,
+        ],
+        [M.parry.dur, TG()],
+      ],
+    },
+    // Counter-cut straight out of the block: a fast diagonal cut down from his left shoulder.
+    TorCounter: {
+      dur: M.parry.counter.dur,
+      keys: [
+        [
+          0,
+          TG({
+            ...crouch(0.3, 0.75, 10),
+            hips: { r: [4, 24, 0] },
+            ...TSh([-0.1, -0.25, 1], [0.75, 0.25, 0.6], [0.15, 0.15, 1]),
+            ...TSw([0.75, 0.6, -0.1], [0.4, 0.8, -0.4], [0.2, 0.5, -0.8]),
+          }),
+        ],
+        [
+          0.14,
+          TG({
+            hips: { r: [8, -24, 0], p: [0, -0.1, 0.12] },
+            chest: [8, -26, 0],
+            head: [-10, 20, 0],
+            ...legs([36, 40, 0, 6], [-20, 20, 0, 6]),
+            ...TSw([-0.2, -0.2, 1], [-0.7, -0.4, 0.6], [-0.6, -0.55, 0.55]),
+            ...TSh([-0.55, -0.6, 0.2], [0.4, -0.3, 0.85], [0, 0, 1]),
+            tail1: [0, 26, 0],
+          }),
+          0.6,
+        ],
+        [
+          0.3,
+          TG({
+            hips: { r: [6, -24, 0], p: [0, -0.08, 0.1] },
+            chest: [6, -28, 0],
+            ...TSw([-0.5, -0.5, 0.6], [-0.85, -0.45, 0], [-0.6, -0.6, -0.5]),
+          }),
+          0.4,
+        ],
+        [M.parry.counter.dur, TG()],
+      ],
+    },
+    // Victory flourish: a twirl of the sword, then raised high with the shield on his chest.
+    Celebrate: {
+      dur: 1.8,
+      fn: (p, t) => {
+        const tw = smooth(clamp01((t - 0.1) / 0.5)),
+          up = smooth(clamp01((t - 0.55) / 0.3)),
+          down = smooth(clamp01((t - 1.45) / 0.3)),
+          k = up * (1 - down),
+          a = TAU * 1.5 * tw;
+        return {
+          hips: { r: [0, 12 * (1 - k), 0], p: [0, 0.02 * k, 0] },
+          spine: [-6 * k, 0, 0],
+          chest: [-8 * k, 0, 0],
+          head: [-14 * k, 0, 0],
+          ...legs([0, 4, 0, 6], [0, 4, 0, 6]),
+          ...T_SWORD(
+            lerpV([0.6, -0.4, 0.6], [0.2, 1, 0.1], k),
+            lerpV([0.4, -0.1 + 0.3 * sin(a), 0.9], [0.1, 1, 0.15], k),
+            lerpV([sin(a) * 0.9, cos(a), 0.4], [0.05, 0.95, 0.3], k)
+          ),
+          ...T_SHIELD([-0.2, -0.8, 0.45], [0.8, 0.15 * k, 0.55], [0.2, 0.05, 1]),
+          ...tailWave(3, p * 3, 18 * k, 0, 0.1),
+        };
+      },
+    },
+    // Interact: kneels on one knee to look, sword resting point-down.
+    Interact: {
+      dur: 1.1,
+      keys: [
+        [0, {}],
+        [
+          0.35,
+          {
+            hips: { p: [0, -0.32, 0.05] },
+            spine: [16, 0, 0],
+            chest: [8, 0, 0],
+            head: [16, 0, 0],
+            ...legs([70, 80, 0, 4], [-10, 95, 0, 4]),
+            ...T_SWORD([0.3, -0.7, 0.5], [0.05, -0.6, 0.8], [0.05, -1, 0.1]),
+            ...T_SHIELD([-0.35, -0.8, 0.3], [0.2, -0.9, 0.4], [0, 0, 1]),
+          },
+          0.3,
+        ],
+        [
+          0.8,
+          {
+            hips: { p: [0, -0.32, 0.05] },
+            spine: [16, 0, 0],
+            chest: [8, 0, 0],
+            head: [10, 8, 0],
+            ...legs([70, 80, 0, 4], [-10, 95, 0, 4]),
+            ...T_SWORD([0.3, -0.7, 0.5], [0.05, -0.6, 0.8], [0.05, -1, 0.1]),
+            ...T_SHIELD([-0.35, -0.8, 0.3], [0.2, -0.9, 0.4], [0, 0, 1]),
+          },
+          0.3,
+        ],
+        [1.1, {}],
+      ],
+    },
     // Charging the Crescent cleave: sword drawn back low behind him, shield up.
     Charge: {
       dur: 0.5,

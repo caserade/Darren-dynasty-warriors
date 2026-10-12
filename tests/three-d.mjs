@@ -282,6 +282,35 @@ test("Tormund's five-hit sword string, his finishers, plunge and shield ram", ()
   tick(g, 0.3);
   assert(e.hp < 500 && e.state === 'down');
 });
+test('Tormund parries from a standstill and counters; with the stick held he still rolls', () => {
+  const g = fresh();
+  g.switchTo(1);
+  place(g, 40, 52, 0);
+  for (const a of g.actors) if (a !== g.player) Object.assign(a, { x: 10, z: 10 });
+  const e = foe(g, 'gopher', 40, 53.5);
+  e.hp = e.max = 500;
+  e.speed = 0;
+  g.update(1 / 60, { x: 0, z: 0 });
+  assert(g.dodge());
+  assert.equal(g.player.action.name, 'Parry');
+  const hp = g.player.hp;
+  // A blow from the front (the attacker stands ahead, so it pushes him back: angle = yaw + pi).
+  assert.equal(g.hurtHero(12, Math.PI), false);
+  assert.equal(g.player.hp, hp);
+  assert.equal(g.player.action.name, 'TorCounter');
+  assert.equal(e.state, 'hurt');
+  tick(g, 0.3);
+  assert(e.hp < 500);
+  tick(g, 1);
+  // From behind, the shield does nothing.
+  assert(g.dodge());
+  assert(g.hurtHero(12, 0));
+  assert(g.player.hp < hp);
+  tick(g, 2);
+  g.update(1 / 60, { x: 1, z: 0 });
+  assert(g.dodge());
+  assert.equal(g.player.action.name, 'Dodge');
+});
 for (let i = 0; i < 3; i++)
   test(CAST[i] + ' charged attack reaches a practice post once', () => {
     const g = fresh();
