@@ -1,6 +1,6 @@
 # Standalone Windows desktop app
 
-Version 1.2.0 runs both bundled games in one window with nothing else to install.
+Version 1.3.0 (studio pass for Darren) runs both bundled games in one window with nothing else to install.
 There is no updater: no startup check, background download, update prompt, credentials,
 or switch to a previously downloaded game. It always serves `resources/game` (or
 `../dist` when running from a checkout).

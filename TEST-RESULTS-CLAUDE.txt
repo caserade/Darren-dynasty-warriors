@@ -1,3 +1,33 @@
+TEST RESULTS · CLAUDE UPDATE 8 (DARREN STUDIO PASS · 3D ONLY) · 2026-10-12
+All runs below were made in a Linux container on branch claude/darren-studio-pass-09el4h,
+with headless Chromium using software WebGL (SwiftShader). Earlier results further down are
+history, not verification of this branch.
+
+npm test (node 22.22): all pass.
+  tests/three-d.mjs 44 checks (new: Darren's hits say who struck and which way), new
+  tests/darren-model.cjs 7 checks, shared-save 8, gameplay, firewood, phone, controllers,
+  screen-fit, tools/verify-scene.cjs, desktop packaging + standalone 9.
+darren.glb passes the glTF validator with no errors (6 notes that skinned meshes sit under
+  a parent node, as in the supplied file).
+tests/browser-qa.cjs: 63 of 63. The log keeps the known harmless net::ERR_ABORTED line for a
+  streamed .glb.
+Extra browser play-through (project files qa/moves-qa.cjs): 16 of 16, every hero's string,
+  charge and special, the Polka Scarf, Tormund's parry, 8 fps stability, style in the save.
+Darren review sheets (tools/review): turnarounds, skin-weight views and six frames of each
+  of his 46 clips were rendered and looked at after each pass; in-game shots checked the
+  paw trails, impact stars, snow chips and the scarf whip.
+tests/desktop-app.cjs under xvfb-run: 13 of 13 from the checkout.
+Windows build: npm run build:win produced the 1.3.0 x64 zip; its resources/game is
+  identical to dist/. Copied to project files desktop-app/Darren-Snowday-Windows.zip.
+Pixel game: no file under dist/ outside dist/3d/ changed. Tormund's and Bucky's models and
+  clips are unchanged.
+
+LIMITS
+- Not run on a real Windows PC, real GPU, physical controller, phone or Mac. How the gloss,
+  shading and effects look on a real graphics card and how they affect frame rate were not
+  measured.
+- The look was judged from renders against the approved design, not by an artist.
+
 TEST RESULTS · CLAUDE UPDATE 7 (FULL QUALITY CHECK, NO UPDATER, FRESH CLONE) · 2026-10-12
 All runs below were made in a Linux container on this branch (claude/full-qa-gdog2s), with
 headless Chromium using software WebGL (SwiftShader) at 1-3 fps. Earlier results further

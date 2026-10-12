@@ -418,3 +418,61 @@ Fresh clone from GitHub:
 - README/START-HERE say the Windows zip is not stored in GitHub and how to build it.
 - package-lock.json added for the root test dependency.
 Windows zip rebuilt from this branch (1.2.0, no updater) and replaced in the project files.
+
+CLAUDE UPDATE 8 · DARREN STUDIO PASS (3D ONLY, DARREN ONLY) · 2026-10-12
+Michael asked for Darren to be brought up to the level of a well-made studio game: a full
+scan of his model first, then four fix passes. Tormund and Bucky are untouched; they wait
+for Michael's go-ahead. The pixel game is untouched. Scan report with before pictures:
+project files darren-studio/scan.md.
+
+HOW THE MODEL IS MADE NOW
+- art-source/darren-3d-original.glb is the supplied model as it first arrived (from git).
+- tools/darren-model.mjs rebuilds dist/3d/assets/darren.glb from it, every step in code
+  (needs gltf-transform + sharp via npm i --no-save, like tools/shrink-models.mjs).
+- tools/review/ renders turnarounds, skin-weight views and frame-by-frame sheets of every
+  clip with the game's own animation code (node tools/review/shoot.cjs <out> <jobs.json>).
+
+PASS 2 · RIG AND SKIN
+- Skin weights rebuilt: the head bone moves only the head (it used to twist the chest,
+  belly and part of a wing), the wing bones only the wings (they used to pull his cheek),
+  the feet follow their bones fully, eyes and brows ride the head.
+- Elbows: hand_L/hand_R moved from the paw tip to mid-arm and now carry forearm and paw,
+  so the forearm aims every clip already had finally bend his arms.
+- Knees: new shin_L/shin_R bones between leg and foot (anim.mjs roles shinL/shinR).
+- The 11 supplied clips inside the file are gone (all were replaced by clips.mjs or were
+  frozen); game.mjs falls back to Idle when a hero has no Attack1.
+
+PASS 3 · MODEL AND LOOK
+- Head: the row of four spikes is smoothed into the skull (rebuilt as an even, fold-free
+  patch) and one curved horn sweeping back grows in its place, as in the approved design.
+  The old spike paint on the crown is covered with the crown's own red.
+- Scarf: the faceted ring, flat box and three balls are replaced by a soft knitted collar,
+  a knot and two loose ends, yellow with big pink dots (generated texture). The ends keep
+  the "Scarf tail" names the game hides while the long scarf whip is out.
+- Glossy finish (clearcoat) instead of one rough matte coat, soft shadowing baked into the
+  vertex colours (armpits, under chin and wings), smooth normals across texture seams.
+- darren.glb 0.66 MB -> 0.75 MB.
+
+PASS 4 · ANIMATION
+- Every Darren clip now uses his knees: lowering the hips crouches with the feet kept on
+  the ground, legs swung forward fold at the knee (clips.mjs dKnees/withKnees).
+- His stance holds bent arms with paws in front, like the design, instead of arms hanging
+  straight.
+
+PASS 5 · COMBAT FEEL AND EFFECTS
+- Bare Paws swings leave a warm trail from both paws (trail.mjs gains an along-bone mode).
+- Darren's landed blows flash with an impact star and throw snow chips the way he struck;
+  heavy blows give the camera a short kick in that direction.
+- Polka Scarf whip: wider, the same knit yellow and pink as his scarf, and it leaves from
+  his paw again (the hand bone now starts at the elbow).
+- sim.mjs: hit events carry who struck (actor, -1 for friends) and the angle.
+
+TESTS
+- New tests/darren-model.cjs (in npm test): joints, elbows, knees, horn, scarf parts by
+  name, gloss and baked shading, no supplied clips, file size.
+- tests/three-d.mjs: new check that Darren's hits say who struck and which way.
+
+WHAT STILL NEEDS AN ARTIST
+- The colour texture is still the supplied AI-made one; hand-painted textures, real fists
+  and fingers, eyelids for blinking and a full re-sculpt need an artist and 3D tools that
+  are not part of this project.

@@ -697,6 +697,19 @@ test('Combo hits damage and defeat a grunt and count K.O.s', () => {
   assert.equal(g.ko, 1);
   assert(g.combo >= 2);
 });
+test("Darren's hits say who struck and which way (for his impact effects)", () => {
+  const g = fresh();
+  near(g, 40, 52, 0);
+  foe(g, 'gopher', 40, 53.4);
+  g.events.length = 0;
+  assert(g.attack());
+  tick(g, 0.3);
+  const hit = g.events.find((e) => e.type === 'hit' && e.foe !== undefined);
+  assert(hit, 'no hit event');
+  assert.equal(hit.actor, 0);
+  assert(Number.isFinite(hit.angle));
+  assert.equal(g.striker, -1, 'striker is cleared after the blow');
+});
 test('Grunts wind up before hitting, and a dodge through the wind-up avoids the damage', () => {
   const g = fresh();
   near(g, 40, 52, 0);

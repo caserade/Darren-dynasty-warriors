@@ -1,7 +1,7 @@
 {
   "name": "darren-snowday-desktop",
   "productName": "Darren's Snowday Search",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Windows desktop app for Darren's Snowday Search (pixel and 3D games in one window)",
   "private": true,
   "main": "main.cjs",
