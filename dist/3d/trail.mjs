@@ -5,10 +5,13 @@ import * as THREE from 'three';
 const N = 12;
 
 export class WeaponTrail {
-  // bone: the hand bone; from/to: distances along the weapon's rest-up axis (in the bone's space).
-  constructor(scene, rig, bone, from, to, color) {
+  // bone: the hand bone; from/to: distances along the weapon's rest-up axis (in the bone's space),
+  // or along the bone itself when alongBone is set (Darren's paws, at the end of his forearms).
+  constructor(scene, rig, bone, from, to, color, alongBone = false) {
     const inf = rig.info.get(bone),
-      up = new THREE.Vector3(0, 1, 0).applyQuaternion(inf.world.clone().invert());
+      up = alongBone
+        ? new THREE.Vector3(0, 1, 0)
+        : new THREE.Vector3(0, 1, 0).applyQuaternion(inf.world.clone().invert());
     this.bone = bone;
     this.a = up.clone().multiplyScalar(from);
     this.b = up.clone().multiplyScalar(to);

@@ -7,7 +7,7 @@ import * as THREE from 'three';
 const FREE = 16, // free points past the paw
   LOOP = 6, // points on the collar-to-paw loop
   SEG = 0.12, // metres between free points before the hero's scale
-  WIDTH = 0.16,
+  WIDTH = 0.2,
   GRAVITY = -9,
   STEP = 1 / 120;
 
@@ -16,9 +16,10 @@ function polkaTexture() {
   c.width = 64;
   c.height = 256;
   const g = c.getContext('2d');
-  g.fillStyle = '#f4c51f';
+  // Same knit yellow and pink as the scarf on his neck (tools/darren-model.mjs).
+  g.fillStyle = '#ffde4a';
   g.fillRect(0, 0, 64, 256);
-  g.fillStyle = '#e9b10e';
+  g.fillStyle = '#f0c232';
   g.fillRect(0, 0, 5, 256);
   g.fillRect(59, 0, 5, 256);
   g.fillStyle = '#ff6fb1';
@@ -97,7 +98,8 @@ export class ScarfRibbon {
     r.spine.updateWorldMatrix(true, false);
     A.set(-0.12, 0.3, 0.27).applyMatrix4(r.spine.matrixWorld);
     r.handR.updateWorldMatrix(true, false);
-    B.set(0, 0.1, 0).applyMatrix4(r.handR.matrixWorld);
+    // hand_R holds forearm and paw (studio pass 2), so the paw is a third of a metre down the bone.
+    B.set(0, 0.33, 0).applyMatrix4(r.handR.matrixWorld);
     r.armR.updateWorldMatrix(true, false);
     D.setFromMatrixPosition(r.armR.matrixWorld);
     // Lash direction: shoulder to paw, carried on past the paw.

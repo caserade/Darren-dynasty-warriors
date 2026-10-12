@@ -851,6 +851,7 @@ export class Game {
   }
   hit(a, r, charge, arc = Math.PI * 1.3, damage = 0, kb = 4) {
     let count = 0;
+    this.striker = this.actors.indexOf(a);
     for (const t of this.targets) {
       const d = Math.hypot(t.x - a.x, t.z - a.z),
         angle = Math.atan2(t.x - a.x, t.z - a.z),
@@ -865,7 +866,14 @@ export class Game {
         t.last = this.time;
         this.stats.hits++;
         count++;
-        this.emit('hit', { x: t.x, z: t.z, y: t.y + 1, power: charge });
+        this.emit('hit', {
+          x: t.x,
+          z: t.z,
+          y: t.y + 1,
+          power: charge,
+          actor: this.striker,
+          angle: a.yaw,
+        });
       }
     }
     if (damage > 0)
@@ -883,6 +891,7 @@ export class Game {
           count++;
         }
       }
+    this.striker = -1;
     return count;
   }
   // One hit of a move: everything inside reach and arc (centre pushed forward by off) takes it.
@@ -892,6 +901,8 @@ export class Game {
       dmg = h.dmg + (q.kind === 0 && h.belly ? this.belly * h.belly : 0),
       heavy = !!(h.down || h.launch || h.kb >= 10);
     let count = 0;
+    // Who landed the blow, for the hit effects (game.mjs); friends' assists count as nobody's.
+    this.striker = q.friend ? -1 : q.kind;
     for (const t of this.targets) {
       const d = Math.hypot(t.x - c.x, t.z - c.z);
       if (
@@ -904,7 +915,14 @@ export class Game {
         t.last = this.time;
         this.stats.hits++;
         count++;
-        this.emit('hit', { x: t.x, z: t.z, y: t.y + 1, power: heavy ? 2 : 1 });
+        this.emit('hit', {
+          x: t.x,
+          z: t.z,
+          y: t.y + 1,
+          power: heavy ? 2 : 1,
+          actor: this.striker,
+          angle: a.yaw,
+        });
       }
     }
     for (const e of this.enemies) {
@@ -953,6 +971,7 @@ export class Game {
         actor: q.kind,
         heavy,
       });
+    this.striker = -1;
     return count;
   }
   // A straight crack along the hero's facing: ahead of him and within about a metre of the line.
@@ -1086,6 +1105,8 @@ export class Game {
       power: heavy ? 2 : 1,
       damage,
       foe: e.id,
+      actor: this.striker ?? -1,
+      angle,
     });
     if (e.hp <= 0) this.killFoe(e, angle);
   }
