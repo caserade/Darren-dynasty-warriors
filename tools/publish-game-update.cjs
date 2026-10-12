@@ -12,9 +12,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { buildManifest, checkManifest } = require('../desktop-app/game-manifest.cjs');
+const { assertBuildEnvironment, assertSafeTree } = require('../desktop-app/package-security.cjs');
 
 const repo = path.join(__dirname, '..');
-const MIN_APP = '1.1.0';
+const MIN_APP = '1.1.1';
 
 function gitBuild() {
   if (process.env.SNOWDAY_BUILD) return Number(process.env.SNOWDAY_BUILD);
@@ -66,6 +67,8 @@ if (require.main === module) {
     console.error('usage: node tools/publish-game-update.cjs <out-folder>');
     process.exit(2);
   }
+  assertBuildEnvironment();
+  assertSafeTree(path.join(repo, 'dist'));
   const manifest = gameManifest();
   const bad = checkManifest(manifest);
   if (bad) {
@@ -75,6 +78,7 @@ if (require.main === module) {
   fs.rmSync(path.join(out, 'game'), { recursive: true, force: true });
   fs.mkdirSync(out, { recursive: true });
   fs.cpSync(path.join(repo, 'dist'), path.join(out, 'game'), { recursive: true });
+  assertSafeTree(path.join(out, 'game'));
   fs.writeFileSync(path.join(out, 'latest.json'), JSON.stringify(manifest, null, 1) + '\n');
   fs.writeFileSync(
     path.join(out, 'README.md'),

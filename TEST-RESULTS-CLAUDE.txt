@@ -274,3 +274,24 @@ LIMITS
   Frame rate and feel on real hardware weren't measured.
 - The controller was simulated through the browser Gamepad API. No physical pad was used.
 - Not tested: iPhone/Safari, real phones, Firefox.
+2026-10-12 — CREDENTIAL-FREE PACKAGING FIX (shell 1.1.1)
+
+Verified on Windows with Node 24.21.0, based on PR3 head bc961e9:
+- npm test: passed, including gameplay/firewood/phone/controller/screen-fit/shared-save,
+  42 3D simulations, native Canvas scene checks, 28 updater checks and 10 new packaging
+  tests. Localhost and directory-junction tests require running outside this sandbox.
+  The scene test's generated preview was restored; no gameplay/art change is included.
+- npm run build:win: built a real Windows x64 app and ZIP using Electron 44.4.5.
+  Inspected all 126 ZIP files, its source-only update config and app.asar's eight runtime
+  files. A harmless sentinel placed in an unapproved source file was absent from the
+  built folder/ASAR/ZIP; the fixture was removed. Final token-free 1.1.1 build passed.
+- Synthetic tests reject inherited build credentials, token/config/env files, nested
+  and case-variant names, recognizable token content and links; confirm runtime-only
+  GitHub authorization, no credential persistence, public routing and denied fallback.
+- Local source-return staging and game-update generation passed. Nothing was published.
+
+Limits: no interactive Windows gameplay, SmartScreen, physical controller/device or
+real private-GitHub update flow was tested in this change. No real update credential
+was read, embedded, configured or revoked. This fixes a design risk, not evidence that
+a previously distributed ZIP contained a key. Known-pattern guards cannot identify
+every arbitrary secret hidden in an asset. No dependency versions changed.

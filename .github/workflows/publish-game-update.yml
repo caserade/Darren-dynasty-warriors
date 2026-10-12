@@ -11,6 +11,8 @@ on:
       - 'dist/**'
       - 'CHANGELOG-CLAUDE.txt'
       - 'desktop-app/game-manifest.cjs'
+      - 'desktop-app/package-security.cjs'
+      - 'desktop-app/update-settings.cjs'
       - 'tools/publish-game-update.cjs'
       - '.github/workflows/publish-game-update.yml'
   workflow_dispatch:
