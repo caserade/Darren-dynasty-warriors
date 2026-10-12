@@ -1,0 +1,128 @@
+TEST RESULTS · CLAUDE UPDATE 3 (TIDY CODE, SHARED SAVES, GIT) · 2026-10-12
+Environment: Linux cloud container, Node 22.22, headless Chromium (Playwright 1.56),
+software WebGL (SwiftShader). This isn't a real GPU, phone or physical controller.
+
+REFORMATTING
+  Prettier --debug-check on all 18 original game files (dist/*.js, dist/3d/*.mjs, every
+  .css and .html): each parses to the same program before and after. Black did the same
+  check on tools/pack-firewood.py. desktop-server.py was rewritten by hand and tested by
+  launching it.
+
+EXISTING SUITE (npm test) — all pass, before and after the reformat and after sharing
+  tests/three-d.mjs       28 checks (27 kept, 1 new: early firewood can go back to the rescue)
+  tests/shared-save.cjs   8 checks (new)
+  tests/gameplay.cjs, firewood.cjs, phone.cjs, controllers.cjs, screen-fit.cjs  pass
+  tools/verify-scene.cjs  pass
+
+REAL-BROWSER PASS (tests/browser-qa.cjs) — 63 of 63 pass
+  All 52 earlier checks still pass.
+  New "shared" checks (11): pixel-game progress line on the 3D menu; pixel rescue opens
+  Firewood for Mom in 3D; a new 3D game starts in the mode picked in the pixel game; sound
+  off carries to 3D; an Attack button chosen in one game carries to the other with a swap;
+  early firewood shows "Back to Ruffy's rescue" and it works; the pixel select screen marks
+  the mode picked last in 3D; sound on carries back; the pixel title shows 3D progress.
+  The first run had 62 of 63: the pixel progress check ran with no 3D progress to show, so
+  the line was correctly empty. The test now clears one 3D camp first; the second run
+  passed everything.
+  Console: no errors. Only the known harmless "net::ERR_ABORTED" lines for .glb models.
+
+LAUNCHERS
+  desktop-server.cjs and desktop-server.py: with the game already running on port 8000,
+  a second launch (either server, --pixel) opened the same address and exited instead of
+  starting on 8001. Windows .cmd files themselves were not run (no Windows here).
+
+NOT TESTED
+  Real phones, a physical controller, a real GPU, Windows or Mac.
+
+TEST RESULTS · CLAUDE UPDATE 2 (3D ENEMIES, BOSSES, HEALTH, COOKIES) · 2026-10-12
+Environment: Linux cloud container, Node 22.22, headless Chromium (Playwright),
+software WebGL (SwiftShader). This isn't a real GPU, phone or physical controller.
+
+EXISTING SUITE (npm test, each script run separately) — all pass
+  tests/three-d.mjs       27 checks (13 kept, 1 removed, 14 new; see below)
+  tests/gameplay.cjs      pass
+  tests/firewood.cjs      pass
+  tests/phone.cjs         pass
+  tests/controllers.cjs   pass
+  tests/screen-fit.cjs    pass
+  tools/verify-scene.cjs  pass (its preview image side effect was put back again)
+
+Changed and new 3D simulation checks
+  Removed: "No enemy instances or enemy AI exist" (no longer true by design).
+  Changed: the full rescue and firewood walk now runs with enemies off.
+  New: grunts spawn away from the cottage; three camp bosses wait at their camps and the
+  Baron only comes after three clues; combos damage and defeat grunts and count K.O.s;
+  grunt wind-ups land, and a dodge avoids them; knocked-out hero hands over, all three
+  down is a defeat that freezes the world, Try again keeps progress; bosses engage,
+  never hit without a wind-up first, and drop cookies; clues are locked until the camp
+  boss is beaten; cookies heal, revive and grow Darren's finisher; dropped cookies are
+  picked up; Cozy mode softens hits; friends swing at nearby enemies; firewood guards
+  block the pile; saves keep bosses, mode and K.O.s, and old saves count found clues as
+  cleared camps; the whole game with enemies on is played start to finish by a simple
+  robot player (it was knocked out once by the Baron and won on Try again).
+
+REAL-BROWSER PASS (tests/browser-qa.cjs) — 52 of 52 pass
+  All 39 checks from update 1 still pass (pixel game, 3D basics, controller remapping,
+  phone layouts).
+  New "3d fight" checks (13): grunts drawn; J combo damages them; grunts hurt the hero
+  and the health bar follows; meeting Sergeant Spudsworth shows his lines and the boss
+  bar; boss wind-up shows the red ground warning; boss bar says to dodge; 9 cookies grow
+  Darren to Snowball sturdy; beating the boss opens the clue; all three knocked out shows
+  the rest screen; Try again heals and keeps the camp; Cozy mode and the cleared camp
+  survive a reload; boss bar clear of other panels on a portrait and a landscape phone.
+  The first run of the new checks failed both phone layout checks (boss bar on top of the
+  quest panel, K.O. counter on the quest panel, landscape hero panel over the joystick).
+  Those were fixed and the second full run passed.
+  Console: no errors. Only the known harmless "net::ERR_ABORTED" lines for .glb models.
+
+LIMITS
+- Software WebGL ran at 1-3 fps, so browser timings wait on game time.
+- Difficulty was judged with a simple robot player, not by a person. Real hardware,
+  phones, iPhone/Safari and physical controllers were not tested for this change.
+- The enemy models are simple shapes without animation clips.
+- No dependencies were added.
+
+---- earlier results (update 1) ----
+TEST RESULTS · CLAUDE UPDATE 1 · 2026-10-12
+Environment: Linux cloud container, Node 22.22, headless Chromium 141 (Playwright 1.56),
+software WebGL (SwiftShader). This isn't a real GPU, phone or physical controller.
+
+EXISTING SUITE (npm test, each script run separately) — all pass
+  tests/three-d.mjs       14 checks (13 original + 1 new)
+  tests/gameplay.cjs      pass
+  tests/firewood.cjs      pass
+  tests/phone.cjs         pass
+  tests/controllers.cjs   pass
+  tests/screen-fit.cjs    pass
+  tools/verify-scene.cjs  pass. It rewrites previews/Darren-Storybook-Weight-Levels.png
+                          as a side effect; the original file was put back.
+The new friends-overlap test fails on the original sim.mjs (closest 0.44 m) and passes
+on the updated one (closest 1.37 m).
+
+REAL-BROWSER PASS (tests/browser-qa.cjs) — 39 of 39 pass
+Pixel game: title screen, style select, start, move, attack, P pause and resume,
+  Darren reference image loads in the pause menu (1254x1254), Chapter 2 starts from the
+  title, phone portrait (412x915, touch) shows the joystick.
+3D game: the valley loads with all 33 animation clips; move; combo; hold-and-release charge;
+  jump; switch heroes (including a press mid-jump); Escape pause and resume; Low detail
+  turns shadows off; combo hits a practice post; the save survives a reload; simulated
+  controller: stick, LB, X, Start, and unplugging pauses; Firewood chapter starts;
+  phone portrait and landscape, with the hero panel clear of the joystick in landscape.
+Remapping: rebinding (Jump to RT); swapping on a conflict (X to Dodge moves Combo to B);
+  Start cancels; the new buttons work in play and the old ones stop; bindings survive a
+  reload; the help line updates; Restore standard buttons works; D-pad moves focus in pause.
+The pixel game had no console errors.
+The 3D game logged one harmless network line per model, "net::ERR_ABORTED", for .glb
+  files. All models load and animate. It comes from how Three.js streams the file.
+
+BEFORE THE FIXES, the same pass found:
+  - a hero switch pressed mid-jump was silently lost
+  - friends overlapping the hero (seen in screenshots, confirmed in simulation)
+  - the hero panel covering the joystick on landscape phones
+  - the PCFSoftShadowMap deprecation warning on every 3D load
+
+LIMITS
+- Software WebGL ran at 1-3 fps, so the timing checks wait on game time, not wall clock.
+  Frame rate and feel on real hardware weren't measured.
+- The controller was simulated through the browser Gamepad API. No physical pad was used.
+- Not tested: iPhone/Safari, real phones, Firefox.

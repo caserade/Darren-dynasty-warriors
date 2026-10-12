@@ -1,0 +1,36 @@
+You are updating my existing Darren Dynasty Warriors-inspired game in the
+Darren-Dynasty-Warriors-Game desktop folder. Read START-HERE.txt, AGENTS.md,
+THREE-D-RELEASE.txt and the phone/firewood/art release notes before edits.
+Do not rebuild blindly or replace this with another game. First inspect and
+summarize the existing files and the current playable behavior.
+
+Current project: Phaser 3.90 pixel/isometric adventure in dist/, plus the
+existing vendored Three.js third-person 3D build in dist/3d/. Preserve the
+current working engines for this handoff; do not migrate them merely because
+of historical engine preferences. Blender -> Unreal remains a separate future
+3D production target; no .blend or .uproject source was included in this export.
+
+Identity: Darren is the red Shoyru, with the approved backward-curving pointed
+head horn, correct feet, wings/tail, optional yellow scarf and smooth featureless
+cartoon torso. Preserve approved art. Tormund is the golden Lupe knight with
+sword/shield; Bucky is the chubby blue Grarrl with mallet and firewood bundles.
+Story: rescue Ruffy; then gather six bundles of wood for Darren's mom with Bucky.
+Keep this project separate from FAU, Feastbreaker and Nucleus/Middle World.
+
+Inspect before changing. Keep save schemas and browser-local preferences
+compatible. Pixel v3 and firewood v1 saves are independent of 3D v1. Preserve
+controller, touch, keyboard, pause/dialogue, fullscreen and screen-fit behavior.
+Keep integer P.weight as pixel combat/save authority and cosmetic weight motion
+separate. Keep animation ownership and bounded texture allocations intact.
+Do not add 3D enemies until I request that stage. Ask me what update to make if
+I have not supplied a specific gameplay change; the package itself is a handoff.
+
+Run npm test after relevant changes. Report actual results and failed checks.
+Inspect model imports, animation clips, collision, camera and save/reload when
+changing the 3D version. Do not copy historical browser/Blender QA claims as
+proof that your new changes were tested. Write CHANGELOG-CLAUDE.txt and
+TEST-RESULTS-CLAUDE.txt, including limitations and any changed dependencies.
+Keep every updated asset and source file in this project folder; return the
+whole updated project, not only snippets or a generated build. Preserve the
+original .openai/hosting.json project_id for ChatGPT to update the same private
+Site. Do not publish, make the Site public, or create a replacement Site.

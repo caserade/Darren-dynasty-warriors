@@ -1,0 +1,43 @@
+DARREN'S SNOWDAY SEARCH — STORYBOOK PASS
+
+Adds an original painted storybook treatment to the existing game. All prior
+story, combat, navigation, collision, controller and version-3 save behavior
+is retained. This is a Phaser browser game, not an Unreal or Blender project.
+
+FOUR SIZES YOU CAN SEE
+The title and pause menus open Darren's size sketchbook. Four animated game
+previews show the existing 0–3 stages: Little adventurer, Cozy belly, Round &
+ready, Snowball sturdy. Waist changes are more visible, while head size, foot
+anchors and movement speed stay fixed. Growth still happens every 3 cookies.
+The gallery never changes gameplay or checkpoints. A separate painted concept
+study is also included. Soft motion, reduced motion and scarf choices remain.
+
+PAINTED WORLD AND RESOLUTION
+New painted pine, cottage, lantern, tent, keep, supplies, flag and boulder
+assets retain the world's original collision footprints and depth sorting.
+Painted props are screen-facing 2.5D scenery, not newly modeled 3D geometry.
+Camera turns keep traversal and world orientation. Smaller architectural
+details and supporting cast retain their code-drawn art, now smoothly rendered.
+Softer snow colors, rounded path marks and warm paper UI complete the pass.
+
+Rendering is now full display resolution up to a 1920×1080 pixel budget,
+instead of the previous half-width/half-height canvas. This quadruples canvas
+pixel count on displays up to that limit. Larger screens are capped to control
+memory use. CSS pixelation and nearest-neighbor filters have been removed.
+Darren's packed cells double from 112×128 to 224×256; padded live/trail frames
+are 256×288. The source painting is retained at its generated resolution.
+Scenery size buckets and reusable character textures keep caches bounded.
+
+VALIDATION
+Gameplay regressions and native Canvas scene/API checks cover old saves,
+Ruffy rescue, companion range, action timing, gradual growth, all four cameras,
+4,992 pose combinations, full-width rendering, source asset/script wiring,
+texture bounds, and read-only weight-gallery behavior. Native renders inspected.
+These are simulation and software-rendering checks, not a new browser/WebGL,
+phone or physical controller test. No device performance claim is made.
+
+ART PROVENANCE
+Built-in image generation created the original storybook character study,
+painted gameplay-sheet treatment and scenery sheet. The source images and
+prompts are in art-source/. Atlas scripts only prepare game-ready assets.
+The approved elevated identity and previous source sheets are preserved.

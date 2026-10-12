@@ -1,0 +1,950 @@
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #162b3a;
+  color: #f4f4e9;
+  font:
+    16px/1.45 system-ui,
+    sans-serif;
+}
+button,
+select,
+input {
+  font: inherit;
+}
+button {
+  color: inherit;
+  background: #213d50;
+  border: 1px solid #8cafbe55;
+  border-radius: 9px;
+  min-height: 44px;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+button:hover {
+  background: #33566b;
+}
+button:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 3px solid #f2c96a;
+  outline-offset: 3px;
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+button.active {
+  border-color: #f5d17b;
+  background: #34546a;
+}
+button small {
+  opacity: 0.6;
+  margin-right: 8px;
+}
+button i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+.red {
+  background: #f07268;
+}
+.gold {
+  background: #e5bd62;
+}
+.blue {
+  background: #6aabdd;
+}
+[hidden] {
+  display: none !important;
+}
+#view {
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  display: block;
+}
+#hud {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+}
+#hud button,
+#hud #stick,
+#touch {
+  pointer-events: auto;
+}
+#party {
+  position: absolute;
+  left: 24px;
+  top: max(22px, env(safe-area-inset-top));
+  display: flex;
+  gap: 6px;
+}
+#party button {
+  padding: 10px 12px;
+  background: #142b3dda;
+  box-shadow: 0 3px 14px #102c3a25;
+}
+#quest {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  max-width: 440px;
+  background: #142b3dd9;
+  padding: 12px 24px;
+  border-radius: 12px;
+  border-bottom: 2px solid #dcbd77;
+}
+#quest small {
+  letter-spacing: 0.2em;
+  font-size: 11px;
+  color: #bacecf;
+}
+#quest strong {
+  display: block;
+  font-size: 17px;
+  font-weight: 550;
+  margin: 4px 0;
+}
+#quest span {
+  font-size: 13px;
+  color: #e7cb83;
+}
+#top-actions {
+  position: absolute;
+  right: 24px;
+  top: 22px;
+  display: flex;
+  gap: 8px;
+}
+#top-actions button {
+  font-size: 22px;
+  background: #142b3dda;
+  width: 46px;
+  padding: 4px;
+}
+#vitals {
+  position: absolute;
+  left: 26px;
+  bottom: 85px;
+  width: 215px;
+  text-shadow: 0 1px 4px #10232f;
+}
+#name {
+  font-size: 23px;
+}
+.meter {
+  height: 7px;
+  background: #18364aad;
+  border: 1px solid #aac7d04d;
+  border-radius: 10px;
+  overflow: hidden;
+  margin: 7px 0;
+}
+.meter i {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: #90dbd5;
+  transition: width 0.08s linear;
+}
+#vitals small {
+  font-size: 13px;
+  background: #18364abf;
+  padding: 4px 7px;
+  border-radius: 5px;
+}
+.charge {
+  height: 11px;
+}
+.charge i {
+  background: #f6d078;
+}
+#chargelabel {
+  font-size: 13px;
+  color: #fff0b5;
+}
+#interaction {
+  position: absolute;
+  bottom: 115px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #142b3df0;
+  padding: 12px 22px;
+  border: 1px solid #f1c973;
+  border-radius: 25px;
+}
+kbd {
+  font: 600 12px system-ui;
+  border: 1px solid #bfd0d15e;
+  border-radius: 4px;
+  padding: 3px 6px;
+  background: #ffffff0e;
+}
+#controls {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 16px;
+  white-space: nowrap;
+  font-size: 12px;
+  background: #142b3de3;
+  border: 1px solid #94abb32c;
+  padding: 14px 20px;
+  border-radius: 10px;
+}
+#toast {
+  position: absolute;
+  left: 50%;
+  top: 135px;
+  transform: translateX(-50%);
+  padding: 10px 20px;
+  border-radius: 10px;
+  background: #16344bea;
+  max-width: 80%;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+#toast.visible {
+  opacity: 1;
+}
+#practice {
+  position: absolute;
+  right: 26px;
+  bottom: 207px;
+  display: flex;
+  flex-direction: column;
+  text-align: right;
+  font-size: 12px;
+  text-shadow: 0 1px 4px #123;
+}
+#practice small {
+  letter-spacing: 0.12em;
+}
+#practice strong {
+  font-size: 23px;
+}
+#minimap {
+  position: absolute;
+  right: 24px;
+  bottom: 26px;
+  border: 1px solid #b5d5db77;
+  border-radius: 12px;
+  background: #172e3cdf;
+  width: 200px;
+  height: 149px;
+}
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(90deg, #0b2537c9, #132c3e52);
+  backdrop-filter: blur(5px);
+  padding: 20px;
+  overflow: auto;
+}
+.panel {
+  background: #112d40ee;
+  border: 1px solid #89b0bc55;
+  box-shadow: 0 25px 90px #03132288;
+  border-radius: 18px;
+  padding: 32px 42px;
+  width: min(470px, 100%);
+  text-align: center;
+  max-height: 95dvh;
+  overflow: auto;
+}
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  color: #c5dfe4;
+}
+h1 {
+  font-size: 66px;
+  letter-spacing: -0.05em;
+  font-weight: 750;
+  line-height: 1;
+  margin: 25px 0 20px;
+}
+h1 span {
+  display: block;
+  font-size: 20px;
+  color: #f0d28b;
+  letter-spacing: 0.015em;
+  font-weight: 450;
+  margin-top: 12px;
+}
+.panel p {
+  color: #cadde2;
+}
+.rule {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #d7b968, transparent);
+  margin: 20px 0;
+}
+.panel > button {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+}
+.primary {
+  background: #e8c776;
+  color: #173345;
+  border-color: #f4da99;
+  font-weight: 650;
+}
+.primary:hover {
+  background: #f1d994;
+}
+.settings {
+  display: flex;
+  justify-content: space-between;
+  margin: 20px 0;
+  font-size: 14px;
+}
+.settings label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.settings select {
+  background: #264758;
+  color: white;
+  border: 1px solid #678493;
+  padding: 6px;
+  border-radius: 5px;
+}
+.help {
+  font-size: 13px;
+  line-height: 1.8;
+}
+.note {
+  color: #a8c3ce;
+  font-size: 12px;
+  display: block;
+}
+.panel a {
+  display: inline-block;
+  color: #ebd499;
+  font-size: 13px;
+  margin-top: 18px;
+}
+.dialogue {
+  align-self: flex-end;
+  margin-bottom: 6vh;
+  width: min(640px, 100%);
+  text-align: left;
+}
+.dialogue > p {
+  font-size: 20px;
+}
+.dialogue small {
+  letter-spacing: 0.2em;
+  color: #edce87;
+}
+.dialogue button span {
+  float: right;
+}
+#pad-settings {
+  text-align: left;
+  margin: 4px 0 8px;
+  font-size: 14px;
+}
+#pad-settings summary {
+  cursor: pointer;
+  color: #ebd499;
+  padding: 6px 0;
+}
+#pad-settings summary:focus-visible {
+  outline: 3px solid #f2c96a;
+  outline-offset: 3px;
+}
+#pad-status {
+  font-size: 13px;
+  min-height: 2.6em;
+}
+.binds {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.binds button {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  padding: 8px 10px;
+  min-height: 40px;
+  text-align: left;
+}
+.binds button b {
+  font-weight: 600;
+  color: #f0d28b;
+  white-space: nowrap;
+}
+.binds button.waiting {
+  border-color: #f5d17b;
+  background: #4a5f3a;
+}
+#pad-reset {
+  width: 100%;
+  margin: 8px 0 6px;
+  font-size: 13px;
+}
+#error {
+  color: #ffc0a7;
+  font-size: 14px;
+}
+#touch {
+  display: none;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+#stick {
+  position: absolute;
+  left: max(24px, env(safe-area-inset-left));
+  bottom: max(35px, env(safe-area-inset-bottom));
+  width: 120px;
+  height: 120px;
+  background: #16364b70;
+  border: 2px solid #d0e3e766;
+  border-radius: 50%;
+  touch-action: none;
+}
+#stick i {
+  position: absolute;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: #d4e8e89c;
+  border: 1px solid #fff8;
+  left: 35px;
+  top: 35px;
+}
+.touch-actions {
+  position: absolute;
+  right: max(24px, env(safe-area-inset-right));
+  bottom: max(28px, env(safe-area-inset-bottom));
+  width: 220px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  justify-content: flex-end;
+  pointer-events: auto;
+}
+.touch-actions button {
+  font-size: 13px;
+  padding: 10px 13px;
+  background: #193c50d9;
+  touch-action: none;
+}
+.touch-actions #touch-charge {
+  background: #ad8b48d9;
+  color: white;
+}
+.touch-device #touch {
+  display: block;
+}
+.touch-device #controls {
+  display: none;
+}
+.touch-device #minimap {
+  width: 130px;
+  height: 97px;
+  bottom: 190px;
+}
+.touch-device #vitals {
+  bottom: 180px;
+  width: 160px;
+}
+.touch-device #practice {
+  display: none;
+}
+@media (max-width: 1100px) {
+  #party {
+    top: 15px;
+    left: 15px;
+  }
+  #party button {
+    font-size: 13px;
+    padding: 8px;
+  }
+  #quest {
+    top: 75px;
+    width: 70%;
+    max-width: 420px;
+    padding: 8px 14px;
+  }
+  #quest small {
+    display: none;
+  }
+  #quest strong {
+    font-size: 14px;
+  }
+  #top-actions {
+    right: 15px;
+    top: 15px;
+  }
+  #controls {
+    gap: 8px;
+    font-size: 11px;
+    bottom: 12px;
+  }
+  #minimap {
+    width: 150px;
+    height: 112px;
+  }
+  #vitals {
+    bottom: 72px;
+  }
+  #toast {
+    top: 155px;
+  }
+}
+@media (max-width: 600px) {
+  #party {
+    gap: 3px;
+  }
+  #party button {
+    font-size: 12px;
+    padding: 8px 6px;
+  }
+  #party button small {
+    display: none;
+  }
+  #top-actions button {
+    width: 40px;
+    min-height: 40px;
+  }
+  #top-actions {
+    gap: 4px;
+  }
+  #quest {
+    top: 70px;
+    width: 92%;
+  }
+  #stick {
+    width: 104px;
+    height: 104px;
+    left: 16px;
+    bottom: 26px;
+  }
+  #stick i {
+    left: 27px;
+    top: 27px;
+  }
+  .touch-actions {
+    width: 190px;
+    right: 16px;
+    bottom: 24px;
+  }
+  .touch-device #vitals {
+    left: 16px;
+    bottom: 157px;
+    width: 150px;
+  }
+  .touch-device #minimap {
+    right: 16px;
+    bottom: 168px;
+    width: 105px;
+    height: 79px;
+  }
+  #interaction {
+    bottom: 275px;
+    font-size: 13px;
+    padding: 8px 13px;
+  }
+  .panel {
+    padding: 24px;
+  }
+  h1 {
+    font-size: 54px;
+  }
+  .help {
+    font-size: 12px;
+  }
+  #controls {
+    display: none;
+  }
+  #practice {
+    display: none;
+  }
+}
+@media (max-height: 520px) {
+  .touch-device #vitals {
+    top: 120px;
+    bottom: auto !important;
+    width: 150px;
+  }
+  .touch-device #name {
+    font-size: 17px;
+  }
+  .touch-device #vitals small {
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  #quest {
+    top: 12px;
+    max-width: 310px;
+  }
+  #quest strong {
+    font-size: 13px;
+  }
+  #party {
+    flex-direction: column;
+    gap: 2px;
+  }
+  #party button {
+    min-height: 32px;
+    padding: 4px 8px;
+  }
+  .touch-device #vitals {
+    bottom: 150px;
+    width: 135px;
+    left: 16px;
+  }
+  #minimap {
+    display: none;
+  }
+  .panel {
+    max-height: 94dvh;
+    padding: 18px 28px;
+  }
+  h1 {
+    font-size: 38px;
+    margin: 10px 0;
+  }
+  .help {
+    display: none;
+  }
+  .panel p {
+    margin: 10px 0;
+  }
+  .rule {
+    margin: 12px 0;
+  }
+  #interaction {
+    bottom: 90px;
+  }
+  #toast {
+    top: 82px;
+  }
+}
+
+#vitals {
+  background: #142b3de6;
+  padding: 12px 15px;
+  border-radius: 12px;
+  border: 1px solid #aac7d03b;
+  text-shadow: none;
+}
+#practice {
+  background: #142b3dde;
+  padding: 10px 14px;
+  border-radius: 10px;
+  text-shadow: none;
+}
+.touch-device #vitals {
+  padding: 8px 10px;
+}
+@media (max-width: 600px) {
+  .touch-device #vitals {
+    bottom: 180px;
+  }
+}
+
+/* Claude update 2: health, bosses, K.O.s, banners and defeat */
+.meter.hp {
+  height: 10px;
+}
+.meter.hp i {
+  background: #7ed27a;
+}
+.meter.hp i.low {
+  background: #ef6a5d;
+}
+#hpnum {
+  float: right;
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 8px;
+  color: #d9eadf;
+}
+#belly {
+  display: inline-block;
+  margin-top: 6px;
+  color: #f3d995;
+}
+#belly:empty {
+  display: none;
+}
+#party button {
+  position: relative;
+}
+#party .hp {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 4px;
+  height: 3px;
+  border-radius: 2px;
+  background: #0b1d2a;
+  overflow: hidden;
+}
+#party .hp b {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: #7ed27a;
+}
+#party button.down {
+  opacity: 0.55;
+}
+#party button.down .hp b {
+  background: #ef6a5d;
+}
+#bossbox {
+  position: absolute;
+  top: 122px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(460px, 86vw);
+  background: #2a1424e0;
+  border: 1px solid #e0708c77;
+  border-radius: 12px;
+  padding: 8px 16px 10px;
+  text-align: center;
+}
+#bossname {
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  color: #ffd9e2;
+}
+.meter.boss {
+  height: 11px;
+  margin: 6px 0 5px;
+}
+.meter.boss i {
+  background: linear-gradient(90deg, #d64e76, #f08aa0);
+}
+#bosshint {
+  font-size: 12px;
+  color: #f5c6d2;
+}
+#kochip {
+  position: absolute;
+  right: 24px;
+  top: 80px;
+  background: #142b3dd9;
+  border-radius: 10px;
+  padding: 6px 12px;
+  text-align: right;
+  min-width: 86px;
+}
+#kochip strong {
+  font-size: 22px;
+}
+#kochip small {
+  letter-spacing: 0.14em;
+  font-size: 11px;
+  color: #bacecf;
+}
+#combo {
+  display: block;
+  font-size: 12px;
+  color: #f6d078;
+}
+#combo:empty {
+  display: none;
+}
+#banner {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  transform: translate(-50%, -50%) scale(0.92);
+  text-align: center;
+  opacity: 0;
+  transition:
+    opacity 0.25s,
+    transform 0.25s;
+  text-shadow: 0 3px 18px #0a1d2a;
+}
+#banner.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+#banner strong {
+  display: block;
+  font-size: 40px;
+  letter-spacing: 0.05em;
+  color: #ffe7a6;
+}
+#banner span {
+  font-size: 17px;
+  color: #e7f2f3;
+}
+#hurtflash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 55%, #e3333a88);
+  opacity: 0;
+  transition: opacity 0.35s;
+}
+#hurtflash.on {
+  opacity: 1;
+  transition: none;
+}
+#floaters {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.float {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font: 800 18px system-ui;
+  color: #fff;
+  text-shadow:
+    0 2px 4px #12243188,
+    0 0 2px #000;
+}
+.float.heavy {
+  font-size: 24px;
+  color: #ffe08a;
+}
+.float.ouch {
+  color: #ff8f86;
+}
+.float.heal {
+  color: #9cf0a0;
+}
+#defeat h2 {
+  font-size: 30px;
+  margin: 14px 0 8px;
+}
+#defeat .eyebrow {
+  display: block;
+}
+#dialogue-copy {
+  white-space: pre-line;
+}
+.settings {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+@media (max-width: 1100px) {
+  #bossbox {
+    top: 140px;
+  }
+  #kochip {
+    top: 70px;
+    right: 15px;
+  }
+  #banner strong {
+    font-size: 30px;
+  }
+}
+@media (max-width: 600px) {
+  #bossbox {
+    top: 130px;
+    padding: 6px 10px;
+  }
+  #bossname {
+    font-size: 13px;
+  }
+  #bosshint {
+    display: none;
+  }
+  #kochip {
+    top: 62px;
+    padding: 4px 9px;
+    min-width: 0;
+  }
+  #kochip strong {
+    font-size: 17px;
+  }
+  #banner strong {
+    font-size: 24px;
+  }
+  #banner span {
+    font-size: 14px;
+  }
+  #party .hp {
+    left: 5px;
+    right: 5px;
+  }
+}
+@media (max-height: 520px) {
+  #bossbox {
+    top: 70px;
+    padding: 4px 12px;
+  }
+  #bosshint {
+    display: none;
+  }
+  #kochip {
+    top: 64px;
+  }
+  #banner {
+    top: 40%;
+  }
+  #banner strong {
+    font-size: 24px;
+  }
+}
+.touch-device #hpnum {
+  float: none;
+  display: block;
+  margin: 2px 0 0;
+  font-size: 12px;
+}
+@media (max-width: 600px) {
+  #kochip {
+    top: auto;
+    right: 16px;
+    bottom: 256px;
+    text-align: center;
+  }
+  .touch-device #kochip {
+    bottom: 256px;
+  }
+}
+@media (max-height: 520px) {
+  .touch-device #hpnum {
+    float: right;
+    display: inline;
+    margin: 3px 0 0;
+  }
+  .touch-device #belly {
+    display: none;
+  }
+  .touch-device #vitals .meter {
+    margin: 4px 0;
+  }
+}
+
+/* A line about progress in the pixel game (shared-save.js). */
+.other-game {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  color: #ffe1a0;
+}

@@ -1,0 +1,74 @@
+CURRENT RELEASE: SOFT-STEPS-UPDATE.txt (Site version 5).
+The browser validation below describes the earlier Paws & Snow release.
+
+DARREN'S SNOWDAY SEARCH — PAWS & SNOW TEST BUILD
+
+WINDOWS 11: PLAY NOW
+1. Extract the entire downloaded ZIP into a folder.
+2. Open index.html in Chrome or Edge.
+3. Choose Start the search, then Adventure or Cozy Explorer.
+4. Click or press Enter through the opening dialogue.
+
+This is a self-contained Phaser browser test build. It needs neither Unreal
+nor Blender. It is not a Windows installer or a full 3D Unreal project.
+All game scripts, music synthesis and Phaser runtime are bundled locally.
+Private hosted edition: https://darren-snowday-adventure.gosplekaiju.chatgpt.site
+Sign in with the owner's account to play. Access remains owner-only.
+
+DARREN'S RESTORED UNARMED STYLE
+New adventures start with Bare Paws. Darren carries no weapon.
+Tap or hold J / Z: jab, cross, kick, then a full spinning tail sweep.
+K: a separate 360-degree tail sweep with a short cooldown.
+Space / X / Shift: dodge, including a cancel out of an attack.
+F or Paws <-> Snow: switch to Darren's signature snowball kit.
+In Snow style, hold J for a packed throw. K grows a rolling snowball;
+press K again to launch it. L / C unleashes Blizzard at 100 Snow power.
+
+MOVE & CAMERA
+WASD / arrows: screen-relative movement.
+B / N: rotate the isometric camera by a quarter turn. Q / E: zoom.
+P / Escape: pause, character appearance, music and controller settings.
+Follow the stone paths and ramps between the raised hilltop camps.
+
+CONTROLLER / TOUCH
+Standard Xbox / PlayStation button positions:
+Left stick or D-pad moves; right stick aims.
+X / Square or RT / R2 attacks; A / Cross dodges.
+B / Circle sweeps or rolls; Y / Triangle uses Blizzard.
+View switches combat style; LB / RB rotates; Start / Options pauses.
+Bindings are remappable in the pause screen. A / Cross confirms menus.
+Phones and tablets show a movement stick and Combo, Sweep, Dodge and Burst.
+Use the Paws <-> Snow button to change touch combat styles.
+Touch controls return and the game pauses if a controller disconnects.
+Physical Galaxy, tablet and controller hardware was not available for testing.
+
+COOKIE WEIGHT GAIN
+Every 3 cookies adds one modest belly-size stage, capped at 3 stages.
+Each stage adds +2 kick, +4 tail-sweep and +5 snow-roll damage.
+Movement speed stays the same. Belly motion and scarf follow-through scale
+with size. Darren keeps thin limbs and a smooth, featureless cartoon chest.
+Pause can disable growth, reset size, hide the scarf or disable soft motion.
+Size, cookie count and combat style save when a camp is cleared.
+Older version-3 saves still load; saves without a style keep Snowball mode.
+Local test-build progress is separate from the hosted game's browser storage.
+
+THIS UPDATE
+Raised terraces, ramps, exposed cliffs, frozen stream, solid snow-covered
+cottages and trees, lanterns, camp tents, castle towers and cast shadows.
+Terrain height drives movement, hit detection, snowballs and enemy projectiles.
+Companions and enemies route around ledges and scenery. Foreground scenery
+fades near Darren. The minimap shows roads and terrace shapes.
+Jab, cross, kick and tail sweep each have 8 animation frames in 8 directions,
+with size-aware motion, wind-up, contact and recovery, impact effects and rumble.
+
+VALIDATED LOCALLY
+All five main route segments in both directions, blocked cliff crossings,
+companion travel between all camps, the full Ruffy rescue and saved ending,
+unarmed combo order and hit rules, cookie stages, packed snowballs, four camera
+views, visible attack warnings, emulated controller switching/remapping, and
+portrait/landscape phone input and layouts. No uncaught page errors in these checks.
+This is a 2.5D isometric pixel presentation with projected solid scenery.
+The exact separate Kisuke behemoth-hunting project was not available to compare.
+
+Fan-made private prototype. Neopets characters remain associated with Neopets.
+Phaser's MIT license is included in vendor/.

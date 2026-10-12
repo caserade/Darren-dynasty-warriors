@@ -1,0 +1,68 @@
+Previous release notes. See PLAY-TEST.txt for the latest local test update.
+
+DARREN’S SNOWDAY SEARCH — PHASER PIXEL UPDATE
+
+Play: https://darren-snowday-adventure.gosplekaiju.chatgpt.site
+Access remains owner-only. This is a browser game, not an Unreal project or a Windows installer.
+
+WHAT CHANGED
+- Actual Phaser 3.90 scene, WebGL/Canvas rendering, depth-sorted sprite objects,
+  palette-built character atlases and a crisp low-resolution isometric world.
+- Eight facing directions, with separate idle, walk, charge, throw, roll, dodge,
+  hurt and blizzard frames. Waving wings, scarf follow-through, snow footprints,
+  impact freeze, camera shake, particles and optional controller vibration.
+- Screen-relative keyboard/analog movement, quick acceleration and braking,
+  a 150 ms action buffer, controller stick deadzones and right-stick aiming.
+- Keyboard, touch and browser gamepads share the same combat actions.
+- Controller menus work on phone, tablet and PC. Remapping and connection status
+  are under Pause > Controller settings. Touch controls return on disconnect.
+- Every three cookies grows Darren's belly one of three modest stages, with
+  +5 snow-roll damage per stage and no movement-speed penalty. Size persists
+  at camp checkpoints. Pause can disable growth or reset size.
+- Optional scarf-free appearance, gentle breathing and belly wobble. Darren's
+  body remains smooth and featureless in all directions, without chest features.
+  Appearance, animation preferences and controller bindings save on this device.
+- The existing three camps, clues, Tormund recruitment, Ruffy rescue and local
+  checkpoint format are retained. Old version-3 saves start at the base size.
+
+CONTROLS
+WASD / arrows: move. J / Z / hold Snowball: throw or charge, release to throw.
+K: start rolling; press again to launch. Space / X / Shift: dodge.
+L / C: Blizzard at 100 Snow. B / N: quarter-turn camera. Q / E: zoom. P: pause.
+
+Standard controller positions (Xbox / PlayStation):
+Left stick or D-pad: move. Right stick: aim.
+X / Square or RT / R2: hold and release a snowball.
+A / Cross: dodge; B / Circle: roll; Y / Triangle: Blizzard.
+LB / L1 and RB / R1: rotate camera. Start / Options: pause.
+Menu: left stick or D-pad navigate, A / Cross confirm, Start / Options resume.
+
+Pair Bluetooth or connect USB through your device, then press a controller
+button with the game open and focused. Browser/controller compatibility and
+vibration support vary. Buttons can be remapped; trigger throw remains an
+alternate unless RT has been assigned to another action.
+
+IMPLEMENTATION
+Static entrypoint: dist/index.html
+Simulation, music, story and HUD: dist/game.js
+Input, controller settings and growth preferences: dist/controls.js
+Darren pixel artwork and atlases: dist/pixel-art.js
+Phaser scene and rendering: dist/phaser-scene.js
+Existing UI foundations: dist/base.css
+UI skin and responsive layout: dist/pixel.css
+Original model-sheet reference: dist/assets/darren-reference.png
+Bundled library: dist/vendor/phaser-3.90.0.min.js, MIT license alongside it.
+No external asset/CDN requests or runtime API keys are needed.
+
+VALIDATION
+Browser-tested keyboard movement at all four camera orientations, acceleration
+and stopping, charged shots, buffered attacks, weight stages and saves, camp
+and rescue transitions, and phone touch layout. Controller input is tested
+with simulated standard gamepads through Phaser's GamepadPlugin; physical
+Galaxy S25, Tab S9 FE, Windows controllers and Bluetooth pairing still need
+on-device testing. No claim of hardware certification or fixed device FPS.
+
+Primary implementation references:
+https://docs.phaser.io/phaser/concepts/textures
+https://docs.phaser.io/phaser/concepts/input
+https://developer.mozilla.org/en-US/docs/Web/API/Gamepad_API/Using_the_Gamepad_API

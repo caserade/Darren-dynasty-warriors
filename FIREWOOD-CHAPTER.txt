@@ -1,0 +1,46 @@
+FIREWOOD FOR MOM — CHAPTER TWO
+
+Play from the title's Chapter 2 button, or after Ruffy's rescue. The title also
+has Continue firewood trip when an unfinished chapter-two save exists.
+Darren remains the player; Tormund and Bucky are automatic companions.
+
+Story: Mom needs six dry bundles. Darren and Tormund meet Bucky, the chubby blue
+Grarrl, by the bridge. Three fallen-wood sites have finite enemy groups (3,4,5).
+Clear each group, stand near the pile and let Bucky bundle it. Each site gives
+two bundles; return to Mom's cottage for the cocoa-and-hearth ending. Ruffy
+follows along. The retained snow-prairie terrain and roads provide the route;
+this is an additional quest in the existing valley, not a separate world map.
+
+Tormund: authored walk poses, sword wind-up/contact/recovery, carrying and
+celebration. His close shield guard reduces damage by 25% when unobstructed.
+Bucky: chunky blue body, wooden mallet, wide knockback swing, gathering and
+carrying poses. Companion damage occurs at the painted impact frame, once per
+swing, with range, facing, ground-height and line-of-sight checks. Both have
+bounded cooldowns and use the existing terrain navigation.
+
+Art: 32 transparent painted character poses (8 actions, front/rear, two cast
+members), mirrored into four facing sectors as the camera turns. This is a
+2D sprite presentation, not rigged 3D or a continuous eight-direction atlas.
+New cabin, log pile, tied bundle and stump art. Original approved turnarounds
+and action sheets are viewable under Pause > Tormund & Bucky's artwork and
+moves. Generated source art is in art-source/firewood; tools/pack-firewood.py
+isolates alpha components and packs stable-foot padded atlases. No per-frame
+texture allocation for these companions. At normal play, only compact HUD
+and current objective remain visible.
+
+State: firewood.js loads after isometric-world.js and before phaser-scene.js.
+Chapter two uses darren-firewood-v1; chapter one's darren-snowday-v3 save and
+schema are preserved. Each meeting/bundle/ending saves chapter two. Retry
+restores collected wood and full health at home; remaining encounter groups
+reset. Starting a new firewood trip replaces that chapter's save only.
+
+Checks passed: tests/gameplay.cjs, tests/firewood.cjs, tools/verify-scene.cjs.
+The full quest was simulated over walkable terrain with automatic companion
+combat, six bundles and the home ending. Tests cover timed hits, no distant
+hits, shield guard, separate saves, chapter defeat/retry, old rescue saves,
+32 nonempty padded character frames and four camera rotations. Native Canvas
+renders inspected and character scale corrected. Browser/WebGL and physical
+phone/controller testing were unavailable; no device certification is claimed.
+
+The Site remains owner-private. This remains the existing Phaser 3.90 browser
+game and preserves Darren's art, combat, weight stages and compact HUD.

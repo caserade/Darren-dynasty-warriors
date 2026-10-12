@@ -1,0 +1,23 @@
+Darren Snowday — quieter gameplay HUD
+
+Health and Snow meters are compact. One objective stays at the top; an active
+boss bar occupies that same space. Style switching and Pause remain accessible.
+Map, clues, KO count, size progress, companion status, checkpoint status, camera
+buttons and music controls now live in Pause. Controls, combat and appearance
+details are collapsible. Keep searching is the first menu action and stays
+available while scrolling.
+
+Phone touch controls sit at the bottom corners. Desktop actions use a small
+bottom strip; controllers hide that strip. Blizzard only appears at full Snow.
+Menus hide the gameplay HUD; dialogue hides attack controls. Layout overrides
+cover narrow portrait screens and short landscape screens with safe-area insets.
+The story, art, saves, difficulty and combat statistics are unchanged.
+
+Verification: node tests/gameplay.cjs and node tools/verify-scene.cjs passed,
+including new checks for Blizzard visibility and camera rotation while paused.
+HTML IDs and moved-control ancestry were checked. The scene verification uses a
+native Canvas Phaser stand-in, not a browser. Phone/PC browser visual testing was
+not available in this environment; this is not device certification.
+
+Continue owner-private publication. dist/hud-clean.css overrides older layered
+styles; preserve its final stylesheet order and all existing control IDs.

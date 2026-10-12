@@ -1,0 +1,25 @@
+CONTROLLER UPDATE
+
+Shared browser Gamepad API controls cover both chapters, dialogue, menus,
+Pause, settings and the size sketchbook. Native numeric axes and Phaser axis
+wrappers are supported. A/confirm and B/back use standard button positions;
+Start always pauses/resumes, including during dialogue. Right stick scrolls
+long menus/artwork. D-pad and left-stick navigation repeat when held; sliders
+accept left/right input. Programmatic focus has a visible gold outline.
+
+The active controller remains selected while connected. Disconnect pauses
+play and clears held inputs. Reconnection seeds held buttons to avoid an
+accidental selection or resume. Touch remains available. Remapping supports
+button swaps, persistent bindings, defaults, and Start/Escape cancellation.
+Start is reserved as an always-available pause/menu control. LT zoom no longer
+moves Darren through its D-pad chord. Audio resume rejection is handled.
+
+Open the private game in the phone browser with its owner account. Pair a
+browser-supported controller through Bluetooth, press/release a button, and
+tap the screen once for audio. In-game title/Pause instructions list controls.
+This remains a browser game; no native app or cross-device saves were added.
+
+Verification: tests/controllers.cjs, gameplay.cjs, firewood.cjs, phone.cjs and
+native Canvas verify-scene.cjs passed. Controller tests simulate standard
+pads and Phaser axes; they do not certify real Android/iPhone controllers or
+browser compatibility. No physical phone/controller test was available.

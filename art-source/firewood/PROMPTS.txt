@@ -1,0 +1,18 @@
+Built-in imagegen created these assets using the approved Tormund and blue
+Grarrl turnaround sheets as identity references. User named the Grarrl Bucky.
+
+Tormund front / rear: eight elevated isometric full-body transparent poses,
+row-major idle, walk-left, walk-right, sword wind-up, sword impact, recovery,
+carry firewood, celebrate. Golden Lupe knight, silver/blue armor, sword and
+shield. Soft volumetric storybook gouache, crisp outlines, no labels.
+
+Bucky: sixteen elevated isometric transparent poses in the same action order,
+front eight then rear eight. Very chubby blue Grarrl, pale-blue featureless
+underside, short dinosaur arms, thick tail, wooden mallet, log-carrying pose.
+Family-friendly. Preserve identity, fullness and proportions; no labels.
+
+Props: two by two transparent sheet of snow-covered cottage, fallen log pile,
+tied dry-firewood bundle and stump. Elevated isometric storybook painting.
+
+Imagegen's cells were not perfectly aligned. Packing isolates each connected
+alpha component instead of naively slicing a grid. Source images are retained.

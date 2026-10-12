@@ -1,0 +1,11 @@
+node_modules/
+.env
+.env.*
+!.env.example
+*.zip
+.sites-runtime/
+qa-screenshots/
+
+# local test setup
+node_modules
+.DS_Store

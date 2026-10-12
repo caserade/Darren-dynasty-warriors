@@ -1,0 +1,218 @@
+CLAUDE UPDATE 1 · TEST AND FIX THE BASICS · 2026-10-12
+Starting point: Darren-Dynasty-Warriors-Game-Desktop.zip (site v13). The original zip is unchanged.
+
+DARREN REFERENCE IMAGE
+- Checked the damaged file (reference-originals/darren-reference-truncated.png.bin).
+  It stops after row 992 of 1254. Every readable pixel above that row is identical
+  to the copy the game already ships (dist/assets/darren-reference.png).
+- That means the shipped copy is a complete, faithful copy of the damaged one, so it
+  stays as the in-game reference. Nothing was redrawn. The bottom fifth of the
+  newer file (the wireframe and texture rows) can't be checked because those bytes
+  are missing. The approved look is still art-source/approved-darren-design.png.
+- The truncated original is still kept for the record.
+
+3D GAME FIXES (dist/3d/)
+- Switching heroes in the middle of a jump or attack used to ignore the key or
+  button press. The switch now waits and happens when the hero lands or finishes
+  (keyboard 1-3, the party buttons and the controller's Next hero button).
+- Friends walked into the hero and into each other, especially when you backed up
+  into them. The closest they came was 0.44 m and their models overlapped. They now
+  step aside and stay at least ~1.4 m apart. Change is in sim.mjs; there's a new test.
+- On landscape phones the hero panel sat on top of the joystick. It now sits under
+  the hero buttons.
+- Removed a Three.js r186 warning by switching from the removed PCFSoftShadowMap
+  to PCFShadowMap. Shadows look the same because r186 already did this switch.
+
+3D CONTROLLER REMAPPING (new)
+- The pause menu has a new "Controller buttons" section. Pick an action, then press
+  the controller button you want for it. If that button was already used, the two
+  actions swap. Start / Options or Escape cancels.
+- Actions you can remap: Combo, Hold charge, Jump, Dodge, Talk / gather, Next hero, Pause.
+  Start / Options always pauses as well.
+- "Restore standard buttons" puts back the original layout (A jump, B dodge, X combo,
+  Y charge, LB next hero, RB interact, Start pause).
+- Button choices save in their own browser key, snowday-3d-controls-v1. The 3D save
+  (snowday-3d-v1) and the pixel game's saves and controls are untouched.
+- The pause menu's help line shows your current buttons.
+- In the pause menu, D-pad up and down move through the menu and A selects. If no menu
+  item is focused, A still resumes, as before.
+
+TESTS
+- tests/three-d.mjs has a new check that friends don't overlap the hero (14 checks now).
+- New tests/browser-qa.cjs runs both games in real Chromium and saves screenshots.
+  It needs Playwright and isn't part of npm test.
+
+NOT CHANGED
+Pixel game code, save formats, art, models, the Phaser and Three.js versions, and the
+launchers. No dependencies were added to package.json.
+
+Left for later threads: 3D enemies, bosses, health and cookie rewards (thread 2);
+tidying the code, sharing saves and controls between both games, and GitHub (thread 3);
+shrinking the models and adding Mac launchers (thread 4).
+
+
+CLAUDE UPDATE 2 · THE 3D GAME BECOMES A REAL GAME · 2026-10-12
+Built on update 1. The pixel game is unchanged; every rule below copies the pixel game
+(dist/game.js) where it has one, converted from pixels to metres. Where the pixel game
+doesn't decide something, the choice made here is marked DEFAULT.
+
+ENEMIES (dist/3d/sim.mjs GRUNTS)
+- Gophers (22 HP, hit 5), crows (14 HP, hit 4, fast and wobbly) and hay bales (46 HP,
+  hit 8, slow), same numbers as the pixel game. Each one winds up for about half a
+  second before it hits, and at most three wind up at once.
+- Ruffy chapter: small groups wander in 18-26 m away. More come as you find clues
+  (6 at a time, up to 12). DEFAULT: none ever appear within 22 m of Mom's cottage, so
+  the practice posts stay a safe place; only 3 at a time during a boss fight.
+- Firewood chapter: no wandering groups. Each wood pile has 3, 4 and 5 guards (like the
+  pixel game) that appear when you get close, and Bucky can't gather until they're gone.
+- Defeated enemies tumble away. 7% drop a cookie and 13% drop a blue energy orb
+  (DEFAULT: orbs refill 30 energy, since the 3D game has energy instead of the
+  pixel game's Blizzard meter).
+- Grunts get a small health bar once hit. Damage numbers float up from every hit.
+
+BOSSES (BOSSES, updateBoss)
+- Sergeant Spudsworth (440 HP: swipe, slam) guards Spud Barricade, Madame Tumbleweed
+  (540: charge, swipe) guards Windswept Ring, Colonel Cluck (640: slam, egg volley,
+  swipe) guards Coop Command, and the Bramble Baron (1350: slam, thorn ring, charge,
+  swipe; hits 30% harder) appears in Bramble Hollow after the third clue, with 6 guards.
+  They're built from simple shapes, like the practice posts.
+- Each boss says the pixel game's opening lines when you get close. A boss bar shows
+  its health and a tip. Every attack shows a red warning on the ground first (an arc
+  for a swipe, a circle for a slam, a lane for a charge) for 0.6-1 second.
+- Beating a boss clears the camp: friends are healed by 25 and revived, nearby grunts
+  are knocked out, and 2 cookies and an orb drop. The camp's clue can then be picked
+  up with Interact, which still gives the same dialogue as before.
+- Clues now need their boss beaten first, and Ruffy needs the Baron beaten.
+- DEFAULT: if you run more than 45 m away, the boss goes home and heals. If a boss is
+  stuck on a ledge it can't get down from for 5 seconds, it hops back to its camp.
+
+HEALTH, KNOCK-OUTS AND DEFEAT
+- Each hero has 100 health, shown in the hero panel and as a thin bar under each name
+  in the party buttons. Getting hit flashes the screen edge and shakes the camera.
+- Dodging makes you untouchable for the first 0.45 s. After a hit you're untouchable
+  for 0.7 s (pixel game value).
+- DEFAULT: friends you aren't playing slowly heal (1 per second).
+- When the hero you're playing is knocked out, the next friend steps in. A resting
+  friend can't be picked until a cookie or a cleared camp revives them.
+- When all three are knocked out you get the pixel game's "A little rest. Another try."
+  screen. Try again starts beside the last cleared camp (or the cottage) with everyone
+  healed. Cleared camps, clues and cookies are kept. Return to the cottage also works.
+- Return to the cottage from Pause now also heals everyone.
+- New Mode setting in Pause: Adventure, or Cozy, where every hit does 55% damage and
+  cookies heal 32 instead of 22 (pixel game values).
+
+FRIENDS FIGHT TOO
+- DEFAULT: friends you aren't playing swing at enemies right beside them
+  (Darren 16, Tormund 18 on one enemy, Bucky 26 to everything around him), with the
+  same 1.4-1.8 s rhythm as the pixel game's companions.
+
+HOW MUCH THE HEROES HIT FOR
+- Combo hits: Darren 16, 19, 28 (the pixel game's Bare Paws jab, cross and kick);
+  DEFAULT Tormund 18, 20, 30 and Bucky 20, 22, 34.
+- Charged attacks: Darren's packed snowball 30-70 and it rolls through grunts;
+  Tormund's cleave 28-62; Bucky's quake 26-56 all around him.
+- K.O. counter and combo counter at the top right. Every 100 K.O.s heals 15.
+
+COOKIES NOW MATTER
+- Each cookie heals the hero you're playing by 22 (32 in Cozy), heals the other two by
+  half that, and gets a resting friend back up.
+- Every 3 cookies grow Darren one belly stage, with the pixel game's names: Little
+  adventurer, Cozy belly, Round & ready, Snowball sturdy. Each stage adds 4 to his
+  combo finisher and 5 to his packed snowball (+12 and +15 at the top stage, like the
+  pixel game). The hero panel shows the stage and progress, and Darren's model gets a
+  little rounder (a gentle width scale only; the model, horn and torso are untouched).
+- The 6 hidden cookies are still there; bosses and enemies drop more. The quest panel
+  shows the total.
+
+SAVES
+- Still the snowday-3d-v1 save, version 1, with new optional fields: mode, bosses,
+  ko, bestCombo, lastCamp. Cookies can now go past 6. Older saves still load: any
+  clue already found counts as that camp's boss beaten, so nobody has to refight.
+- The pixel game's saves and the 3D controller buttons are untouched.
+
+SCREEN CHANGES
+- Pause menu note, help text and quest text now describe the fights.
+- New: boss bar, K.O. chip, health bars, belly stage line, big banners (boss names,
+  camps cleared, belly stages), red hurt edge, damage numbers, the rest screen.
+- The rest screen works with keyboard (Enter), mouse and controller (D-pad and A).
+- Pressing 1-3 or Next hero skips a resting friend and says why.
+
+TESTS
+- tests/three-d.mjs: 27 checks (was 14). The old "no enemies exist" check was removed
+  because enemies now exist. The full-quest walk runs with enemies off, and a new check
+  plays the whole game with them on: all four bosses, Ruffy home, then the firewood
+  chapter with its guards.
+- tests/browser-qa.cjs has a new "3d fight" section (grunts, boss lines, warnings,
+  belly stage, clearing a camp, defeat and Try again, Cozy mode across a reload, and
+  phone layouts with the boss bar).
+
+LEFT FOR LATER
+- Darren's Blizzard special, the Bare Paws / Snowball style choice and the tail sweep
+  from the pixel game aren't in 3D. They need new animation work.
+- The bosses are simple-shape models with no animation clips; they bob, squash and
+  tilt instead. Proper models are a later art job.
+- No hurt or knocked-out animation exists in the hero models, so a hit is shown with
+  a flash and a shove instead.
+- Balance has been tested by a simple robot player in the simulation and in the
+  browser, not by a person with a controller. Numbers are easy to change in sim.mjs.
+- For thread 3: the pixel and 3D games now share the same enemy and boss numbers but
+  keep them in two places (dist/game.js and dist/3d/sim.mjs). The 3D save's cookie
+  count and the pixel game's cookie count are still separate.
+
+
+CLAUDE UPDATE 3 · TIDY CODE, SHARED SAVES, GIT · 2026-10-12
+
+READABLE CODE (no behaviour change)
+- All game scripts, styles and pages were squeezed onto very long lines (some over 700
+  characters). They are now laid out one statement per line with Prettier:
+  dist/*.js, dist/3d/*.mjs, every .css and .html file, tests/ and tools/, and
+  desktop-server.cjs. Vendor libraries and the big generated art files were left alone.
+- Prettier's own check confirmed every file parses to exactly the same program before
+  and after. The settings are in .prettierrc.json; `npm run format` repeats it.
+- desktop-server.py and tools/pack-firewood.py were laid out the same way by hand / Black.
+- Save keys and formats are unchanged: darren-snowday-v3, darren-firewood-v1,
+  darren-controls-v1, darren-look-v1, snowday-3d-v1, snowday-3d-controls-v1.
+
+SHARED BETWEEN BOTH GAMES (new file dist/shared-save.js)
+- Both games load it. Each game keeps its own save exactly as before; one new small
+  record, snowday-shared-v1, holds what means the same in both games.
+- Sound: turning sound off (pixel music button, 3D Sound box) carries to the other game.
+- Mode: the Adventure / Cozy choice you made last becomes the starting mode of a brand-new
+  3D adventure, and the pixel game's character cards mark it "last pick". An existing 3D
+  save keeps its own mode.
+- Controller buttons: Attack (pixel Throw = 3D Combo), Dodge and Pause carry across when
+  you remap them on purpose. A button already in use swaps, the same way remapping does.
+  "Restore standard buttons" in either game forgets the shared choice. Other buttons
+  differ between the games and stay separate.
+- Story: each title screen shows one line about the other game ("In the pixel game:
+  Ruffy is home, 2 of 3 wood piles gathered."). This is read straight from the other
+  game's save, so old saves count at once and nothing is copied.
+- Rescuing Ruffy in the pixel game opens Firewood for Mom in the 3D game. If you start it
+  before finishing the 3D rescue, the same Pause button then says "Back to Ruffy's
+  rescue" and your camps, clues and wood are all kept.
+- Not shared on purpose: cookies and Darren's belly size, health, K.O.s and camp
+  progress. Each adventure grows Darren from little during that run, and the pixel
+  game's camp checkpoint rules (run token, matching camps) would break if another game
+  wrote into it. Scarf, breathing wobble and growth on/off exist only in the pixel game.
+- Both local servers (desktop-server.cjs and .py) now reuse a copy of the game that is
+  already running instead of starting a second one on the next port. Browser saves
+  belong to one address, so before this, opening PLAY-PIXEL while PLAY-3D was running put
+  the two games on different ports with separate saves.
+
+GIT
+- Added README.md, .gitattributes (Windows launchers keep CRLF; art is binary) and a
+  `format` script in package.json. node_modules and .DS_Store are ignored.
+- EXPORT-MANIFEST.json and EXPORT-VALIDATION.txt describe the original ChatGPT export and
+  were already out of date after updates 1 and 2; they are kept as a historical record.
+
+TESTS
+- New tests/shared-save.cjs (8 checks), now part of npm test.
+- tests/three-d.mjs: new check that firewood started early can switch back to the rescue
+  without losing anything (28 checks).
+- tests/browser-qa.cjs: new "shared" section driving both games in one browser.
+
+LEFT FOR LATER
+- Enemy and boss numbers are still written in two places (dist/game.js in pixels,
+  dist/3d/sim.mjs in metres). Merging them would mean loading one game's code into the
+  other and re-checking all the balance, so it was left as is.
+- For update 4: the 3D models are still 17 MB, and there are still only Windows launchers.

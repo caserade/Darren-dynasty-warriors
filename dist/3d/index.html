@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="theme-color" content="#152a3a" />
+    <title>Snowday · The Three Friends</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="style.css" />
+    <script type="importmap">
+      { "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/" } }
+    </script>
+  </head>
+  <body>
+    <canvas id="view" aria-label="Snowday 3D game"></canvas>
+    <div id="hud" hidden>
+      <div id="party" aria-label="Choose character">
+        <button data-cast="0">
+          <small>1</small><i class="red"></i>Darren<em class="hp"><b></b></em></button
+        ><button data-cast="1">
+          <small>2</small><i class="gold"></i>Tormund<em class="hp"><b></b></em></button
+        ><button data-cast="2">
+          <small>3</small><i class="blue"></i>Bucky<em class="hp"><b></b></em>
+        </button>
+      </div>
+      <div id="quest">
+        <small>THE SNOWBELL VALLEY</small><strong id="objective"></strong
+        ><span id="distance"></span>
+      </div>
+      <div id="bossbox" hidden>
+        <strong id="bossname"></strong>
+        <div class="meter boss"><i id="bossbar"></i></div>
+        <span id="bosshint"></span>
+      </div>
+      <div id="kochip">
+        <strong id="kocount">0</strong> <small>K.O.</small><span id="combo"></span>
+      </div>
+      <div id="banner" aria-live="polite"><strong></strong><span></span></div>
+      <div id="hurtflash"></div>
+      <div id="floaters"></div>
+      <div id="top-actions">
+        <button id="fullscreen" aria-label="Toggle full screen">⛶</button
+        ><button id="pause" aria-label="Pause game">Ⅱ</button>
+      </div>
+      <div id="vitals">
+        <strong id="name">Darren</strong><b id="hpnum"></b>
+        <div class="meter hp" aria-label="Health"><i id="health"></i></div>
+        <div class="meter" aria-label="Energy"><i id="energy"></i></div>
+        <small id="kit"></small> <small id="belly"></small>
+        <div id="chargebox" hidden>
+          <div class="meter charge"><i id="chargebar"></i></div>
+          <b id="chargelabel">Gathering power</b>
+        </div>
+      </div>
+      <div id="interaction" hidden><kbd>E</kbd> <span>Interact</span></div>
+      <div id="toast" role="status" aria-live="polite"></div>
+      <div id="practice">
+        <small>PRACTICE POSTS</small><strong><span id="hits">0</span> hits</strong
+        ><span>Try a combo or hold your charge</span>
+      </div>
+      <div id="controls">
+        <span><kbd>WASD</kbd> Move</span><span><kbd>J</kbd> Combo</span
+        ><span><kbd>Hold K</kbd> Charge / release</span><span><kbd>Space</kbd> Jump</span
+        ><span><kbd>Shift</kbd> Dodge</span><span><kbd>Drag / Z X</kbd> Camera</span>
+      </div>
+      <canvas id="minimap" width="220" height="164" aria-label="Valley map"></canvas>
+      <div id="touch">
+        <div id="stick" aria-label="Movement joystick"><i></i></div>
+        <div class="touch-actions">
+          <button id="touch-interact">Talk / gather</button><button id="touch-jump">Jump</button
+          ><button id="touch-dodge">Dodge</button><button id="touch-attack">Combo</button
+          ><button id="touch-charge">Hold charge</button>
+        </div>
+      </div>
+    </div>
+    <section id="menu" class="overlay">
+      <div class="panel">
+        <div class="eyebrow">DARREN · TORMUND · BUCKY</div>
+        <h1>Snowday<span>The Three Friends</span></h1>
+        <p id="menu-copy">
+          Explore the snowy valley, bring Ruffy home, and gather firewood with your friends.
+        </p>
+        <p id="other-game" class="other-game" hidden></p>
+        <div class="rule"></div>
+        <button id="play" class="primary" disabled>Preparing the valley…</button
+        ><button id="firewood" disabled>Firewood for Mom</button
+        ><button id="return-home" hidden>Return to the cottage</button>
+        <div class="settings">
+          <label>Sound <input id="sound" type="checkbox" checked /></label
+          ><label
+            >Mode
+            <select id="mode">
+              <option value="adventure">Adventure</option>
+              <option value="cozy">Cozy</option>
+            </select></label
+          ><label
+            >Detail
+            <select id="quality">
+              <option value="high">High</option>
+              <option value="low">Low</option>
+            </select></label
+          >
+        </div>
+        <p class="help">
+          WASD / left stick to move · J to combo<br />Hold K, then release to charge attack<br />Space
+          jump · Shift dodge · E interact<br />1–3 switch hero · Drag / right stick look<br />Cookies
+          heal the party · every 3 makes Darren hit harder
+        </p>
+        <p class="help" id="pad-help"></p>
+        <details id="pad-settings">
+          <summary>Controller buttons</summary>
+          <p id="pad-status" role="status">
+            Connect a controller and press any button. Pick an action below, then press the button
+            you want for it.
+          </p>
+          <div class="binds">
+            <button data-bind="combo">Combo <b></b></button
+            ><button data-bind="charge">Hold charge <b></b></button
+            ><button data-bind="jump">Jump <b></b></button
+            ><button data-bind="dodge">Dodge <b></b></button
+            ><button data-bind="interact">Talk / gather <b></b></button
+            ><button data-bind="switch">Next hero <b></b></button
+            ><button data-bind="pause">Pause <b></b></button>
+          </div>
+          <button id="pad-reset">Restore standard buttons</button
+          ><small class="note"
+            >Start / Options always pauses. D-pad ↑↓ moves through this menu and A selects.</small
+          >
+        </details>
+        <small class="note"
+          >Clear the three camps, beat their bosses and the Bramble Baron, and bring Ruffy home.
+          Cozy mode softens every hit.</small
+        ><a href="../index.html">Open the pixel adventure</a>
+        <p id="error" role="alert" hidden></p>
+      </div>
+    </section>
+    <section id="defeat" class="overlay" hidden>
+      <div class="panel">
+        <small class="eyebrow">SNOWDAY STORIES</small>
+        <h2>A little rest. Another try.</h2>
+        <p id="defeat-copy">
+          Darren, Tormund and Bucky warm their paws. Ruffy still needs them. Cleared camps, clues
+          and cookies are saved.
+        </p>
+        <button id="retry" class="primary">Try again</button
+        ><button id="defeat-home">Return to the cottage</button>
+      </div>
+    </section>
+    <section id="dialogue" class="overlay" hidden>
+      <div class="dialogue panel">
+        <small>SNOWDAY STORIES</small>
+        <p id="dialogue-copy"></p>
+        <button id="dialogue-close" class="primary">Continue <span>↵</span></button>
+      </div>
+    </section>
+    <script src="../shared-save.js?v=1"></script>
+    <script type="module" src="game.mjs"></script>
+  </body>
+</html>

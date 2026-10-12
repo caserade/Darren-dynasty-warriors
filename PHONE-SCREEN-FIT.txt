@@ -1,0 +1,28 @@
+PHONE FULL SCREEN AND CAMERA FIT
+
+Full-screen toggle is now visible beside Pause and at the top of Pause,
+as well as the title. Unsupported/denied requests show guidance and pause
+active play so the message can be read. Native and WebKit methods supported;
+entry/exit controls clear held input. The browser still requires a user tap.
+
+Available viewport dimensions, touch capability and orientation determine
+camera scale. Phone zoom now permits .42 base scale instead of the old .60
+minimum, and removes the 1.15 initial magnification. The shared camera anchor
+moves Darren above lower touch controls in portrait and wide landscape.
+Ground and sprites use the same anchor. Visual viewport resize updates both
+render textures; CSS dynamic viewport height follows mobile browser chrome.
+Pinch zoom does not shrink the game render area. Fit my screen resets manual
+zoom and shows measured dimensions locally. Safe-area styles are preserved.
+
+No private phone data, model fingerprint or device scan is collected. Existing
+bounded phone render resolution remains. No automatic OS or browser updates,
+native app package, offline support, or hardware performance guarantee.
+
+Verification: phone.cjs, controllers.cjs, gameplay.cjs, firewood.cjs,
+verify-scene.cjs and screen-fit.cjs passed. Screen-fit tests simulate six screen
+sizes, numeric viewport resize, pinch guard, full-screen entry/exit, unsupported
+fallback and fit reset. Native Canvas renders are not mobile browser QA.
+Physical Samsung/iPhone devices and browser address-bar transitions untested.
+
+API references: https://developer.mozilla.org/en-US/docs/Web/API/Element/requestFullscreen
+https://support.apple.com/guide/iphone/open-as-web-app-iphea86e5236/ios

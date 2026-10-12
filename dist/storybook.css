@@ -1,0 +1,182 @@
+/* Soft painted edges and warm paper, at full display resolution. */
+#game canvas,
+.portrait canvas,
+.card canvas,
+.poster canvas,
+#mini {
+  image-rendering: auto !important;
+}
+:root {
+  --display: Georgia, 'Times New Roman', serif;
+  --body: 'Trebuchet MS', sans-serif;
+  --ink: #344557;
+  --snow: #fff8e9;
+  --scarf: #f6d06f;
+}
+.logo {
+  font-family: var(--display);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  text-shadow: 0 3px 12px #17263590;
+}
+.logo em {
+  -webkit-text-stroke: 0;
+}
+.chapterTag {
+  letter-spacing: 0.13em;
+  color: #ffe4a1;
+}
+.screen {
+  background: linear-gradient(110deg, #193448eb, #274a5edb 63%, #456a7d9e);
+}
+.status,
+.portrait,
+.bar,
+.bar i,
+#obj,
+#ko,
+#mini,
+#bossBox,
+#rosterChip,
+#sizeChip,
+#abilityDock button,
+#cameraTools,
+#dialog,
+.pauseInfo,
+.card,
+.go,
+.secondary,
+.modelReference {
+  border-radius: 13px !important;
+}
+.status,
+#obj,
+#ko,
+#rosterChip,
+#sizeChip,
+#abilityDock button {
+  box-shadow:
+    0 4px 13px #1c334329,
+    inset 0 0 0 1px #fff9e1;
+}
+.status,
+#obj,
+#sizeChip,
+#dialog,
+.pauseInfo {
+  background-color: #fff7e6;
+}
+.status:after {
+  border-radius: 12px;
+  background: linear-gradient(90deg, #f5d271, #ef9bb4, #f5d271);
+}
+.go,
+.secondary {
+  box-shadow: 0 4px 0 #6e624b80;
+  border-color: #8f784c;
+}
+.card {
+  border-color: #647c88;
+  background: #294958;
+}
+.card canvas {
+  border-radius: 9px;
+}
+.poster {
+  background: #f6ead1;
+  border-radius: 10px;
+  box-shadow: 0 12px 30px #10283c55;
+}
+.poster canvas {
+  border-radius: 6px;
+}
+#dialog {
+  border: 2px solid #88775e;
+  box-shadow: 0 8px 28px #18304445;
+}
+#dialog .who {
+  border-radius: 8px;
+}
+#weightBook {
+  width: min(1050px, calc(100vw - 32px));
+  max-height: 90dvh;
+  box-sizing: border-box;
+  overflow: auto;
+  border: 2px solid #b99e74;
+  border-radius: 20px;
+  padding: 24px;
+  background: #fff7e7;
+  color: #344557;
+  box-shadow: 0 24px 90px #172c4890;
+}
+#weightBook::backdrop {
+  background: #1d334acc;
+  backdrop-filter: blur(5px);
+}
+#weightBook h2 {
+  font:
+    700 clamp(27px, 4vw, 44px) Georgia,
+    serif;
+  margin: 0 0 8px;
+}
+#weightBook p {
+  line-height: 1.55;
+  max-width: 75ch;
+}
+.weightGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.weightCard {
+  border: 1px solid #dfcda9;
+  border-radius: 15px;
+  background: linear-gradient(#fffaf0, #f2e7d0);
+  padding: 10px;
+  text-align: center;
+}
+.weightCard canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.weightCard h3 {
+  font:
+    700 18px Georgia,
+    serif;
+  margin: 0 0 7px;
+}
+.weightCard p {
+  font-size: 12px;
+  margin: 0;
+}
+.weightStudy {
+  margin: 20px 0;
+}
+.weightStudy img {
+  width: 100%;
+  display: block;
+  border-radius: 12px;
+}
+.weightStudy summary {
+  cursor: pointer;
+  font-weight: bold;
+}
+.bookClose {
+  margin-top: 18px;
+}
+@media (max-width: 680px) {
+  #weightBook {
+    padding: 16px;
+  }
+  .weightGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+  .weightCard h3 {
+    font-size: 16px;
+  }
+  .weightCard {
+    padding: 6px;
+  }
+}

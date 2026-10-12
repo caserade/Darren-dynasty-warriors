@@ -1,0 +1,62 @@
+DARREN'S SNOWDAY SEARCH — SOFT STEPS (SITE VERSION 5)
+
+Owner-private update to the existing Phaser 3.90 Paws & Snow game.
+The red Shoyru design, thin limbs, smooth featureless torso, yellow scarf
+with pink dots, eight-direction isometric world, bare-paws combo, snow kit,
+Tormund, three camps, Ruffy story and old version-3 saves are preserved.
+
+SMOOTHER MOTION
+- Cookie size changes now ease through a real display weight. Combat bonuses
+  still use the integer 0–3 weight stage and movement speed is unchanged.
+- A small bounded torso spring settles after growth. Belly/scarf follow-through
+  stays nonsexual and honors the existing soft-motion and reduced-motion choices.
+- One reusable padded 96×104 hero texture replaces rebuilding a full 624-frame
+  atlas whenever size changes. Up to eight small trail textures preserve the
+  emitted pose rather than changing old afterimages to the current pose.
+- Padding repairs clipped crests, paws, kicks and tails. The retained atlas
+  utility also clips individual padded cells to prevent neighboring-frame bleed.
+- Attack extension and effects now coincide with the real contact windows.
+  Damage, cooldowns and active hit windows are unchanged.
+- Dodge, hurt, special, throw and stationary snow-roll animations use their own
+  clocks. Walking cadence follows distance traveled. Pause, dialogue and hitstop
+  preserve simulation-owned growth state.
+- Live reduced-motion changes update appearance without needing a reload.
+
+GAMEPLAY / SAVE REPAIRS
+- Ruffy could spawn inside the keep and permanently block the reunion. His
+  cinematic spawn now requires a collision-valid, walkable route to Darren.
+- Holding a paw combo resumes after heavy-hit recovery rather than becoming
+  stuck until the attack key is released and pressed again.
+- Tormund selects targets from his own location, with matching ground and clear
+  line of sight. He can no longer strike from across the map.
+- Continue remembers the actual last camp cleared, even out of order. The new
+  optional lastCamp field stays compatible with old version-3 checkpoints.
+- Collected growth rewards and appearance updates persist into the matching
+  current camp checkpoint. Run identity and matching camp flags prevent a new
+  game or Reset Size from rewriting an older run's save.
+- KO milestones restore correctly, avoiding a duplicate milestone heal.
+- Buffered dodge is no longer lost at a lower-frame-rate cooldown boundary
+  or while hitstop freezes its cooldown.
+- Officer greetings cannot block the defeat transition or appear after defeat.
+- Controller menu presses are consumed once: A confirms; Start resumes. Those
+  fixed menu controls remain available when combat buttons are remapped.
+- Reset Size updates the paused appearance immediately. The charge HUD updates
+  even when Snow power itself has not changed.
+
+VERIFICATION
+Gameplay VM regressions cover the issues above, legacy checkpoints, run/save
+isolation, gradual weight, contact poses, action clocks and a successful saved
+Ruffy reunion near the keep at 120, 60, 30 and 25 updates per second.
+Native Canvas scene/API assembly checks cover four camera directions, gradual
+growth, bounded texture use and 4,992 padded poses (all states, eight directions,
+four weight stages, scarf on/off). New game-scene renders were inspected.
+
+Current verification uses simulation and a native Canvas stand-in for Phaser
+texture/display APIs. It is not browser/WebGL or physical controller testing.
+The local Chromium process cannot launch in this execution environment due to
+an OS socket restriction. Earlier browser-test claims in older notes refer to
+the previous release, not this new pass. Samsung/Windows hardware performance,
+Bluetooth behavior and physical controller testing remain unverified.
+
+No new image generation, external services or API keys. This remains a private
+fan-made browser prototype, not an Unreal project or a 3D engine migration.

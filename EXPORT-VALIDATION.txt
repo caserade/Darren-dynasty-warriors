@@ -1,0 +1,11 @@
+PASS: all 22 PNG images decoded fully after the documented reference-panel repair.
+PASS: GLB container bucky.glb; 11 animations; 5 mesh records.
+PASS: GLB container terrain.glb; 0 animations; 2 mesh records.
+PASS: GLB container tormund.glb; 11 animations; 6 mesh records.
+PASS: GLB container darren.glb; 11 animations; 6 mesh records.
+PASS: local server serves both games, modules and the Darren model with matching MIME types.
+PASS: 13 3D simulation checks; pixel gameplay, firewood, phone, controller and screen-fit regressions.
+PASS: native Canvas scene assembly and 4,992 bounded character poses.
+NOT RUN: Windows .cmd/PowerShell execution, real browser rendering, physical controller/phone tests, new Blender or Unreal tests.
+Model container checks are not a full rig or deformation audit.
+Existing THREE-D-RELEASE.txt records earlier verification; it is not new testing in this export.

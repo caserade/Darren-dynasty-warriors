@@ -1,0 +1,66 @@
+DARREN DYNASTY WARRIORS GAME — DESKTOP / CLAUDE / CHATGPT
+Exported October 11, 2026 from the latest saved Site source (version 13).
+Source commit: 6a34f9e6d5a0ecc148c8d78e1d63e7ec90a34130
+Private hosted game: https://darren-snowday-adventure.gosplekaiju.chatgpt.site/
+
+PUT THIS ON YOUR WINDOWS DESKTOP
+1. Download Darren-Dynasty-Warriors-Game-Desktop.zip.
+2. Right-click the ZIP and choose Extract All.
+3. Choose your Desktop as the extraction destination. The ZIP already contains
+   one folder named Darren-Dynasty-Warriors-Game; do not add another outer folder.
+4. The resulting folder is Desktop\Darren-Dynasty-Warriors-Game.
+   Windows may keep your Desktop under OneDrive; either Desktop location works.
+
+PLAY LOCALLY
+Double-click PLAY-3D.cmd for the 3D exploration game, or PLAY-PIXEL.cmd for the
+pixel game. The launchers use Node.js if installed, otherwise Python 3. If
+neither is installed, install one and run the launcher again. A local server
+window opens; keep it open while playing. Ctrl+C stops it. A browser tab opens
+on Windows. Avoid double-clicking index.html: 3D models/modules need HTTP.
+These launchers need no npm packages to play. Browser saves from the hosted
+site do not automatically transfer to localhost or another computer.
+The two games share sound, Adventure/Cozy choice, the Attack/Dodge/Pause
+controller buttons and story progress (see CHANGELOG-CLAUDE.txt, update 3).
+Opening the second launcher while the first is running reuses the same game
+address, so the shared saves keep working.
+
+CONTENTS
+- dist/: full playable pixel game and both chapters.
+- dist/3d/: current third-person 3D exploration/practice build; same main cast,
+  terrain, rescue/firewood quests, character switching, controller/touch support.
+- dist/3d/assets/: Darren, Tormund, Bucky and terrain GLB models with textures.
+- art-source/ and dist/assets/: original art, turnarounds and 2D game assets.
+- tests/ and tools/: existing checks and asset preparation/export utilities.
+- .openai/hosting.json: original Site identity for return to ChatGPT.
+- CLAUDE-HANDOFF.txt: prompt and development requirements for Claude.
+- MAKE-CHATGPT-RETURN-ZIP.cmd: packages the edited project for return.
+
+This is the full currently available project, not a finished Dynasty Warriors
+campaign or Unreal project. The 3D version currently has no enemies. Native
+.blend source files and an Unreal .uproject were not in the saved repository;
+GLB models can be imported into Blender. Keep 3D enemy creation deferred until
+Michael requests it. The pixel game includes its existing enemies.
+
+WORK WITH CLAUDE
+Use the extracted folder as the project directory in your local Claude coding
+tool, or upload this ZIP if your Claude interface accepts archives. Paste
+CLAUDE-HANDOFF.txt. Do not assume an ordinary chat can edit your desktop files.
+Keep the original downloaded ZIP as your backup. Work only inside this folder.
+Ask Claude for CHANGELOG-CLAUDE.txt and TEST-RESULTS-CLAUDE.txt after updates.
+
+RETURN TO CHATGPT
+After editing, double-click MAKE-CHATGPT-RETURN-ZIP.cmd. It creates a dated ZIP
+beside the game folder. Upload that ZIP to this ChatGPT conversation and say:
+"Review and test this Claude update, then apply it to my existing private
+Darren Site. Preserve its current Site identity and privacy."
+The return tool omits .git, node_modules, standard .env files and root ZIPs;
+remove any other private files you personally add before sharing the archive.
+If the packaging script is unavailable, right-click the entire project folder
+and choose Compress to ZIP, excluding node_modules and private environment files.
+
+DEVELOPMENT TESTS
+With Node.js installed, open a terminal in this folder, run npm install, then
+npm test. The pinned @napi-rs/canvas dependency is for rendering checks and art
+utilities; it is unnecessary for normal browser play. Python art tools also
+require Pillow, NumPy and SciPy if you choose to regenerate their outputs.
+See EXPORT-VALIDATION.txt for checks actually run for this package.

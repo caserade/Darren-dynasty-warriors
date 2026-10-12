@@ -1,0 +1,8 @@
+The current source revision has a truncated dist/assets/darren-reference.png.
+The desktop export uses the fully readable copy from source revision
+b9703e6459f9539de3cab63d9531c440ee1be135 for this reference panel only.
+Original bytes are retained as reference-originals/darren-reference-truncated.png.bin.
+Compare the current approved design in art-source/approved-darren-design.png
+and the supplied 3D GLB before character edits. The older panel is not the
+latest character design authority. Gameplay models/sprites were not changed.
+The hosted Site and canonical repository were not modified in this export.

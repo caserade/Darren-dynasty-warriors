@@ -1,0 +1,39 @@
+SNOWDAY — THE THREE FRIENDS
+Non-enemy playable 3D build, October 7, 2026
+
+Open /3d/ from the private game site, or use the new link on the pixel game's title screen.
+
+Included
+- Terrain height, trails, terraces, ramps and scenery placement converted from this game's pixel world.
+- Supplied Darren, Tormund and Bucky models, repaired and rigged in Blender, with embedded textures.
+- Eleven animation clips per character: idle, run, jump, dodge, three combo attacks, charge, charge attack, interact and celebrate.
+- Darren's charged snowball, Tormund's wide sword cleave, and Bucky's ground shockwave.
+- Third-person orbit camera, character switching, companions, collision, energy and three practice posts.
+- Ruffy rescue exploration quest, Firewood for Mom quest, six collectible cookies, dialogue, map, local saving and sound effects.
+- Keyboard, touch controls and standard gamepad mapping. Low detail disables shadows and lowers pixel density.
+- Original pixel game and its version-3 saves preserved. The 3D game uses a separate version-1 local save.
+- No enemies in the 3D build. Future enemies can be authored from simple shapes.
+
+Controls
+WASD / arrows: move. Drag or Z/X: orbit camera. Wheel: zoom. C: center camera.
+1/2/3: choose Darren/Tormund/Bucky. J: combo. Hold K, then release: charge attack.
+Space: jump. Shift: dodge. E: interact. Escape: pause.
+Gamepad: left stick move, right stick camera, X combo, Y hold/release charge,
+A jump, B dodge, RB interact, LB cycle hero, Start pause.
+Touch: left joystick plus independent action buttons. Drag the view to orbit.
+Return to the cottage from Pause if you need to regroup. Progress saves at interactions, cookies and pause.
+
+Verification
+- Blender 5.2.2: final native meshes have zero boundary edges, non-manifold edges, degenerate faces, or failed weight sums. Maximum four skin influences per vertex.
+- Final triangles including equipment: Darren 11,476; Tormund 21,786; Bucky 20,206.
+- Reimported GLB: 287 evaluated animation frames per character, 861 total; zero nonfinite vertices or missing images; eleven clips each.
+- Browser: all 33 clips load; skin weights and exact loop endpoints checked. Keyboard switching, all three charge hits, pause cancellation, jump/landing, dialogue, save/reload, low detail, simulated controller/disconnection and multi-touch cancellation passed.
+- Responsive layouts checked at 1440x900, 412x915 and 915x412 in desktop Edge/Chromium automation.
+- Thirteen simulation checks, including full rescue and firewood trips using actual terrain collision routes, passed.
+- Existing gameplay, firewood, phone and verify-scene regression checks passed. verify-scene is a native Canvas Phaser stand-in, not browser certification. Its temporary image paths were made Windows-compatible.
+
+Limits
+This is a playable non-enemy build, not certification for every device. Physical gamepads, iOS/Safari and low-end phones have not been tested. The authored animations are a first gameplay set; final enemy contact, damage, crowd performance and balance require the next stage. Model appearance was visually compared with the supplied/reference artwork; generated source geometry and baked textures remain the foundation.
+
+No paid generation service or new asset credits were used for this build.
+Three.js r186.1 is vendored with its license in dist/3d/vendor/LICENSE.

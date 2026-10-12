@@ -1,0 +1,22 @@
+Use case: stylized-concept. Asset type: FINAL animation sprite atlas for a polished snowy isometric action game.
+Image 1 is the APPROVED identity, proportions, art style and CAMERA ANGLE reference. Match that character exactly. Image 2 is ONLY a diagram of the required 8-column by 5-row sprite arrangement and pose/direction order. NEVER copy Image2's shallower, eye-level camera.
+Produce exactly ONE transparent-background PNG atlas with EXACTLY 40 full-body character sprites laid out in 8 COLUMNS ×5 ROWS, 8:5 landscape canvas, preferably 2048x1280. Each square cell must be equal, with completely transparent gutters. NO labels or grid lines.
+CRUCIAL ART IDENTITY: Darren red Shoyru dragon, exactly as image1: mostly slim body with only a little round belly, smooth featureless chest, red hands and legs, dark maroon-red rounded toe caps, big rounded head, big warm black-and-white expressive eyes, small rounded muzzle, ONE sweptback red crest, red tapered curved tail, two pink membranous wings with red spars and small white top tips. Rich crimson red with coral warm highlights and plum-red shade. Reproduce image1's dimensional cel-painted pixel clusters, matte controlled highlights, coherent volume, premium isometric adventure-game readability. No plastic shine.
+BASE LAYER: REMOVE THE YELLOW SCARF COMPLETELY FROM EVERY SPRITE. The game draws the scarf separately; this base atlas has NO scarf, no collars, no jewelry, no clothes, no equipment.
+CRUCIAL CAMERA: EXACTLY the strong ELEVATED THREE-QUARTER TOP-DOWN view of image1, approximately 45 degrees looking DOWN. Large top/crown of head visible, top plane of muzzle, shoulders, wing tops and feet visible. Foreshorten torso behind head; do not draw an eye-level chibi or side-view platformer sprite. SAME camera elevation for all40 sprites. Since background transparent, retain head/torso/feet overlap that establishes elevation even without the snow tiles.
+ROW1 all face RIGHT / EAST, camera still elevated looking down.
+ROW2 all face DOWN-RIGHT / SOUTHEAST, exactly like image1's top-left hero view.
+ROW3 all face straight DOWN toward camera / SOUTH, elevated frontal view with head top visible.
+ROW4 all face UP-RIGHT / NORTHEAST, rear three-quarter like image1's top-right figure; back of head and upper wings dominate, face turned away.
+ROW5 all face UP away / NORTH, TRUE BACK VIEW, no eyes or face visible at all.
+Each of those5 rows has THE SAME8 ACTION COLUMNS:
+1 idle: relaxed arms down, feet planted.
+2 walk: left foot forward and right foot back with arm counter-swing.
+3 walk: right foot forward and left foot back with opposite arm swing.
+4 jab: lead paw fully extended toward the facing direction, opposite paw tucked near torso, slight shoulder twist.
+5 cross: opposite paw fully extended toward the facing direction, hips and shoulder rotated in an obviously DIFFERENT pose from jab.
+6 kick: one leg extending far forward, dark-red toe cap visible, other foot planted, tail counterbalances. Match image1 bottom-right action quality.
+7 push: BOTH paws reaching forward together at chest height, palms forward, bent supporting legs as if pushing a heavy ball, but NO BALL in image.
+8 throw: overarm throwing windup with one paw over/back behind the head and opposite paw toward target, but NO BALL OR PROJECTILE.
+Pose always follows its ROW'S facing direction. All40 heads stay exactly same size. All bodies stay same base volume. Feet use common ground contact level within each cell. Fit each COMPLETE character in the central 70% of its cell, leaving at least15% empty margin on each side, with a common baseline around82% cell height. Keep entire crest, wing tips, tail tip, hands and kicking feet safely inside their cell. No sprites touching one another. No detached low-alpha speckles.
+This is a usable game atlas: transparent outside the body, no snow tiles, no ground, no cast shadows, no effects, no snowballs, no extra props, no text, no logos. Exactly40 character figures, not a collage or presentation sheet.

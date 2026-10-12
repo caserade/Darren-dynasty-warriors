@@ -1,0 +1,32 @@
+PAWS & SNOW — ISOMETRIC OVERHAUL
+
+Private hosted edition:
+https://darren-snowday-adventure.gosplekaiju.chatgpt.site
+Sign in with the owner's account to play. Access remains owner-only.
+
+See PLAY-TEST.txt for launch instructions, current controls and validation.
+
+Implemented: height-field terrain shared by rendering and collision, five
+raised areas (96–320 world units), walkable ramps, exposed snow-capped cliffs,
+solid shaded cottages / trees / tents / towers, scenery collision and fading,
+road and terrace minimap, height-aware projectiles and melee, and navigation
+around scenery and ledges. Four camera angles preserve screen-relative input.
+
+Darren: default unarmed style, jab / cross / kick / spinning tail combo,
+separate tail-sweep action, eight directional poses and eight frames per move,
+size-aware follow-through, retained snowball kit, optional scarf, and modest
+cookie weight growth with kick / sweep / roll bonuses. Style switch is F,
+controller View, or the always-visible Paws <-> Snow button. Version-3 saves
+remain compatible; new checkpoints include the selected style.
+
+Validation: local Chromium automation and screenshot inspection. Main routes
+walk in both directions, companions reach each camp, and the Ruffy reunion
+finishes and saves. Combo order, directional hits, one hit per attack, radial
+sweep, 3 growth stages, packed throws, 4 camera angles, elevated telegraphs,
+controller switching and binding swaps, disconnect behavior and portrait /
+landscape touch layouts passed. No uncaught page errors in these checks.
+Physical Samsung/Windows hardware performance was not measured.
+
+Presentation remains Phaser 2.5D isometric pixels with projected solid scenery,
+not a full 3D Unreal project. The exact Kisuke behemoth-hunting project could
+not be located, so no direct style comparison is claimed.

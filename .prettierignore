@@ -1,0 +1,10 @@
+node_modules/
+dist/vendor/
+dist/3d/vendor/
+dist/assets/
+dist/3d/world.json
+art-source/
+reference-originals/
+previews/
+*.json
+*.md

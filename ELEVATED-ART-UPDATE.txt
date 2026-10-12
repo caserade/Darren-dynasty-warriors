@@ -1,0 +1,30 @@
+DARREN'S SNOWDAY SEARCH — APPROVED ELEVATED ART
+
+This adds the approved elevated Darren artwork to the latest Soft Steps game.
+All version-5 gameplay, story, rescue, controller and checkpoint repairs remain.
+Combat/save authority stays at integer weight 0–3; smooth visual growth and
+belly springs remain cosmetic. Old version-3 saves remain compatible.
+
+ART AND ANIMATION
+40 authored painted poses provide five views, mirrored into eight directions.
+The camera shows Darren from above with a visible crown and shaded depth.
+The removable yellow scarf with pink dots remains animated. Heads stay the
+same size while cookie growth widens the waist gradually. A padded 128×144
+live texture and up to eight reusable trail textures retain bounded rendering.
+Walk, jab, cross, kick, push and throw use distinct poses. Contact poses follow
+the existing strike windows; tail sweeps add a wind-up, full turn and recovery.
+HUD and difficulty previews use the same artwork. Existing soft-motion and
+reduced-motion preferences remain functional. World scale and shadows fit
+Darren to the retained terrain. No level, story, damage or speed changes.
+
+VERIFICATION
+Passed node tests/gameplay.cjs and node tools/verify-scene.cjs after merging
+onto version 5. Checks cover the saved rescue, old saves, run isolation, growth,
+combat timing, input buffer, four cameras, live texture bounds and 4,992 poses.
+HTML script order and asset availability are checked; scene tests decode the
+same embedded sprite image used by the game. Native scene renders inspected.
+These checks use simulation and a native Canvas stand-in, not a new browser,
+WebGL or physical controller/device test.
+
+PUBLISHING
+Prepared for the existing owner-private Site with its existing audience.

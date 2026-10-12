@@ -1,0 +1,35 @@
+PHONE PLAY — PRIVATE BROWSER UPDATE
+
+Open the existing private Site on the phone and sign in with its owner account.
+Both chapters support touch controls. Landscape gives more room, but portrait
+remains supported. Title and Pause include phone instructions and an optional
+Full screen button when the browser exposes fullscreen support. Refused
+fullscreen requests show a message and do not block normal browser play.
+No app store package, offline installation, or cross-device save sync is added.
+Saves remain local to the browser/device where each chapter is played.
+
+FIXES
+- Removed touch-action:none from the page ancestors so long menus, art sheets,
+  dialogue and the size sketchbook can scroll vertically. Game surfaces retain
+  touch-action:none to prevent a movement/attack gesture scrolling the page.
+- Each joystick/attack gesture owns its pointer; a second finger cannot steal
+  the joystick or release another finger's attack. Lost capture/cancel resets
+  safely. Normal release still throws a charged snowball exactly once.
+- Actual touch enables the phone HUD even on hybrid/desktop-mode devices.
+- Resize clears held controls; orientation changes also pause active play.
+  Resume attempts to restart suspended audio without an unhandled rejection.
+- Landscape thumb controls respect bottom safe-area insets; joystick knob
+  travel is calculated from its actual rendered size. Menu targets are >=44px.
+- Touch rendering is capped at 1280x800; desktop keeps the 1920x1080 cap.
+  These are resolution budgets, not an FPS or hardware performance guarantee.
+
+CHECKS
+Tests phone.cjs cover concurrent touch ownership, canceled/lost gestures,
+charged release, rotation pause and hybrid-device control restoration.
+Existing gameplay.cjs, firewood.cjs and native Canvas verify-scene.cjs passed.
+HTML asset paths/IDs checked. No live mobile browser, Samsung hardware or
+physical controller test was possible; device performance remains unverified.
+
+API references used for implementation:
+https://developer.mozilla.org/en-US/docs/Web/API/Element/requestFullscreen
+https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/touch-action

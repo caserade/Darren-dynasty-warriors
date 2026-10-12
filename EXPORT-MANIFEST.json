@@ -1,0 +1,410 @@
+{
+  "source_commit": "6a34f9e6d5a0ecc148c8d78e1d63e7ec90a34130",
+  "site_version": 13,
+  "files": {
+    ".gitignore": {
+      "bytes": 62,
+      "sha256": "2ec521966b22812d1d0b4ddf9dcb4d4906d884f9f158a9899e3316adba301eb6"
+    },
+    ".openai/hosting.json": {
+      "bytes": 106,
+      "sha256": "66f9463f963bf0ff2443c781969617d97bf19fad5b01cf84db6f1c6e948bd0ae"
+    },
+    "AGENTS.md": {
+      "bytes": 1305,
+      "sha256": "e443474c1463bb60ea75087567d9f7a6126f25bdc5106dd038039993bba5b3a7"
+    },
+    "CLAUDE-HANDOFF.txt": {
+      "bytes": 2468,
+      "sha256": "eabc5a038bc7a9c9d46e7e43d321dd36b1296c390d23b800e95d6225d110e849"
+    },
+    "CONTROLLER-PLAY.txt": {
+      "bytes": 1534,
+      "sha256": "b8c444c7d3574ad96e0af4b2aaa4209387a700dede18d20d85fb5ef2a0c0646c"
+    },
+    "ELEVATED-ART-UPDATE.txt": {
+      "bytes": 1752,
+      "sha256": "c0cf95d88c4dc662d79e5a5274f1184cdaa375898a0e9678b40041ab05bb6058"
+    },
+    "EXPORT-VALIDATION.txt": {
+      "bytes": 892,
+      "sha256": "9e6730cbb41f9c401185e42ad50d9df166e02037d41853e8454ae2ccdfc16e38"
+    },
+    "FIREWOOD-CHAPTER.txt": {
+      "bytes": 2892,
+      "sha256": "aec0aa95480518fbd3298d0170f39e6f5efdb30a9085a7719119e11b40c383e9"
+    },
+    "HUD-CLEANUP.txt": {
+      "bytes": 1389,
+      "sha256": "2d0331c835931a1daf661f0fe6e7bdb10d8ede454442ecbb93a2efa216adfbbe"
+    },
+    "ISOMETRIC-UPDATE.txt": {
+      "bytes": 1834,
+      "sha256": "886e72324b8fde77287801a3a0215787e7d6f9e447c946e7f0e4bbfc8d28934b"
+    },
+    "MAKE-CHATGPT-RETURN-ZIP.cmd": {
+      "bytes": 125,
+      "sha256": "afcf92fd24a4656c7ec4b917775de56f592b067a37e642e93e62c0de1b6c0dd4"
+    },
+    "MAKE-CHATGPT-RETURN-ZIP.ps1": {
+      "bytes": 906,
+      "sha256": "38ff5e982a634525667e44219b3d223c4b9ddce6551f3efdd092a37ffe9ef93b"
+    },
+    "PHASER-UPDATE.txt": {
+      "bytes": 3800,
+      "sha256": "69e90bf8d6fed0bb749aa07872835b5357b54d69f5ce418ee4dab9bd82d75397"
+    },
+    "PHONE-PLAY.txt": {
+      "bytes": 2154,
+      "sha256": "b7449f87fb30eae3177fe03a14914e73bb56741b9c7d04ef210ce0f9ac4ea29d"
+    },
+    "PHONE-SCREEN-FIT.txt": {
+      "bytes": 1716,
+      "sha256": "d763e659fa3272cbb4ab625cfdddff0874b44f3124bae161b9f7bc54e38c36af"
+    },
+    "PLAY-3D.cmd": {
+      "bytes": 364,
+      "sha256": "99f007f3a3f1ccc76a46ca947274199ecf37367be9dc9bde3d56f36888d54b5b"
+    },
+    "PLAY-PIXEL.cmd": {
+      "bytes": 388,
+      "sha256": "1bc12fbb29afd9876c12a6b0271d687fbcf0dae98b3d5725259a06975affc64c"
+    },
+    "PLAY-TEST.txt": {
+      "bytes": 4010,
+      "sha256": "ce6d3521e161d494f5fcd749f60fed6f96e457c1b886820d9e9155a351a3657e"
+    },
+    "REFERENCE-REPAIR.txt": {
+      "bytes": 610,
+      "sha256": "76dae1f2f26ff495cbc6a684f379f6c1ef04ed08fc45de0e0c78e25021e0e139"
+    },
+    "SOFT-STEPS-UPDATE.txt": {
+      "bytes": 3929,
+      "sha256": "7825d75480fe3766ca5d98e1057625a12967c75d134a2bfac613d70beb96bdd4"
+    },
+    "START-HERE.txt": {
+      "bytes": 3739,
+      "sha256": "a73ef80030cb35a968643027a8e37065586912593d26f615f056151e50adc4c5"
+    },
+    "STORYBOOK-UPDATE.txt": {
+      "bytes": 2571,
+      "sha256": "3e92e5f96472fe481a192f0aad0df44d1adf173f7d50d7f40ea443dfff25ae7a"
+    },
+    "THREE-D-RELEASE.txt": {
+      "bytes": 3352,
+      "sha256": "9d6fcdd76a07307a527c10a724f3b1107095e1b40b4221f0c0d40c2cd1e96b1b"
+    },
+    "art-source/angle-revision-prompt.txt": {
+      "bytes": 2446,
+      "sha256": "d483a81cc37b59cd3855c47b80a461297f96553b1a6bd0e3cbb50e40e69f5351"
+    },
+    "art-source/approved-darren-design.png": {
+      "bytes": 1865907,
+      "sha256": "6cdf7f1d7fbfeb6c9b0ea61aaac744f58ffa296bb928fc09bfdd460941f83344"
+    },
+    "art-source/darren-art-manifest.json": {
+      "bytes": 7570,
+      "sha256": "c976a3bf1a9635b8aef4ba3e76e9636bae23efc481fa4192239be41f45f25b1e"
+    },
+    "art-source/darren-isometric-source.png": {
+      "bytes": 1487541,
+      "sha256": "5b1ce10a1c4c11156f44305c2aeb2219441303e8e97adab1b15e1b3ac134b542"
+    },
+    "art-source/darren-storybook-source.png": {
+      "bytes": 1779437,
+      "sha256": "c51e195b15ec3a8d5ff16ada44a67cabab5e7bdfebeed6166ec536c7ed682f5a"
+    },
+    "art-source/firewood/PROMPTS.txt": {
+      "bytes": 1071,
+      "sha256": "6dcafdf7666cd05bed60c90e56473edd4b628adfa69238d2e541cf4bf499d93a"
+    },
+    "art-source/firewood/bucky-actions.png": {
+      "bytes": 1911103,
+      "sha256": "aeada0ae6a7f4837f2726bc459e12b9fcff1c8288bebebfd36cf6f6069206a34"
+    },
+    "art-source/firewood/props.png": {
+      "bytes": 1967578,
+      "sha256": "67ba78d430eafd5d4d6e65450998ca20e1dc8d6dca11b513c792b53386f6eb46"
+    },
+    "art-source/firewood/tormund-front.png": {
+      "bytes": 1728568,
+      "sha256": "db2b8f8cc20907da431f6e7d9dec782994128db35c31b6b7db07bb03fc73db11"
+    },
+    "art-source/firewood/tormund-rear.png": {
+      "bytes": 1340564,
+      "sha256": "fe22be0f1ca2940e2b3992f5728824358ab3844ff726e890c9c08c9a0f01870d"
+    },
+    "art-source/generation-prompt.txt": {
+      "bytes": 4006,
+      "sha256": "2f6b5cc9a511748ecd8420733540b71dbf3bb2668fc79a16b11e534982264ea6"
+    },
+    "art-source/storybook-darren-prompt.txt": {
+      "bytes": 1387,
+      "sha256": "ad30779ecdd31f32553c9240dc4e11addee814bcb006c897edc4e61aa6e354d6"
+    },
+    "art-source/storybook-scenery-prompt.txt": {
+      "bytes": 1782,
+      "sha256": "5f73497546bc9fcaa02f762f4a793df056f6a8dcb85f0d2453716624ea563a45"
+    },
+    "art-source/storybook-scenery.png": {
+      "bytes": 1982462,
+      "sha256": "977701e5cd692d0a64fc191bf3274e09971907a6bf5a993f388f93135ef7bd06"
+    },
+    "art-source/weight-study-prompt.txt": {
+      "bytes": 1666,
+      "sha256": "61544e5556294d30032b0d08205576cd1eaf1975bb20624477dea89929b804f1"
+    },
+    "desktop-server.cjs": {
+      "bytes": 1648,
+      "sha256": "dfe7589f92655cfae91863e718944d8b4bfd7492ca63cc57d5697936737d493a"
+    },
+    "desktop-server.py": {
+      "bytes": 790,
+      "sha256": "7e9540cea05e5bea4cfdbe8139cdfbb2291efc54cbb86e14c6774fe1efe747ca"
+    },
+    "dist/3d/assets/bucky.glb": {
+      "bytes": 5929688,
+      "sha256": "f02b9748fe9751e4beb8ad3b1b502f596b049d8126cfa0fee21cb071e8ef71cd"
+    },
+    "dist/3d/assets/darren.glb": {
+      "bytes": 976164,
+      "sha256": "67c78556421b504cf75e3130bfe169334e9f3bac07e0bb6cf870440c81fd5302"
+    },
+    "dist/3d/assets/terrain.glb": {
+      "bytes": 2321508,
+      "sha256": "4846fcf406a6514de0ad700c7e3e7224e93283e656cea3160e0a42bd0c37975f"
+    },
+    "dist/3d/assets/tormund.glb": {
+      "bytes": 7973716,
+      "sha256": "d321879ae664ca4ad76f57b8c9467543688e43ca161a831126aac0c0cfc9a604"
+    },
+    "dist/3d/game.mjs": {
+      "bytes": 19464,
+      "sha256": "7f2f3548d6501f1140f6a9fe5a3fbcd6d830bbedf855bca406e8f10666e55c75"
+    },
+    "dist/3d/index.html": {
+      "bytes": 3627,
+      "sha256": "aced9141647d167eee2a527dfbd0fb06b9d9ff2f8b92b4b7fcd28bcf65f25794"
+    },
+    "dist/3d/sim.mjs": {
+      "bytes": 14006,
+      "sha256": "26495c12c62b157d00687307ead3a793ab58ee4c9ac49c3b2657cce6bfa35f7d"
+    },
+    "dist/3d/style.css": {
+      "bytes": 7499,
+      "sha256": "d08f74c6d6b479086a76485d3b71ebfccce00dbe8c9e29bdb34f04d8344fbb30"
+    },
+    "dist/3d/vendor/LICENSE": {
+      "bytes": 1081,
+      "sha256": "8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc"
+    },
+    "dist/3d/vendor/loaders/GLTFLoader.js": {
+      "bytes": 117570,
+      "sha256": "131c0f78c01d19368ae495caa65b3adaa10487810a36a05bb5901b769a35ac16"
+    },
+    "dist/3d/vendor/three.core.js": {
+      "bytes": 1458113,
+      "sha256": "9edde002b066a9a05676a6127f67735b62baf399bdea529f2f7e31657da769e6"
+    },
+    "dist/3d/vendor/three.module.js": {
+      "bytes": 662772,
+      "sha256": "9052042d676cb0fdc1ddfefe193053f34b7ac0513a616fdac4535d49987812ea"
+    },
+    "dist/3d/vendor/utils/BufferGeometryUtils.js": {
+      "bytes": 37712,
+      "sha256": "9fb63427ce6641fa14fd0baff9cc4d1b5f9c3d85fd084bf2e90e803c44ec1797"
+    },
+    "dist/3d/vendor/utils/SkeletonUtils.js": {
+      "bytes": 11535,
+      "sha256": "b1632a703206c3d830de9fcbe515696770d04b71a15ee6b50afa6d2c3298c86f"
+    },
+    "dist/3d/world.json": {
+      "bytes": 392620,
+      "sha256": "969d25ee432e2a07d658a312c1d6b773da2e1dfd5bf793d8eb98550c3f105d6f"
+    },
+    "dist/assets/bucky-actions.png": {
+      "bytes": 1911103,
+      "sha256": "aeada0ae6a7f4837f2726bc459e12b9fcff1c8288bebebfd36cf6f6069206a34"
+    },
+    "dist/assets/bucky-atlas.png": {
+      "bytes": 582390,
+      "sha256": "4bce04343ee5764b5ca4f96e6b73638a287e55665e2e36854050d6ea352f17a4"
+    },
+    "dist/assets/bucky-turnaround.png": {
+      "bytes": 2465477,
+      "sha256": "c5f510b02ae1cf410f4f1d966f700ef01c5ed23d2c83effa8fb89ab53462fd4a"
+    },
+    "dist/assets/darren-isometric.js": {
+      "bytes": 2390809,
+      "sha256": "d742c3eb12400ddad6987f5188cfe69f68b5b3980c744be85df0b3c7a927a08c"
+    },
+    "dist/assets/darren-isometric.png": {
+      "bytes": 1790700,
+      "sha256": "3232cb108aead5b44d350b25d7e5e1015a3ec4923292c1e004c6483fe932b895"
+    },
+    "dist/assets/darren-reference.png": {
+      "bytes": 2657706,
+      "sha256": "6710c7ccb863272e2dd4b95cabc1a2c3e653eee18b6ad8c9b6fd924420ca5e3d"
+    },
+    "dist/assets/darren-weight-storybook.png": {
+      "bytes": 2367746,
+      "sha256": "8aabf2cfcdca99fa507d9bdbf1c94d29e8f12c40d79ce030f55e4e8510509f71"
+    },
+    "dist/assets/firewood-atlas.png": {
+      "bytes": 733432,
+      "sha256": "05fc43f1bb3602953627948ea42895909e2847d4bdb8f05cc3707cb6d69b750c"
+    },
+    "dist/assets/storybook-scenery.js": {
+      "bytes": 2417746,
+      "sha256": "365552558cce5dc6ad6735f991fa7a0da619a569ab3cd4a9cd5154c10c0c8c03"
+    },
+    "dist/assets/tormund-actions-rear.png": {
+      "bytes": 1340564,
+      "sha256": "fe22be0f1ca2940e2b3992f5728824358ab3844ff726e890c9c08c9a0f01870d"
+    },
+    "dist/assets/tormund-actions.png": {
+      "bytes": 1728568,
+      "sha256": "db2b8f8cc20907da431f6e7d9dec782994128db35c31b6b7db07bb03fc73db11"
+    },
+    "dist/assets/tormund-atlas.png": {
+      "bytes": 477510,
+      "sha256": "c5ea6296d21bff818d1658071e12e8fbd6d3d2a935e19113acdfee98490e7edf"
+    },
+    "dist/assets/tormund-turnaround.png": {
+      "bytes": 2672712,
+      "sha256": "1052a302e9ab8d2040070fe130c5765cf28e2479424f1da26b3e8ffa6b93f6e9"
+    },
+    "dist/base.css": {
+      "bytes": 21149,
+      "sha256": "da447d7abcff232d116ab18c0e6e088a0d64eb8b9588b8b33fbd2d9219258eca"
+    },
+    "dist/controls.js": {
+      "bytes": 12301,
+      "sha256": "c3fbac63bf39d8d4333b103c5116db19eb3f4d8a559bba7fbff7727b3e69e02d"
+    },
+    "dist/darren-art.js": {
+      "bytes": 7010,
+      "sha256": "61be03eab55d98e9e3e5bf9cb2dd23c8a53548e2b66e84cc752749dc8f2dc9dc"
+    },
+    "dist/firewood.js": {
+      "bytes": 16022,
+      "sha256": "cfe06b247398031ab389d1d70d2270a7fd651778656cae472333e4ce32f0aec5"
+    },
+    "dist/game.js": {
+      "bytes": 80422,
+      "sha256": "29a37c8ede7fcc750447746e0d594a33eaad93fed0fe36cc3051282cf0b7c240"
+    },
+    "dist/hud-clean.css": {
+      "bytes": 10841,
+      "sha256": "64e46cd195008358dc71146ed91d12f8428ad7b244e28df95ddfa5693f37ef2d"
+    },
+    "dist/index.html": {
+      "bytes": 16729,
+      "sha256": "f42381185f3c15b61bfd33f9202d54a0558e032c58d571c5b41e05ab81ea8ef5"
+    },
+    "dist/isometric-world.js": {
+      "bytes": 19771,
+      "sha256": "15257049ca93c549798a90f984dc51ddc1fd8fb86c94228bfaf0f2b5127ed366"
+    },
+    "dist/phaser-scene.js": {
+      "bytes": 18422,
+      "sha256": "de98503c2c724db998abeed8de1f7340ab6864b6bde33f6a394396293c6dd314"
+    },
+    "dist/phone.js": {
+      "bytes": 2525,
+      "sha256": "96101d236b64906594767132cd19d6197de1f49aca1619baeea2087069170cf2"
+    },
+    "dist/pixel-art.js": {
+      "bytes": 12468,
+      "sha256": "241968e574986a10358853c1f02d1214acf9e4faf677f13e3499b812c48cfd95"
+    },
+    "dist/pixel.css": {
+      "bytes": 4914,
+      "sha256": "a247dffc831d51d065440a0bdc49b8babf4175ef53c9ed85b9c0849b293c5875"
+    },
+    "dist/storybook.css": {
+      "bytes": 2495,
+      "sha256": "06c0327cdc434982539386ee7c01f5c328bb33eb535dbda75ecba78c398c294b"
+    },
+    "dist/storybook.js": {
+      "bytes": 2214,
+      "sha256": "03eb726502b1f30cb01f8a9c459a68c13b64d396cd192c22117bada34d17d28a"
+    },
+    "dist/vendor/PHASER-LICENSE.md": {
+      "bytes": 1120,
+      "sha256": "080f3d5539e766bb556df5b8e86c4f5d581ece35c692b80956ca352b84d29134"
+    },
+    "dist/vendor/phaser-3.90.0.min.js": {
+      "bytes": 1196122,
+      "sha256": "e92ddef111ba42e92d316979c732311757093688ea1810591cb7aa2858eba7a7"
+    },
+    "package.json": {
+      "bytes": 453,
+      "sha256": "3fe1c286e26be502317862ddd2f1cb1ec3324b3731861eddb1d347907ef5c9fa"
+    },
+    "previews/Darren-Isometric-Preview.png": {
+      "bytes": 236969,
+      "sha256": "28b2db5a7ef6b7986ae18440de9075cc30d85c1b28d91593b5218c78b2b111b9"
+    },
+    "previews/Darren-Storybook-Weight-Levels.png": {
+      "bytes": 152978,
+      "sha256": "fdf4776cb170fd19b75f5fa35de493da1271dc104266b37deb89c59fdfc3d223"
+    },
+    "previews/Darren-Unarmed-Frames.png": {
+      "bytes": 78282,
+      "sha256": "350ebcf4fd2c3e48de011becdd04a8b0af0ef9d51461777d368e4b053d344030"
+    },
+    "reference-originals/darren-reference-truncated.png.bin": {
+      "bytes": 2114048,
+      "sha256": "77f6d1c21e329a6dd838a60a44ed700ea546514e32921ba125342a4d29bca8a1"
+    },
+    "tests/controllers.cjs": {
+      "bytes": 2570,
+      "sha256": "afd6498f182cf152670d00e1304faabd64683b0de8e1cad5f317f01522a0e7e0"
+    },
+    "tests/firewood.cjs": {
+      "bytes": 3898,
+      "sha256": "1825b046c44d6d7dac485cd7dd26ec568a67f57a3be260b25c3ee4afff118a87"
+    },
+    "tests/gameplay.cjs": {
+      "bytes": 5095,
+      "sha256": "3e63e99b6bd6594e9dc1901deacfa02564c1de3a4ec4a9b3cb413d5ea1cb62b1"
+    },
+    "tests/phone.cjs": {
+      "bytes": 2144,
+      "sha256": "f81856cd64547e207010d8dba861ecc91abd82f28b7474b94e3abde3d6778f34"
+    },
+    "tests/screen-fit.cjs": {
+      "bytes": 1621,
+      "sha256": "55379d375a520a0b3c7cc71471e618c65f835e1cd5591394935ad7a3ea1e6911"
+    },
+    "tests/support.cjs": {
+      "bytes": 1805,
+      "sha256": "cd7bf88c00f2035be1be67d846bbf928534364937d0123659ebe3c4cb0ae75df"
+    },
+    "tests/three-d.mjs": {
+      "bytes": 4630,
+      "sha256": "cf49f5e0d8b7b7693aebe3b9e73d65bb9ca8ae726adae09b349bab8476a6be40"
+    },
+    "tools/export-unreal-reference.cjs": {
+      "bytes": 728,
+      "sha256": "92293ee2486070bb364ceadd835551b73e2ffb0dcd692f6310df8c85ec620eaf"
+    },
+    "tools/pack-firewood.py": {
+      "bytes": 2857,
+      "sha256": "f4d3757f235c582c515827df9391fb989707a86a302ad2774030371b531d43b9"
+    },
+    "tools/prepare-darren-art.cjs": {
+      "bytes": 3433,
+      "sha256": "94da72600ccb95804ccd492aead06cad841739698de9f935012b4bc514b428f4"
+    },
+    "tools/prepare-storybook.cjs": {
+      "bytes": 1932,
+      "sha256": "eb5ac43dd2085775b80e96f03c072adb246bd367f59990d8483a392c6dacb53b"
+    },
+    "tools/verify-scene.cjs": {
+      "bytes": 9820,
+      "sha256": "eb128daeb80f38bb5bee9c40abc4ab71205d84b0ddcde650936307dca2852c72"
+    }
+  }
+}
