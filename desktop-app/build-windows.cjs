@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { packager } = require('@electron/packager');
+const { gameManifest } = require('../tools/publish-game-update.cjs');
 
 const here = __dirname;
 const pkg = require('./package.json');
@@ -39,6 +40,8 @@ const exeName = 'Darren Snowday';
       /^\/build-windows\.cjs$/,
       /^\/icon\.ico$/,
       /^\/README/,
+      /^\/update-config\.json$/,
+      /^\/update-token\.txt$/,
     ],
     icon: path.join(here, 'icon.ico'),
     appVersion: pkg.version,
@@ -56,6 +59,20 @@ const exeName = 'Darren Snowday';
   fs.cpSync(path.join(here, '..', 'dist'), path.join(dest, 'resources', 'game'), {
     recursive: true,
   });
+  // What the bundled game is, so the app downloads only newer games and only changed files.
+  const manifest = gameManifest(path.join(dest, 'resources', 'game'));
+  fs.writeFileSync(path.join(dest, 'resources', 'game-manifest.json'), JSON.stringify(manifest));
+  // Where updates come from. The private repo needs a read-only key: SNOWDAY_UPDATE_TOKEN or
+  // desktop-app/update-token.txt (never committed). Without one the app reads a public repo.
+  const config = JSON.parse(fs.readFileSync(path.join(here, 'update-config.json'), 'utf8'));
+  let token = process.env.SNOWDAY_UPDATE_TOKEN || '';
+  try {
+    token = token || fs.readFileSync(path.join(here, 'update-token.txt'), 'utf8').trim();
+  } catch {}
+  if (token) config.token = token;
+  else console.log('No update key found: the app will only see updates from a public repo.');
+  fs.writeFileSync(path.join(dest, 'resources', 'update-config.json'), JSON.stringify(config));
+  console.log(`Bundled game build ${manifest.build} (${manifest.commit}) "${manifest.notes}"`);
 
   fs.writeFileSync(
     path.join(dest, 'HOW-TO-PLAY.txt'),
@@ -72,6 +89,10 @@ const exeName = 'Darren Snowday';
       'The start screen lets you pick the pixel or the 3D adventure. Ctrl+H comes back',
       'to it, Ctrl+1 / Ctrl+2 jump straight to a game, F11 is full screen. Controllers,',
       'keyboard and mouse work as in the browser versions.',
+      '',
+      'Updates: the app checks for a newer game every time it starts and downloads only the',
+      'changed game files. The start screen says when it updated. You do not need to',
+      'download this folder again unless the start screen says a new copy of the app is needed.',
       '',
       "Saves live in %APPDATA%\\Darren's Snowday Search (Test > Open save folder).",
       'They are separate from saves made in a web browser.',

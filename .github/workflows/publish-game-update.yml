@@ -1,0 +1,45 @@
+# Publishes the game in dist/ for the desktop app's self-updater. Every push to main that
+# changes the game rebuilds the game-updates branch (one commit, replaced each time) with
+# latest.json and game/. The app checks that branch when it starts and downloads only the
+# files that changed. See desktop-app/README.md.
+name: Publish game update
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'dist/**'
+      - 'CHANGELOG-CLAUDE.txt'
+      - 'desktop-app/game-manifest.cjs'
+      - 'tools/publish-game-update.cjs'
+      - '.github/workflows/publish-game-update.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-game-update
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build the update
+        run: node tools/publish-game-update.cjs "$RUNNER_TEMP/update"
+      - name: Replace the game-updates branch
+        working-directory: ${{ runner.temp }}/update
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git init -q -b game-updates
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "Game update from ${GITHUB_SHA::7}"
+          git push -f "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" game-updates

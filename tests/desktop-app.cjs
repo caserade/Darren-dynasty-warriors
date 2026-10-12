@@ -18,14 +18,15 @@ function rec(check, ok, note = '') {
   if (!ok) fails++;
   console.log(ok ? 'PASS' : 'FAIL', 'desktop ·', check, note);
 }
-async function launch() {
+async function launch(env = { SNOWDAY_NO_UPDATES: '1' }) {
   const args = ['--no-sandbox', '--user-data-dir=' + profile, '--ignore-gpu-blocklist'];
   const app = await electron.launch(
     packaged
-      ? { executablePath: packaged, args }
+      ? { executablePath: packaged, args, env: { ...process.env, ...env } }
       : {
           executablePath: require(path.join(appDir, 'node_modules', 'electron')),
           args: [appDir, ...args],
+          env: { ...process.env, ...env },
         }
   );
   const p = await app.firstWindow();
@@ -122,6 +123,63 @@ const tag = packaged ? 'packaged' : 'checkout';
     (await p.evaluate(() => localStorage.getItem('desktop-test-marker'))) === 'kept'
   );
   await app.close();
+
+  // Self-update: a local web server plays GitHub's game-updates branch with a newer game
+  // (dist/ plus one marker file and a changed start page comment).
+  const { buildManifest } = require(path.join(appDir, 'game-manifest.cjs'));
+  const pub = fs.mkdtempSync(path.join(os.tmpdir(), 'snowday-pub-'));
+  fs.cpSync(path.join(appDir, '..', 'dist'), path.join(pub, 'game'), { recursive: true });
+  fs.writeFileSync(path.join(pub, 'game', 'update-marker.txt'), 'new game');
+  fs.appendFileSync(path.join(pub, 'game', 'index.html'), '\n<!-- updated -->\n');
+  const latest = buildManifest(path.join(pub, 'game'), { build: 4000000000, notes: 'Test update' });
+  fs.writeFileSync(path.join(pub, 'latest.json'), JSON.stringify(latest));
+  const served = [];
+  const srv = require('node:http').createServer((req, res) => {
+    const rel = decodeURIComponent(req.url.split('?')[0]);
+    served.push(rel);
+    const file = path.join(pub, rel);
+    if (!file.startsWith(pub + path.sep) || !fs.existsSync(file)) return res.writeHead(404).end();
+    res.end(fs.readFileSync(file));
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const updateEnv = { SNOWDAY_UPDATE_URL: 'http://127.0.0.1:' + srv.address().port };
+  ({ app, p, log } = await launch(updateEnv));
+  await p
+    .waitForFunction(() => document.querySelector('#update.news'), null, { timeout: 60000 })
+    .catch(() => {});
+  const news = await p.evaluate(() => document.getElementById('update').textContent);
+  rec('start screen says the game was updated', /was updated.*Test update/.test(news), news);
+  const gameFiles = served.filter((u) => u.startsWith('/game/'));
+  rec(
+    'only the changed files were downloaded',
+    gameFiles.sort().join() === '/game/index.html,/game/update-marker.txt',
+    gameFiles.length + ' files: ' + gameFiles.slice(0, 4).join(' ')
+  );
+  rec(
+    'the updated game is what plays',
+    await p.evaluate(async () => (await (await fetch('/update-marker.txt')).text()) === 'new game')
+  );
+  rec(
+    'saves are kept across the update',
+    (await p.evaluate(() => localStorage.getItem('desktop-test-marker'))) === 'kept'
+  );
+  await p.screenshot({ path: out + `desktop-04-updated-${tag}.png` });
+  await app.close();
+  srv.close();
+  ({ app, p, log } = await launch({ SNOWDAY_UPDATE_URL: 'http://127.0.0.1:9/offline' }));
+  await p
+    .waitForFunction(() => /Offline/.test(document.getElementById('update').textContent), null, {
+      timeout: 30000,
+    })
+    .catch(() => {});
+  rec(
+    'offline after an update: still plays the updated game, no repeat news',
+    (await p.evaluate(async () => (await fetch('/update-marker.txt')).ok)) &&
+      !(await p.isVisible('#update.news')),
+    await p.evaluate(() => document.getElementById('update').textContent)
+  );
+  await app.close();
+  fs.rmSync(pub, { recursive: true, force: true });
   fs.rmSync(profile, { recursive: true, force: true });
   console.log(fails ? fails + ' failed' : 'all desktop checks passed');
   process.exit(fails ? 1 : 0);
