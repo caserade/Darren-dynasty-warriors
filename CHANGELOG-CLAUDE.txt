@@ -411,6 +411,7 @@ Desktop app (desktop-app/):
 Fresh clone from GitHub:
 - tools/verify-scene.cjs rewrote previews/Darren-Storybook-Weight-Levels.png on every
   npm test, leaving a changed file; it now only does so with --update-previews.
+- tests/browser-qa.cjs: "grunts hurt the hero" waits up to 8 game-seconds (grunts take turns).
 - tests/firewood.cjs failed about 1 run in 15 because its robot stood at a wood pile while
   one guard stayed out of the friends' reach; it now walks to that guard like a player.
   The pixel game itself is unchanged (no dist/ file outside dist/3d/ differs from main).

@@ -691,7 +691,12 @@ function rec(area, check, ok, note = '') {
       ])
         g.enemies.push(g.makeFoe(t, a.x + dx, a.z + dz));
     });
-    await gt(4);
+    // Grunts take turns and back off after striking, so the first hit can land a little
+    // after 4 s (about 1 run in 200 in the simulation); allow up to 8 game-seconds.
+    for (let i = 0; i < 4; i++) {
+      await gt(i ? 1 : 4);
+      if (await p.evaluate(() => snowdayTest.game.player.hp < 100)) break;
+    }
     rec(
       '3d fight',
       'grunts hurt the hero and the health bar follows',

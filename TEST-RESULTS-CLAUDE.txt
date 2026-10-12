@@ -1,3 +1,43 @@
+TEST RESULTS · CLAUDE UPDATE 7 (FULL QUALITY CHECK, NO UPDATER, FRESH CLONE) · 2026-10-12
+All runs below were made in a Linux container on this branch (claude/full-qa-gdog2s), with
+headless Chromium using software WebGL (SwiftShader) at 1-3 fps. Earlier results further
+down are history, not verification of this branch.
+
+npm test (node 22.22): all pass.
+  tests/three-d.mjs 43 checks (new: a hero knocked out mid-air can jump-attack again;
+  it fails without the sim.mjs fix), shared-save 8, gameplay, firewood, phone,
+  controllers, screen-fit, tools/verify-scene.cjs, desktop packaging + standalone 9.
+Repeat runs: tests/firewood.cjs failed 2 of 30 before the robot fix (a guard out of the
+  friends' reach) and 0 of 40 after; tests/gameplay.cjs 10 of 10.
+tests/browser-qa.cjs: 63 of 63 before the fixes. After the fixes, one run gave 62 of 63:
+  "grunts hurt the hero" saw no hit inside 4 game-seconds while the machine was also
+  building the app. A 200-run simulation of that scene showed it happens about 1 run in
+  200 because grunts take turns (both were winding up when the window closed), so the
+  check now allows up to 8 game-seconds. A clean rerun on the fixes: 63 of 63.
+Extra browser play-through written for this check (not in the repo; script kept with the
+  QA report): each hero's full string (Paws N1-N6, Scarf N1-N6, Tormund N1-N5, Bucky
+  N1-N4), charge attack and special (PawSpecial, ScarfSpecial, TorSpecial, BukSpecial);
+  Q swaps Darren to the Polka Scarf; Tormund's parry; the 3D game stepped at 8 fps
+  through a jump landing and hits keeps every hero transform finite; the scarf choice is
+  in the save; no page errors. 16 of 16.
+tests/desktop-app.cjs under xvfb-run: 13 of 13 from the checkout and 13 of 13 from a
+  packaged Linux build of this code (new checks: a backslash path escape is refused, and
+  snowday://game/3d redirects to /3d/ and loads).
+Windows build: npm run build:win produced the 1.2.0 x64 zip (135 files); its
+  resources/game is byte-identical to dist/ and app.asar holds only main.cjs,
+  package.json and home/. Copied to project files desktop-app/Darren-Snowday-Windows.zip.
+Fresh clone: cloned the branch from GitHub into an empty folder; npm install, npm test
+  (pass), desktop-app npm install + npm run build:win (builds). Before the fixes npm test
+  left previews/Darren-Storybook-Weight-Levels.png modified; now the clone stays clean.
+  Launcher files keep CRLF (.cmd) and the executable bit (.command).
+Pixel game: no file under dist/ outside dist/3d/ differs from main.
+Merges: main is an ancestor of every PR branch; this branch contains PR #1 and PR #2.
+
+LIMITS
+- Not run on a real Windows PC (Linux build of the same code only), real GPU, physical
+  controller (Gamepad API simulated), real phone, Mac or Safari. SmartScreen not checked.
+- Frame rate, feel and balance on real hardware were not measured.
+
 TEST RESULTS · CLAUDE UPDATE 6 (FLUID ANIMATION, COMBOS, POLKA SCARF, SMARTER AI · 3D ONLY) · 2026-10-12
 Environment: Linux cloud container, Node 22.22, headless Chromium (Playwright 1.56),
 software WebGL (SwiftShader). This isn't a real GPU, Windows PC, phone or physical
