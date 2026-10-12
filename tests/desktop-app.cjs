@@ -111,8 +111,22 @@ const tag = packaged ? 'packaged' : 'checkout';
   rec(
     'outside the game folder is refused',
     await p.evaluate(async () => {
-      const r = await fetch('snowday://game/%2E%2E%2Fdesktop-app%2Fmain.cjs').catch(() => null);
-      return !r || !r.ok;
+      const bad = [
+        'snowday://game/%2E%2E%2Fdesktop-app%2Fmain.cjs',
+        'snowday://game/..%5C..%5Cdesktop-app%5Cmain.cjs',
+      ];
+      for (const u of bad) {
+        const r = await fetch(u).catch(() => null);
+        if (r && r.ok) return false;
+      }
+      return true;
+    })
+  );
+  rec(
+    'a folder without its slash still loads its own files',
+    await p.evaluate(async () => {
+      const r = await fetch('snowday://game/3d');
+      return r.ok && r.url === 'snowday://game/3d/' && /importmap/.test(await r.text());
     })
   );
   await app.close();

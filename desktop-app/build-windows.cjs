@@ -18,6 +18,17 @@ const platform = process.env.DESKTOP_PLATFORM || 'win32';
 const folderName = platform === 'win32' ? 'Darren-Snowday-Windows' : 'Darren-Snowday-' + platform;
 const exeName = 'Darren Snowday';
 
+// rename fails across drives (a checkout on D: with %TEMP% on C:), so copy instead there.
+function move(from, to) {
+  try {
+    fs.renameSync(from, to);
+  } catch (e) {
+    if (e.code !== 'EXDEV') throw e;
+    fs.cpSync(from, to, { recursive: true });
+    fs.rmSync(from, { recursive: true, force: true });
+  }
+}
+
 (async () => {
   assertBuildEnvironment();
   // Validate before creating any distributable; never read update-token.txt.
@@ -111,8 +122,8 @@ const exeName = 'Darren Snowday';
     fs.mkdirSync(out, { recursive: true });
     fs.rmSync(path.join(out, folderName), { recursive: true, force: true });
     fs.rmSync(path.join(out, folderName + '.zip'), { force: true });
-    fs.renameSync(dest, path.join(out, folderName));
-    if (fs.existsSync(zip)) fs.renameSync(zip, path.join(out, folderName + '.zip'));
+    move(dest, path.join(out, folderName));
+    if (fs.existsSync(zip)) move(zip, path.join(out, folderName + '.zip'));
     console.log('Built ' + path.join(out, folderName));
   } finally {
     fs.rmSync(staging, { recursive: true, force: true });

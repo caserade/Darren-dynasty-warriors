@@ -120,7 +120,11 @@
         if (e.key === '2') cards[1].click();
       });
       // Controller: d-pad or left stick moves between the two games, A (or Start) opens one.
-      let held = true;
+      // A button already down when this page opens (coming back from a game) is ignored until
+      // released; a pad that only appears later (Chromium shows it after the first press) is
+      // read at once, so the first A press already opens a game.
+      let held = false,
+        firstPoll = true;
       (function poll() {
         const pad = [...(navigator.getGamepads ? navigator.getGamepads() : [])].find(Boolean);
         if (pad) {
@@ -128,6 +132,7 @@
           const left = x < -0.5 || pad.buttons[14]?.pressed || pad.buttons[12]?.pressed;
           const right = x > 0.5 || pad.buttons[15]?.pressed || pad.buttons[13]?.pressed;
           const go = pad.buttons[0]?.pressed || pad.buttons[9]?.pressed;
+          if (firstPoll) held = !!(left || right || go);
           if (!held) {
             if (left || right) {
               pick = left ? 0 : 1;
@@ -139,6 +144,7 @@
           }
           held = !!(left || right || go);
         }
+        firstPoll = false;
         requestAnimationFrame(poll);
       })();
     </script>

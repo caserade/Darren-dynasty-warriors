@@ -53,16 +53,24 @@ function resolveFile(pathname) {
 }
 
 function serve(request) {
-  let url;
+  let url, pathname;
   try {
     url = new URL(request.url);
-    url.pathname = decodeURIComponent(url.pathname);
+    // Decode into a plain string: assigning back to url.pathname would re-encode it, so
+    // names with spaces or accents would never be found.
+    pathname = decodeURIComponent(url.pathname);
   } catch {
     return new Response('Bad request', { status: 400 });
   }
   if (url.host !== HOST) return new Response('Not found', { status: 404 });
-  const file = resolveFile(url.pathname);
+  const file = resolveFile(pathname);
   if (!file) return new Response('Not found', { status: 404 });
+  // A folder asked for without its trailing slash (snowday://game/3d) would load index.html
+  // with relative links pointing at the wrong folder, so send the browser to the slash form.
+  if (path.basename(file) === 'index.html' && !/\/(?:index\.html)?$/.test(pathname)) {
+    url.pathname = url.pathname + '/';
+    return new Response(null, { status: 301, headers: { Location: url.href } });
+  }
   return fs.promises.readFile(file).then(
     (data) =>
       new Response(data, {
