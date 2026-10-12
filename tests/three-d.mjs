@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { World, Game, CAST, GRUNTS, BOSSES, BELLY } from '../dist/3d/sim.mjs';
+import { World, Game, CAST, GRUNTS, BOSSES, BELLY, MOVE_WIND } from '../dist/3d/sim.mjs';
 const data = JSON.parse(fs.readFileSync(new URL('../dist/3d/world.json', import.meta.url)));
 const world = new World(data);
 world.prepareNav();
@@ -52,18 +52,316 @@ test('Switching cancels charge and preserves player location', () => {
   assert(!g.chargeRelease());
   assert(!g.switchTo(8));
 });
-test('Combo impacts occur once per action and cycle through three clips', () => {
+test("Pressing attack through a move chains Darren's six-hit Bare Paws string, one impact per hit", () => {
   const g = fresh();
-  place(g, 23, 52, Math.PI);
+  place(g, 23, 54.5, Math.PI);
   const names = [];
-  for (let i = 0; i < 3; i++) {
+  let hits = 0;
+  for (let i = 0; i < 6; i++) {
     assert(g.attack());
-    names.push(g.player.action.name);
-    tick(g, 1);
-    assert.equal(g.targets[0].hits, i + 1);
+    const q = g.player.action;
+    names.push(q.name);
+    // Press again before the cancel point; the next hit starts right at it.
+    while (g.player.action === q) tick(g, 1 / 60);
+    hits += q.move.hits.length;
   }
-  assert.deepEqual(names, ['Attack1', 'Attack2', 'Attack3']);
-  assert.equal(g.stats.attacks, 3);
+  tick(g, 1.5);
+  assert.deepEqual(names, ['PawN1', 'PawN2', 'PawN3', 'PawN4', 'PawN5', 'PawN6']);
+  assert.equal(g.stats.attacks, 6);
+  assert(g.targets.reduce((n, t) => n + t.hits, 0) >= 6);
+  assert(hits >= 7);
+});
+test('Charge after hit N of the string gives that finisher (C2-C6), and holding charge from neutral still charges', () => {
+  for (let n = 1; n <= 5; n++) {
+    const g = fresh();
+    for (let i = 0; i < n; i++) {
+      assert(g.attack());
+      while (!(g.player.action?.type === 'normal' && g.player.action.index === i)) tick(g, 1 / 60);
+    }
+    assert(g.chargeStart());
+    const q = g.player.action;
+    while (g.player.action === q) tick(g, 1 / 60);
+    assert.equal(g.player.action.name, 'PawC' + (n + 1));
+    assert(!g.player.charging);
+  }
+  const g = fresh();
+  assert(g.chargeStart());
+  assert(g.player.charging);
+});
+test('Jump attack in the air, dash attack after a sprint', () => {
+  const g = fresh();
+  place(g, 40, 52);
+  assert(g.jump());
+  tick(g, 0.15);
+  assert(g.attack());
+  assert.equal(g.player.action.name, 'PawJump');
+  assert(!g.attack() || g.player.buffer === 'attack');
+  tick(g, 1.5);
+  assert.equal(g.player.air, 0);
+  tick(g, 1.2, { x: 1, z: 0 });
+  assert(g.attack());
+  assert.equal(g.player.action.name, 'PawDash');
+});
+test('Special needs a full meter that fills from hits, keeps Darren untouchable and clears a crowd', () => {
+  const g = fresh();
+  place(g, 40, 52);
+  for (const a of g.actors) if (a !== g.player) Object.assign(a, { x: 10, z: 10 });
+  assert(!g.special());
+  const e = foe(g, 'gopher', 40, 53.6);
+  e.hp = e.max = 500;
+  assert(g.attack());
+  tick(g, 0.5);
+  assert(g.player.mus > 0);
+  e.hp = 0.1;
+  for (let k = 0; k < 6; k++) foe(g, 'gopher', 40 + Math.sin(k) * 2.4, 52 + Math.cos(k) * 2.4);
+  g.player.mus = 100;
+  assert(g.special());
+  assert.equal(g.player.action.name, 'PawSpecial');
+  assert.equal(g.player.mus, 0);
+  const hp = g.player.hp;
+  tick(g, 1);
+  assert(g.player.hp === hp && !g.hurtHero(20, 0));
+  tick(g, 2);
+  assert(g.ko >= 6);
+});
+test('Launchers pop grunts into the air and sweeps knock them down; lunges stop at the foe', () => {
+  const g = fresh();
+  place(g, 40, 52);
+  for (const a of g.actors) if (a !== g.player) Object.assign(a, { x: 10, z: 10 });
+  const e = foe(g, 'bale', 40, 53.5);
+  e.hp = e.max = 999;
+  const s = g.moveset();
+  g.startMove(g.player, s.charge[1], 'charge', 1);
+  tick(g, 0.3);
+  assert(e.air > 0 && e.state === 'air');
+  tick(g, 1.5);
+  assert.equal(e.air, 0);
+  g.startMove(g.player, s.charge[2], 'charge', 2);
+  tick(g, 0.3);
+  assert.equal(e.state, 'down');
+  for (let i = 0; i < 6; i++) {
+    g.startMove(g.player, s.normal[0], 'normal', 0);
+    tick(g, 0.4);
+  }
+  assert(Math.hypot(e.x - g.player.x, e.z - g.player.z) > e.r);
+});
+test('A pause between presses restarts the string at the first hit', () => {
+  const g = fresh();
+  assert(g.attack());
+  tick(g, 1.2);
+  assert(g.attack());
+  assert.equal(g.player.action.name, 'PawN1');
+});
+test('Darren swaps to the Polka Scarf: its own six-hit string, longer reach, and the choice is saved', () => {
+  const g = fresh();
+  place(g, 40, 52);
+  for (const a of g.actors) if (a !== g.player) Object.assign(a, { x: 10, z: 10 });
+  g.switchTo(1);
+  assert(!g.switchStyle('scarf'));
+  g.switchTo(0);
+  assert(g.attack());
+  assert(!g.switchStyle('scarf'), 'not mid-move');
+  tick(g, 1.2);
+  assert(g.switchStyle('scarf') && g.style === 'scarf');
+  assert(!g.switchStyle('tormund'));
+  assert.equal(new Game(world, JSON.parse(JSON.stringify(g.save()))).style, 'scarf');
+  assert.equal(new Game(world, { ...g.save(), style: 'bogus' }).style, 'paws');
+  const names = [];
+  for (let i = 0; i < 6; i++) {
+    assert(g.attack());
+    const q = g.player.action;
+    names.push(q.name);
+    while (g.player.action === q) tick(g, 1 / 60);
+  }
+  assert.deepEqual(names, ['ScarfN1', 'ScarfN2', 'ScarfN3', 'ScarfN4', 'ScarfN5', 'ScarfN6']);
+  // A gopher 2.9 m away: the scarf's first lash reaches it, the paws' jab does not.
+  const reach = (style) => {
+    const h = fresh();
+    place(h, 40, 52);
+    for (const a of h.actors) if (a !== h.player) Object.assign(a, { x: 10, z: 10 });
+    h.switchStyle(style);
+    const e = foe(h, 'gopher', 40, 54.9);
+    e.hp = e.max = 500;
+    e.speed = 0;
+    h.startMove(h.player, h.moveset().normal[0], 'normal', 0);
+    tick(h, 0.2);
+    return e.hp < 500;
+  };
+  assert(reach('scarf') && !reach('paws'));
+});
+test('Scarf finishers and the hold-charge Polka Snare drag foes in; Polka Cyclone pulls a crowd', () => {
+  const g = fresh();
+  place(g, 40, 52);
+  for (const a of g.actors) if (a !== g.player) Object.assign(a, { x: 10, z: 10 });
+  g.switchStyle('scarf');
+  for (let n = 1; n <= 5; n++) {
+    const h = fresh();
+    h.switchStyle('scarf');
+    for (let i = 0; i < n; i++) {
+      assert(h.attack());
+      while (!(h.player.action?.type === 'normal' && h.player.action.index === i)) tick(h, 1 / 60);
+    }
+    assert(h.chargeStart());
+    const q = h.player.action;
+    while (h.player.action === q) tick(h, 1 / 60);
+    assert.equal(h.player.action.name, 'ScarfC' + (n + 1));
+  }
+  const e = foe(g, 'gopher', 40, 57);
+  e.hp = e.max = 500;
+  e.speed = 0;
+  assert(g.chargeStart());
+  tick(g, 1.3);
+  assert(g.chargeRelease());
+  assert.equal(g.player.action.name, 'ScarfSnare');
+  tick(g, 0.9);
+  const d = Math.hypot(e.x - g.player.x, e.z - g.player.z);
+  assert(
+    e.hp < 500 && d < 3.2 && d > e.r,
+    'snared foe ends up in front of Darren: ' + d.toFixed(2)
+  );
+  tick(g, 1);
+  const ring = [];
+  for (let k = 0; k < 6; k++) {
+    const o = foe(g, 'gopher', 40 + Math.sin(k) * 5, 52 + Math.cos(k) * 5);
+    o.hp = o.max = 500;
+    o.speed = 0;
+    ring.push(o);
+  }
+  const before = ring.map((o) => Math.hypot(o.x - g.player.x, o.z - g.player.z));
+  g.player.mus = 100;
+  assert(g.special());
+  assert.equal(g.player.action.name, 'ScarfSpecial');
+  tick(g, 1.5);
+  const pulled = ring.filter(
+    (o, k) => Math.hypot(o.x - g.player.x, o.z - g.player.z) < before[k] - 1
+  ).length;
+  assert(pulled >= 4, 'cyclone pulled ' + pulled);
+  tick(g, 1.5);
+  // Every foe on his level (this spot is a slope) took the cyclone's hits.
+  assert(ring.filter((o) => Math.abs(o.y - g.player.y) < 1.6).every((o) => o.hp < 500));
+});
+test("Tormund's five-hit sword string, his finishers, plunge and shield ram", () => {
+  const g = fresh();
+  g.switchTo(1);
+  place(g, 40, 52);
+  for (const a of g.actors) if (a !== g.player) Object.assign(a, { x: 10, z: 10 });
+  const names = [];
+  for (let i = 0; i < 5; i++) {
+    assert(g.attack());
+    const q = g.player.action;
+    names.push(q.name);
+    while (g.player.action === q) tick(g, 1 / 60);
+  }
+  assert.deepEqual(names, ['TorN1', 'TorN2', 'TorN3', 'TorN4', 'TorN5']);
+  for (let n = 1; n <= 5; n++) {
+    const h = fresh();
+    h.switchTo(1);
+    for (let i = 0; i < n; i++) {
+      assert(h.attack());
+      while (!(h.player.action?.type === 'normal' && h.player.action.index === i)) tick(h, 1 / 60);
+    }
+    assert(h.chargeStart());
+    const q = h.player.action;
+    while (h.player.action === q) tick(h, 1 / 60);
+    assert.equal(h.player.action.name, 'TorC' + (n + 1));
+  }
+  tick(g, 1.5);
+  assert(g.jump());
+  tick(g, 0.2);
+  assert(g.attack());
+  assert.equal(g.player.action.name, 'TorJump');
+  tick(g, 1.5);
+  // The shield ram shrugs off a light hit (armor) and knocks grunts flat.
+  tick(g, 1.2, { x: 1, z: 0 });
+  const e = foe(g, 'gopher', g.player.x + 1.6, g.player.z);
+  e.hp = e.max = 500;
+  assert(g.attack());
+  assert.equal(g.player.action.name, 'TorDash');
+  g.hurtHero(8, Math.PI / 2);
+  assert.equal(g.player.action?.name, 'TorDash');
+  tick(g, 0.3);
+  assert(e.hp < 500 && e.state === 'down');
+});
+test('Tormund parries from a standstill and counters; with the stick held he still rolls', () => {
+  const g = fresh();
+  g.switchTo(1);
+  place(g, 40, 52, 0);
+  for (const a of g.actors) if (a !== g.player) Object.assign(a, { x: 10, z: 10 });
+  const e = foe(g, 'gopher', 40, 53.5);
+  e.hp = e.max = 500;
+  e.speed = 0;
+  g.update(1 / 60, { x: 0, z: 0 });
+  assert(g.dodge());
+  assert.equal(g.player.action.name, 'Parry');
+  const hp = g.player.hp;
+  // A blow from the front (the attacker stands ahead, so it pushes him back: angle = yaw + pi).
+  assert.equal(g.hurtHero(12, Math.PI), false);
+  assert.equal(g.player.hp, hp);
+  assert.equal(g.player.action.name, 'TorCounter');
+  assert.equal(e.state, 'hurt');
+  tick(g, 0.3);
+  assert(e.hp < 500);
+  tick(g, 1);
+  // From behind, the shield does nothing.
+  assert(g.dodge());
+  assert(g.hurtHero(12, 0));
+  assert(g.player.hp < hp);
+  tick(g, 2);
+  g.update(1 / 60, { x: 1, z: 0 });
+  assert(g.dodge());
+  assert.equal(g.player.action.name, 'Dodge');
+});
+test("Bucky's four-hit mallet string carries armor; finishers, ground pound and rolling dash", () => {
+  const g = fresh();
+  g.switchTo(2);
+  place(g, 40, 52);
+  for (const a of g.actors) if (a !== g.player) Object.assign(a, { x: 10, z: 10 });
+  const names = [];
+  for (let i = 0; i < 4; i++) {
+    assert(g.attack());
+    const q = g.player.action;
+    names.push(q.name);
+    if (i === 1) {
+      // A grunt's jab doesn't interrupt a heavy swing.
+      g.hurtHero(8, 0);
+      assert.equal(g.player.action, q);
+    }
+    while (g.player.action === q) tick(g, 1 / 60);
+  }
+  assert.deepEqual(names, ['BukN1', 'BukN2', 'BukN3', 'BukN4']);
+  for (let n = 1; n <= 4; n++) {
+    const h = fresh();
+    h.switchTo(2);
+    for (let i = 0; i < n; i++) {
+      assert(h.attack());
+      while (!(h.player.action?.type === 'normal' && h.player.action.index === i)) tick(h, 1 / 60);
+    }
+    assert(h.chargeStart());
+    const q = h.player.action;
+    while (h.player.action === q) tick(h, 1 / 60);
+    assert.equal(h.player.action.name, 'BukC' + (n + 1));
+  }
+  tick(g, 2);
+  assert(g.jump());
+  tick(g, 0.2);
+  assert(g.attack());
+  assert.equal(g.player.action.name, 'BukJump');
+  tick(g, 1.5);
+  tick(g, 1.2, { x: 1, z: 0 });
+  assert(g.attack());
+  assert.equal(g.player.action.name, 'BukDash');
+  // The log splitter cracks a straight line well beyond arm's reach, but not off to the side.
+  const k = fresh();
+  k.switchTo(2);
+  place(k, 40, 52, 0);
+  for (const a of k.actors) if (a !== k.player) Object.assign(a, { x: 10, z: 10 });
+  const ahead = foe(k, 'bale', 40, 57.5),
+    side = foe(k, 'bale', 43.5, 53);
+  for (const e of [ahead, side]) ((e.hp = e.max = 500), (e.speed = 0));
+  k.startMove(k.player, k.moveset().charge[4], 'charge', 4);
+  k.player.yaw = 0;
+  tick(k, 1);
+  assert(ahead.hp < 500 && side.hp === 500);
 });
 for (let i = 0; i < 3; i++)
   test(CAST[i] + ' charged attack reaches a practice post once', () => {
@@ -192,13 +490,13 @@ function foe(g, type, x, z) {
   g.enemies.push(e);
   return e;
 }
-function fight(g, limit = 120) {
-  let route = null; // simple bot: walk to the nearest active foe and combo it
+function fight(g, limit = 120, boss = null) {
+  let route = null; // simple bot: walk to the nearest active foe and combo it (or go and find the boss)
   for (let t = 0; t < limit; t += 1 / 60) {
     const a = g.player;
     let e = g.engaged && !g.engaged.dead ? g.engaged : null;
     if (!e) {
-      let best = 7;
+      let best = 14;
       for (const o of g.enemies) {
         if (o.dead || (o.boss && !o.active)) continue;
         const d = Math.hypot(o.x - a.x, o.z - a.z);
@@ -208,6 +506,7 @@ function fight(g, limit = 120) {
         }
       }
     }
+    if (!e && boss && !boss.dead) e = boss;
     if (!e) {
       if (t > 1) return t;
       g.update(1 / 60);
@@ -222,9 +521,15 @@ function fight(g, limit = 120) {
       }
       ang = world.direction(a, e, route.field, false);
     }
-    g.update(1 / 60, d > e.r + 0.9 ? { x: Math.sin(ang), z: Math.cos(ang) } : { x: 0, z: 0 });
-    if (!a.action && d < e.r + 2) {
-      a.yaw = ang;
+    g.update(
+      1 / 60,
+      d > e.r + 0.9 || Math.abs(e.y - a.y) > 1.2
+        ? { x: Math.sin(ang), z: Math.cos(ang) }
+        : { x: 0, z: 0 }
+    );
+    // Like a player, keep pressing attack while in range so the string chains.
+    if (d < e.r + 2 && Math.abs(e.y - a.y) < 1.6) {
+      if (!a.action) a.yaw = ang;
       g.attack();
     }
     if (g.defeated) g.retry();
@@ -232,6 +537,127 @@ function fight(g, limit = 120) {
   }
   return limit;
 }
+test('Smarter grunts: a few press in while the rest circle; they back off from a charge and dodge boss warnings', () => {
+  const g = fresh();
+  place(g, 40, 52);
+  for (const a of g.actors) if (a !== g.player) Object.assign(a, { x: 10, z: 10 });
+  g.enemies = g.enemies.filter((e) => e.boss);
+  const pack = [];
+  for (let k = 0; k < 9; k++) {
+    const e = foe(g, 'gopher', 40 + Math.sin(k * 0.7) * 6, 52 + Math.cos(k * 0.7) * 6);
+    e.hp = e.max = 999;
+    pack.push(e);
+  }
+  g.player.hp = g.player.max = 9999;
+  tick(g, 4);
+  const close = pack.filter((e) => Math.hypot(e.x - g.player.x, e.z - g.player.z) < 2.2).length,
+    ring = pack.filter((e) => {
+      const d = Math.hypot(e.x - g.player.x, e.z - g.player.z);
+      return d > 2.8 && d < 5.5;
+    }).length;
+  assert(close <= 4 && close >= 2, 'pressing in: ' + close);
+  assert(ring >= 4, 'circling: ' + ring);
+  // Charging makes the nearby ones give ground.
+  const before = pack.map((e) => Math.hypot(e.x - g.player.x, e.z - g.player.z));
+  assert(g.chargeStart());
+  tick(g, 0.8);
+  const backed = pack.filter(
+    (e, k) => Math.hypot(e.x - g.player.x, e.z - g.player.z) > before[k] + 0.3
+  );
+  assert(backed.length >= 2, 'backed off: ' + backed.length);
+  g.chargeRelease();
+  // A boss winding up a slam: grunts inside the marked circle walk out of it.
+  const h = fresh();
+  const b = h.enemies[0];
+  near(h, b.x + 5, b.z + 5);
+  tick(h, 0.1);
+  const grunt = foe(h, 'gopher', b.x + 2.5, b.z);
+  grunt.hp = grunt.max = 999;
+  Object.assign(b, { state: 'wind', move: 'slam', st: 1, windMax: 1 });
+  h.planFoes();
+  assert(h.escape(grunt) !== null);
+  const r0 = Math.hypot(grunt.x - b.x, grunt.z - b.z);
+  for (let t = 0; t < 0.6; t += 1 / 60) {
+    b.st = 1;
+    h.update(1 / 60);
+  }
+  assert(Math.hypot(grunt.x - b.x, grunt.z - b.z) > r0 + 1, 'stepped out of the slam');
+});
+test('Crows dive-bomb and hay bales roll-charge after a telegraph', () => {
+  for (const type of ['crow', 'bale']) {
+    const g = fresh();
+    place(g, 18, 48);
+    for (const a of g.actors) if (a !== g.player) Object.assign(a, { x: 10, z: 10 });
+    g.enemies = g.enemies.filter((e) => e.boss);
+    const e = foe(g, type, 18, 53);
+    e.hp = e.max = 999;
+    e.special = 0;
+    const seen = new Set();
+    let hurt = false;
+    for (let t = 0; t < 3; t += 1 / 60) {
+      g.update(1 / 60);
+      seen.add(e.state);
+      if (g.events.splice(0).some((v) => v.type === 'hurt')) {
+        hurt = true;
+        assert(seen.has('aim') && seen.has('dash'), type + ' warned before hitting');
+      }
+    }
+    assert(seen.has('aim') && seen.has('dash'), type + ' states ' + [...seen]);
+    assert(hurt, type + ' hit the hero');
+  }
+});
+test('Bosses pick moves by range, rarely repeat, and turn furious below half health', () => {
+  const g = fresh();
+  const b = g.makeFoe('baron', 60, 60, true);
+  let repeats = 0,
+    last = null;
+  const counts = {};
+  for (let k = 0; k < 200; k++) {
+    b.last = last;
+    const m = g.chooseBossMove(b, 9, true);
+    if (m === last) repeats++;
+    counts[m] = (counts[m] || 0) + 1;
+    last = m;
+  }
+  assert(repeats < 60, 'repeats ' + repeats);
+  assert(counts.charge > (counts.swipe || 0), 'far away: charges more than swipes');
+  b.last = null;
+  const closeCounts = {};
+  for (let k = 0; k < 200; k++) {
+    const m = g.chooseBossMove(b, b.r + 1.5, true);
+    closeCounts[m] = (closeCounts[m] || 0) + 1;
+  }
+  assert(closeCounts.swipe > (closeCounts.charge || 0), 'up close: swipes more than charges');
+  const c = g.enemies.find((e) => e.type === 'spud');
+  near(g, c.x + 3, c.z + 3);
+  tick(g, 0.1);
+  c.hp = c.max * 0.4;
+  g.events.length = 0;
+  c.cd = 0;
+  for (let t = 0; t < 3 && c.state !== 'wind'; t += 1 / 60) g.update(1 / 60);
+  assert(g.events.some((e) => e.type === 'banner' && /FURIOUS/.test(e.title)));
+  assert.equal(c.state, 'wind');
+  assert(c.windMax < MOVE_WIND[c.move] - 1e-6, 'enraged wind-ups are quicker');
+});
+test('Friends walk over to a fight near the hero and use their own moves', () => {
+  const g = fresh();
+  place(g, 18, 48);
+  g.enemies = g.enemies.filter((e) => e.boss);
+  tick(g, 2);
+  const e = foe(g, 'bale', 18, 53);
+  e.hp = e.max = 999;
+  e.speed = 0;
+  const anims = new Set();
+  for (let t = 0; t < 7; t += 1 / 60) {
+    g.update(1 / 60);
+    for (const b of g.actors) if (b !== g.player && b.assist) anims.add(b.assist.move.anim);
+  }
+  assert(e.hp < 999, 'friends hurt the bale');
+  assert(
+    [...anims].some((n) => /^Tor/.test(n)) && [...anims].some((n) => /^Buk/.test(n)),
+    [...anims].join()
+  );
+});
 test('Grunts wander in away from the cottage, never beside it', () => {
   const g = fresh();
   tick(g, 30);
@@ -388,11 +814,13 @@ test('Cookies heal, revive resting friends and grow Darren every 3, which hits h
     near(h, 40, 52, 0);
     const e = foe(h, 'bale', 40, 53.4);
     e.hp = e.max = 999;
-    for (let i = 0; i < 3; i++) {
-      h.player.cooldown = 0;
+    // The whole six-hit string; the last hit (somersault tail slam) grows with the belly.
+    for (let i = 0; i < 6; i++) {
       assert(h.attack());
-      tick(h, 1);
+      const q = h.player.action;
+      while (h.player.action === q) tick(h, 1 / 60);
     }
+    tick(h, 1.5);
     return 999 - e.hp;
   };
   assert(finisher(3) > finisher(0) + 10);
@@ -492,7 +920,7 @@ test('Whole adventure with enemies: three camp bosses, the Baron, Ruffy home, th
       assert(b, 'no boss for ' + o.label);
       for (let k = 0; k < 4 && !g.bosses[b.camp]; k++) {
         near(g, b.x + 2.5, b.z + 2.5);
-        fight(g, 300);
+        fight(g, 300, b);
       }
       assert(g.bosses[b.camp], 'could not beat ' + b.name);
       continue;
