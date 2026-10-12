@@ -18,7 +18,9 @@ screen picks the pixel or the 3D game; Ctrl+H returns to it, F11 is full screen.
 The first time, Windows may say "Windows protected your PC" because the app is not
 signed: click "More info", then "Run anyway". Saves made in the app are kept in
 %APPDATA%\Darren's Snowday Search and are separate from browser saves.
-The app is built from desktop-app/ (see desktop-app/README.md).
+The app is built from desktop-app/ (see desktop-app/README.md). A fresh copy of the
+project from GitHub does not include the ZIP: build it there with npm install and
+npm run build:win, or use the copy kept with the project files.
 Version 1.2.0 is standalone: it never checks for or downloads game updates and
 needs no GitHub key. For a later version, close the old app, extract the new ZIP
 into a new folder and launch its EXE. Keep the same save folder; old downloaded

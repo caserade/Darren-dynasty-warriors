@@ -347,8 +347,16 @@ async function main() {
     sg.textAlign = 'center';
     sg.fillText(i + ' · ' + run('SIZE_NAMES[' + i + ']'), i * 288 + 144, 347);
   }
-  fs.mkdirSync('previews', { recursive: true });
-  fs.writeFileSync('previews/Darren-Storybook-Weight-Levels.png', sheet.toBuffer('image/png'));
+  // The committed preview is only replaced on request (--update-previews), so running the
+  // checks on a fresh clone does not leave a changed file behind.
+  const previewDir = process.argv.includes('--update-previews')
+    ? 'previews'
+    : require('os').tmpdir();
+  fs.mkdirSync(previewDir, { recursive: true });
+  fs.writeFileSync(
+    require('path').join(previewDir, 'Darren-Storybook-Weight-Levels.png'),
+    sheet.toBuffer('image/png')
+  );
   run(
     'initAudio=()=>{};startFirewood(false);while(dialogOpen)nextLine();G.firewood.met=true;bucky.x=P.x+130;bucky.y=P.y+30;ally.x=P.x-65;ally.y=P.y+30'
   );

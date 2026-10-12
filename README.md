@@ -11,7 +11,9 @@ Both games share sound, difficulty, a few controller buttons and story progress 
 ## Play
 
 - Windows desktop app: unzip `Darren-Snowday-Windows.zip` and double-click
-  `Darren Snowday.exe` (no Node or Python needed). Built from `desktop-app/`; see its README.
+  `Darren Snowday.exe` (no Node or Python needed). The zip is too big for GitHub, so it is
+  not in this repository: make it with Node.js 22.12 or newer (`cd desktop-app`, `npm install`,
+  `npm run build:win`; it lands in `desktop-app/out/`), or use the copy kept with the project files.
 - Windows: double-click `PLAY-3D.cmd` or `PLAY-PIXEL.cmd`.
 - Mac: double-click `PLAY-3D.command` or `PLAY-PIXEL.command` (the first time, right-click and
   choose Open).
@@ -21,7 +23,8 @@ Read `START-HERE.txt` for controls, phone play and the full history of the proje
 
 ## Develop
 
-- `npm test` runs the simulation and regression checks (needs `@napi-rs/canvas` 0.1.100).
+- `npm install` once, then `npm test` runs the simulation and regression checks (installs
+  `@napi-rs/canvas` 0.1.100).
 - `node tests/browser-qa.cjs` drives both games in a real browser while `npm start` is running
   (needs Playwright).
 - `npm run format` reformats the game code with Prettier.

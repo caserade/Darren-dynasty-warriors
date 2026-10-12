@@ -51,12 +51,13 @@ assert(run('G.firewood.met&&G.firewood.collected[0]&&P.weight===2&&P.hp===100'))
 assert.equal(store.get('darren-snowday-v3'), rescueSave);
 console.log('PASS separate resumable chapter save and rescue-save preservation');
 // Simulate actual traversable routes and automatic companion combat through the complete quest.
+// Like a player, the robot walks over to a pile guard that stays out of the friends' reach.
 fresh();
 run('P.inv=9999');
 let finished = false;
 for (let i = 0; i < 14000; i++) {
   run(
-    `if(dialogOpen){while(dialogOpen)nextLine();}if(state==='play'){const target=firewoodTarget();if(target){const d=Math.hypot(target.x-P.x,target.y-P.y);if(d>55){if(navTarget!==cellId(target.x,target.y))buildNavigation(target.x,target.y);const angle=navDirection(P,target.x,target.y);terrainMove(P,Math.cos(angle)*8,Math.sin(angle)*8,14);}}P.inv=9999;update(.04);}`
+    `if(dialogOpen){while(dialogOpen)nextLine();}if(state==='play'){const site=G.firewood.collected.findIndex(v=>!v),guard=enemies.find(e=>!e.dead&&e.woodSite===site&&Math.hypot(e.x-P.x,e.y-P.y)>110),target=guard||firewoodTarget();if(target){const d=Math.hypot(target.x-P.x,target.y-P.y);if(d>55){if(navTarget!==cellId(target.x,target.y))buildNavigation(target.x,target.y);const angle=navDirection(P,target.x,target.y);terrainMove(P,Math.cos(angle)*8,Math.sin(angle)*8,14);}}P.inv=9999;update(.04);}`
   );
   if (run("state==='over'&&G.firewood.complete")) {
     finished = true;
