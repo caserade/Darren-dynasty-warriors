@@ -184,6 +184,8 @@ const gameKeys = [
   'ShiftLeft',
   'ShiftRight',
   'KeyE',
+  'KeyL',
+  'KeyQ',
   'KeyZ',
   'KeyX',
   'KeyC',
@@ -219,6 +221,8 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'Space') game.jump();
   if (e.code.startsWith('Shift')) game.dodge();
   if (e.code === 'KeyE') game.interact();
+  if (e.code === 'KeyL') game.special();
+  if (e.code === 'KeyQ') swapStyle();
   if (e.code === 'KeyC') cameraYaw = game.player.yaw + Math.PI;
   if (e.code.startsWith('Digit')) requestSwitch(Number(e.code.slice(-1)) - 1);
 });
@@ -260,6 +264,8 @@ stick.onpointerup =
       }
     };
 for (const [id, method] of [
+  ['special', 'special'],
+  ['style', 'switchStyle'],
   ['attack', 'attack'],
   ['jump', 'jump'],
   ['dodge', 'dodge'],
@@ -317,7 +323,17 @@ canvas.onwheel = (e) => {
   cameraDistance = clamp(cameraDistance + e.deltaY * 0.008, 4.5, 13);
 };
 const PAD_SAVE = 'snowday-3d-controls-v1',
-  PAD_DEFAULTS = { jump: 0, dodge: 1, combo: 2, charge: 3, switch: 4, interact: 5, pause: 9 },
+  PAD_DEFAULTS = {
+    jump: 0,
+    dodge: 1,
+    combo: 2,
+    charge: 3,
+    switch: 4,
+    interact: 5,
+    style: 6,
+    special: 7,
+    pause: 9,
+  },
   PAD_LABELS = {
     combo: 'Combo',
     charge: 'Hold charge',
@@ -325,6 +341,8 @@ const PAD_SAVE = 'snowday-3d-controls-v1',
     dodge: 'Dodge',
     interact: 'Talk / gather',
     switch: 'Next hero',
+    special: 'Special',
+    style: 'Paws / Scarf',
     pause: 'Pause',
   };
 let padBindings = { ...PAD_DEFAULTS },
@@ -384,7 +402,7 @@ function showBindings() {
   }
   const n = (k) => buttonName(padBindings[k]).split(' / ')[0];
   $('pad-help').textContent =
-    `Controller: ${n('combo')} combo · hold ${n('charge')} charge · ${n('jump')} jump · ${n('dodge')} dodge · ${n('interact')} interact · ${n('switch')} next hero`;
+    `Controller: ${n('combo')} combo · hold ${n('charge')} charge · ${n('jump')} jump · ${n('dodge')} dodge · ${n('interact')} interact · ${n('special')} special · ${n('style')} Darren's style · ${n('switch')} next hero`;
 }
 function saveBindings() {
   try {
@@ -429,6 +447,10 @@ $('pad-reset').onclick = () => {
   shared?.forgetButtons();
   padStatus('Standard controller buttons restored.');
 };
+function swapStyle() {
+  if (game.selected !== 0) toast('Only Darren swaps styles: Bare Paws or the Polka Scarf.');
+  else game.switchStyle();
+}
 function requestSwitch(i) {
   if (game.actors[i]?.down) {
     toast(`${CAST[i]} is resting. A cookie or a cleared camp gets them back up.`);
@@ -507,6 +529,8 @@ function padInput(dt) {
     if (edge(B.jump)) game.jump();
     if (edge(B.dodge)) game.dodge();
     if (edge(B.interact)) game.interact();
+    if (edge(B.special)) game.special();
+    if (edge(B.style)) swapStyle();
     if (edge(B.switch)) {
       const from = pendingSwitch ?? game.selected,
         next = [1, 2].map((k) => (from + k) % 3).find((i) => !game.actors[i].down);
@@ -646,6 +670,16 @@ function events() {
     }
     if (e.type === 'snowburst') ring(e);
     if (e.type === 'throw') tone(380, 0.2);
+    if (e.type === 'hitstop') hitstop = Math.max(hitstop, e.t);
+    if (e.type === 'special') {
+      banner(e.name, 'SPECIAL');
+      tone(196, 0.5, 0.06);
+      shake = Math.max(shake, 0.25);
+    }
+    if (e.type === 'style') {
+      toast(`Darren: ${e.name}`);
+      tone(520, 0.15);
+    }
     if (e.type === 'cookie') {
       tone(880, 0.18);
       toast(
@@ -1137,6 +1171,7 @@ function updateFloaters(dt) {
   }
 }
 let bannerTime = 0,
+  hitstop = 0,
   shake = 0,
   defeatOpen = false;
 function banner(title, text = '') {
@@ -1435,6 +1470,12 @@ function hud() {
   $('name').textContent = a.name;
   $('kit').textContent = game.kit.charge;
   $('energy').style.width = a.energy + '%';
+  $('musou').style.width = (a.mus || 0) + '%';
+  $('musou').parentElement.classList.toggle('full', (a.mus || 0) >= 100);
+  $('style').hidden = game.selected !== 0;
+  $('style').textContent = game.selected === 0 ? game.moveset().name : '';
+  $('style-key').hidden = $('touch-style').hidden = game.selected !== 0;
+  $('touch-special').classList.toggle('ready', (a.mus || 0) >= 100);
   $('chargebox').hidden = !a.charging;
   $('chargebar').style.width = (a.charge / 1.2) * 100 + '%';
   $('chargelabel').textContent =
@@ -1494,7 +1535,11 @@ function frame(now) {
     x: x * Math.cos(cameraYaw) + z * Math.sin(cameraYaw),
     z: z * Math.cos(cameraYaw) - x * Math.sin(cameraYaw),
   };
-  accumulator += dt;
+  // Hit-stop: a heavy hit freezes the action for a few hundredths of a second so it lands with weight.
+  if (hitstop > 0) {
+    hitstop -= dt;
+    accumulator += dt * 0.08;
+  } else accumulator += dt;
   while (accumulator >= 1 / 60) {
     game.update(1 / 60, input);
     accumulator -= 1 / 60;

@@ -46,6 +46,8 @@
         <strong id="name">Darren</strong><b id="hpnum"></b>
         <div class="meter hp" aria-label="Health"><i id="health"></i></div>
         <div class="meter" aria-label="Energy"><i id="energy"></i></div>
+        <div class="meter special" aria-label="Special"><i id="musou"></i></div>
+        <small id="style" hidden></small>
         <small id="kit"></small> <small id="belly"></small>
         <div id="chargebox" hidden>
           <div class="meter charge"><i id="chargebar"></i></div>
@@ -61,7 +63,9 @@
       <div id="controls">
         <span><kbd>WASD</kbd> Move</span><span><kbd>J</kbd> Combo</span
         ><span><kbd>Hold K</kbd> Charge / release</span><span><kbd>Space</kbd> Jump</span
-        ><span><kbd>Shift</kbd> Dodge</span><span><kbd>Drag / Z X</kbd> Camera</span>
+        ><span><kbd>Shift</kbd> Dodge</span><span><kbd>L</kbd> Special</span
+        ><span id="style-key"><kbd>Q</kbd> Paws / Scarf</span
+        ><span><kbd>Drag / Z X</kbd> Camera</span>
       </div>
       <canvas id="minimap" width="220" height="164" aria-label="Valley map"></canvas>
       <div id="touch">
@@ -69,7 +73,8 @@
         <div class="touch-actions">
           <button id="touch-interact">Talk / gather</button><button id="touch-jump">Jump</button
           ><button id="touch-dodge">Dodge</button><button id="touch-attack">Combo</button
-          ><button id="touch-charge">Hold charge</button>
+          ><button id="touch-charge">Hold charge</button><button id="touch-special">Special</button
+          ><button id="touch-style">Paws / Scarf</button>
         </div>
       </div>
     </div>
@@ -102,9 +107,11 @@
           >
         </div>
         <p class="help">
-          WASD / left stick to move · J to combo<br />Hold K, then release to charge attack<br />Space
-          jump · Shift dodge · E interact<br />1–3 switch hero · Drag / right stick look<br />Cookies
-          heal the party · every 3 makes Darren hit harder
+          WASD / left stick to move · tap J for a combo string<br />K right after a combo hit for
+          its finisher · hold K from standing to charge<br />J in the air or after a sprint for jump
+          and dash attacks<br />L special when the gold meter is full · Q swaps Darren between Bare
+          Paws and the Polka Scarf<br />Space jump · Shift dodge · E interact<br />1–3 switch hero ·
+          Drag / right stick look<br />Cookies heal the party · every 3 makes Darren hit harder
         </p>
         <p class="help" id="pad-help"></p>
         <details id="pad-settings">
@@ -119,6 +126,8 @@
             ><button data-bind="jump">Jump <b></b></button
             ><button data-bind="dodge">Dodge <b></b></button
             ><button data-bind="interact">Talk / gather <b></b></button
+            ><button data-bind="special">Special <b></b></button
+            ><button data-bind="style">Paws / Scarf <b></b></button
             ><button data-bind="switch">Next hero <b></b></button
             ><button data-bind="pause">Pause <b></b></button>
           </div>

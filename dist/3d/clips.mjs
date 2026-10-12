@@ -1,6 +1,7 @@
 // Hand-authored animation library for Darren, Tormund and Bucky (Claude update 6).
 // Every clip is built from key poses (see anim.mjs for the pose format) when the game loads.
 import { makeClip, mix, mirror } from './anim.mjs';
+import { MOVESETS } from './moves.mjs';
 
 const { sin, cos, PI } = Math,
   TAU = PI * 2,
@@ -37,6 +38,39 @@ const D_ARMS = (l, r) => ({
   armR: { aim: r[0] },
   handR: { aim: r[1] || r[0] },
 });
+// A tucked forward roll; u runs 0..1 over the roll.
+function darrenRoll(u0) {
+  const p = u0 * 0.8,
+    u = smooth(u0),
+    th = TAU * u,
+    tuck = sin(PI * clamp01(p / 0.86)) ** 0.5,
+    cy = lerp(0.78, 0.68, tuck) + 0.1 * sin(PI * u),
+    oy = 0.3,
+    oz = 0.2;
+  // Spin about the middle of the curled-up body, not the hip joint, so he rolls over the ground.
+  return seq({
+    hips: {
+      r: [360 * u, 0, 0],
+      p: [0, cy - (oy * cos(th) - oz * sin(th)) - 0.48, oz - (oy * sin(th) + oz * cos(th))],
+    },
+    spine: [45 * tuck, 0, 0],
+    head: [40 * tuck, 0, 0],
+    legL: [-105 * tuck, 0, 10 * tuck],
+    legR: [-105 * tuck, 0, -10 * tuck],
+    footL: [50 * tuck, 0, 0],
+    footR: [50 * tuck, 0, 0],
+    armL: { aim: [lerp(0.45, 0.15, tuck), lerp(-1, -0.5, tuck), lerp(0.18, 1, tuck)] },
+    armR: { aim: [lerp(-0.45, -0.15, tuck), lerp(-1, -0.5, tuck), lerp(0.18, 1, tuck)] },
+    handL: { aim: [lerp(0.25, -0.4, tuck), lerp(-1, -0.8, tuck), lerp(0.4, 0.4, tuck)] },
+    handR: { aim: [lerp(-0.25, 0.4, tuck), lerp(-1, -0.8, tuck), lerp(0.4, 0.4, tuck)] },
+    wingL: { aim: [lerp(0.6, 0.2, tuck), lerp(0.55, 0.1, tuck), -0.95] },
+    wingR: { aim: [lerp(-0.6, -0.2, tuck), lerp(0.55, 0.1, tuck), -0.95] },
+    tail1: [30 * tuck, 0, 0],
+    tail2: [35 * tuck, 0, 0],
+    tail3: [35 * tuck, 0, 0],
+    tail4: [30 * tuck, 0, 0],
+  });
+}
 function darrenLocomotion() {
   return {
     Idle: {
@@ -214,40 +248,7 @@ function darrenLocomotion() {
       ],
     },
     // Dodge: a tucked forward roll (DW-style evade). Invincible for the first 0.45 s in the simulation.
-    Dodge: {
-      dur: 0.55,
-      fn: (p) => {
-        const u = smooth(clamp01(p / 0.8)),
-          th = TAU * u,
-          tuck = sin(PI * clamp01(p / 0.86)) ** 0.5,
-          cy = lerp(0.78, 0.68, tuck) + 0.1 * sin(PI * u),
-          oy = 0.3,
-          oz = 0.2;
-        // Spin about the middle of the curled-up body, not the hip joint, so he rolls over the ground.
-        return seq({
-          hips: {
-            r: [360 * u, 0, 0],
-            p: [0, cy - (oy * cos(th) - oz * sin(th)) - 0.48, oz - (oy * sin(th) + oz * cos(th))],
-          },
-          spine: [45 * tuck, 0, 0],
-          head: [40 * tuck, 0, 0],
-          legL: [-105 * tuck, 0, 10 * tuck],
-          legR: [-105 * tuck, 0, -10 * tuck],
-          footL: [50 * tuck, 0, 0],
-          footR: [50 * tuck, 0, 0],
-          armL: { aim: [lerp(0.45, 0.15, tuck), lerp(-1, -0.5, tuck), lerp(0.18, 1, tuck)] },
-          armR: { aim: [lerp(-0.45, -0.15, tuck), lerp(-1, -0.5, tuck), lerp(0.18, 1, tuck)] },
-          handL: { aim: [lerp(0.25, -0.4, tuck), lerp(-1, -0.8, tuck), lerp(0.4, 0.4, tuck)] },
-          handR: { aim: [lerp(-0.25, 0.4, tuck), lerp(-1, -0.8, tuck), lerp(0.4, 0.4, tuck)] },
-          wingL: { aim: [lerp(0.6, 0.2, tuck), lerp(0.55, 0.1, tuck), -0.95] },
-          wingR: { aim: [lerp(-0.6, -0.2, tuck), lerp(0.55, 0.1, tuck), -0.95] },
-          tail1: [30 * tuck, 0, 0],
-          tail2: [35 * tuck, 0, 0],
-          tail3: [35 * tuck, 0, 0],
-          tail4: [30 * tuck, 0, 0],
-        });
-      },
-    },
+    Dodge: { dur: 0.55, fn: (p) => darrenRoll(clamp01(p / 0.8)) },
     HurtF: {
       dur: 0.42,
       keys: [
@@ -626,8 +627,701 @@ function darrenLocomotion() {
   };
 }
 
+// ---- Darren · Bare Paws attacks (timed to moves.mjs) ----
+// Fighting guard: weight low, left paw forward, right paw cocked by the chin.
+const D_GUARD = {
+  hips: { r: [4, -18, 0], p: [0, -0.05, 0] },
+  spine: [8, 12, 0],
+  head: [-8, 6, 0],
+  legL: [-18, 0, 5],
+  legR: [14, 0, -5],
+  footL: [12, 0, 0],
+  footR: [-6, 0, 0],
+  armL: { aim: [0.35, -0.35, 0.85] },
+  handL: { aim: [0.05, 0.3, 1] },
+  armR: { aim: [-0.5, -0.55, 0.55] },
+  handR: { aim: [0.1, 0.45, 1] },
+  wingL: { aim: [0.75, 0.6, -0.45] },
+  wingR: { aim: [-0.75, 0.6, -0.45] },
+  tail1: [4, 10, 0],
+};
+const G = (p = {}) => mix(D_GUARD, p);
+function spinKeys(t0, t1, turns, pose, ease = smooth) {
+  return (p, t) => {
+    const u = ease(clamp01((t - t0) / (t1 - t0)));
+    return mix(pose(u, t), { hips: { r: [0, -360 * turns * u, 0] } });
+  };
+}
+function darrenPaws() {
+  const M = MOVESETS.paws,
+    N = M.normal,
+    Cc = M.charge;
+  return {
+    // Jab with the left paw, stepping in.
+    PawN1: {
+      dur: N[0].dur,
+      keys: [
+        [0, G()],
+        [
+          0.06,
+          G({
+            hips: { r: [0, 6, 0] },
+            spine: [0, 8, 0],
+            armL: { aim: [0.45, -0.3, 0.6] },
+            handL: { aim: [0.1, 0.4, 0.9] },
+          }),
+          0.7,
+        ],
+        [
+          0.12,
+          G({
+            hips: { r: [6, -10, 0], p: [0, -0.02, 0.06] },
+            spine: [8, -26, 0],
+            head: [-6, 16, 0],
+            legL: [-30, 0, 5],
+            legR: [22, 0, -5],
+            armL: { aim: [0.02, 0.08, 1] },
+            handL: { aim: [0, 0.05, 1] },
+            tail1: [4, 28, 0],
+          }),
+          0.2,
+        ],
+        [
+          0.22,
+          G({
+            hips: { r: [5, -12, 0], p: [0, -0.03, 0.05] },
+            spine: [8, -20, 0],
+            legL: [-28, 0, 5],
+            legR: [20, 0, -5],
+            armL: { aim: [0.1, 0.0, 1] },
+            handL: { aim: [0, 0.1, 1] },
+            tail1: [4, 20, 0],
+          }),
+          0.5,
+        ],
+        [N[0].dur, G()],
+      ],
+    },
+    // Right cross: hips and shoulders whip round.
+    PawN2: {
+      dur: N[1].dur,
+      keys: [
+        [0, G({ armL: { aim: [0.1, 0.0, 1] } })],
+        [
+          0.07,
+          G({
+            hips: { r: [0, -26, 0] },
+            spine: [6, -10, 0],
+            armR: { aim: [-0.6, -0.4, 0.2] },
+            handR: { aim: [-0.1, 0.5, 1] },
+          }),
+          0.7,
+        ],
+        [
+          0.14,
+          G({
+            hips: { r: [8, 22, 0], p: [0, -0.04, 0.08] },
+            spine: [10, 34, 0],
+            head: [-6, -24, 0],
+            legL: [-26, 0, 5],
+            legR: [28, 0, -5],
+            footR: [-25, 0, 0],
+            armR: { aim: [-0.02, 0.08, 1] },
+            handR: { aim: [0, 0.05, 1] },
+            armL: { aim: [0.5, -0.6, 0.2] },
+            handL: { aim: [0.1, 0.3, 1] },
+            tail1: [4, -30, 0],
+            tail2: [0, -15, 0],
+          }),
+          0.2,
+        ],
+        [
+          0.25,
+          G({
+            hips: { r: [6, 18, 0], p: [0, -0.04, 0.07] },
+            spine: [8, 28, 0],
+            legL: [-24, 0, 5],
+            legR: [24, 0, -5],
+            armR: { aim: [-0.08, 0, 1] },
+            handR: { aim: [0, 0.1, 1] },
+            tail1: [4, -20, 0],
+          }),
+          0.5,
+        ],
+        [N[1].dur, G()],
+      ],
+    },
+    // Hop kick with the left foot.
+    PawN3: {
+      dur: N[2].dur,
+      keys: [
+        [0, G({ armR: { aim: [-0.08, 0, 1] } })],
+        [
+          0.08,
+          G({
+            hips: { r: [10, 0, 0], p: [0, -0.1, 0] },
+            spine: [16, 0, 0],
+            legL: [-10, 0, 6],
+            legR: [-6, 0, -6],
+            ...D_ARMS([[0.6, -0.5, 0.4]], [[-0.6, -0.5, 0.4]]),
+          }),
+          0.6,
+        ],
+        [
+          0.2,
+          G({
+            hips: { r: [-22, 0, 0], p: [0, 0.14, 0.05] },
+            spine: [-12, 0, 0],
+            head: [10, 0, 0],
+            legL: [-95, 0, 4],
+            footL: [-30, 0, 0],
+            legR: [25, 0, -4],
+            footR: [20, 0, 0],
+            ...D_ARMS([[0.95, 0.2, -0.3]], [[-0.95, 0.2, -0.3]]),
+            wingL: { aim: [0.95, 0.55, -0.1] },
+            wingR: { aim: [-0.95, 0.55, -0.1] },
+            tail1: [-25, 0, 0],
+            tail2: [-15, 0, 0],
+          }),
+          0.3,
+        ],
+        [
+          0.32,
+          G({
+            hips: { r: [-10, 0, 0], p: [0, 0.04, 0.05] },
+            spine: [-4, 0, 0],
+            legL: [-55, 0, 4],
+            footL: [-10, 0, 0],
+            legR: [15, 0, -4],
+            ...D_ARMS([[0.9, 0, -0.1]], [[-0.9, 0, -0.1]]),
+          }),
+          0.5,
+        ],
+        [
+          0.4,
+          G({
+            hips: { p: [0, -0.09, 0.05] },
+            spine: [14, 0, 0],
+            legL: [-20, 0, 6],
+            legR: [10, 0, -6],
+          }),
+          0.4,
+        ],
+        [N[2].dur, G()],
+      ],
+    },
+    // Full spin: the tail whips round twice-hitting everything nearby.
+    PawN4: {
+      dur: N[3].dur,
+      fn: spinKeys(0.08, 0.44, 1, (u, t) => {
+        const e = sin(PI * clamp01((t - 0.03) / 0.5));
+        return G({
+          hips: { r: [6 * e, 18, 0], p: [0, -0.08 * e, 0] },
+          spine: [10 * e, 18, -8 * e],
+          head: [0, -20 * e, 0],
+          legL: [-10, 0, 14 * e],
+          legR: [10, 0, -14 * e],
+          armL: { aim: [0.9, 0.2 * e, 0.3] },
+          armR: { aim: [-0.9, 0.2 * e, -0.2] },
+          wingL: { aim: [0.9, 0.7, -0.2] },
+          wingR: { aim: [-0.9, 0.7, -0.2] },
+          tail1: [12 * e, 30 * e, 0],
+          tail2: [6 * e, 10 * e, 0],
+          tail3: [0, -5 * e, 0],
+          tail4: [0, -20 * e, 0],
+        });
+      }),
+    },
+    // Wing buffet: both paws shove forward as the wings clap in front.
+    PawN5: {
+      dur: N[4].dur,
+      keys: [
+        [0, G()],
+        [
+          0.12,
+          G({
+            hips: { r: [-6, 0, 0], p: [0, -0.04, -0.03] },
+            spine: [-14, 0, 0],
+            head: [-6, 0, 0],
+            ...D_ARMS(
+              [
+                [0.7, -0.2, -0.3],
+                [0.3, 0.6, 0.5],
+              ],
+              [
+                [-0.7, -0.2, -0.3],
+                [-0.3, 0.6, 0.5],
+              ]
+            ),
+            wingL: { aim: [0.8, 0.5, -0.8] },
+            wingR: { aim: [-0.8, 0.5, -0.8] },
+            wingtipL: [0, 0, 20],
+            wingtipR: [0, 0, -20],
+          }),
+          0.6,
+        ],
+        [
+          0.22,
+          G({
+            hips: { r: [14, 0, 0], p: [0, -0.06, 0.1] },
+            spine: [22, 0, 0],
+            head: [-18, 0, 0],
+            legL: [-30, 0, 6],
+            legR: [24, 0, -6],
+            ...D_ARMS(
+              [
+                [0.2, 0.15, 1],
+                [0, 0.6, 0.8],
+              ],
+              [
+                [-0.2, 0.15, 1],
+                [0, 0.6, 0.8],
+              ]
+            ),
+            wingL: { aim: [0.75, 0.3, 0.75] },
+            wingR: { aim: [-0.75, 0.3, 0.75] },
+            wingtipL: [0, 0, -15],
+            wingtipR: [0, 0, 15],
+            tail1: [20, 0, 0],
+            tail2: [10, 0, 0],
+          }),
+          0.2,
+        ],
+        [
+          0.34,
+          G({
+            hips: { r: [10, 0, 0], p: [0, -0.05, 0.08] },
+            spine: [16, 0, 0],
+            legL: [-26, 0, 6],
+            legR: [20, 0, -6],
+            ...D_ARMS([[0.3, 0.05, 1]], [[-0.3, 0.05, 1]]),
+            wingL: { aim: [0.85, 0.4, 0.4] },
+            wingR: { aim: [-0.85, 0.4, 0.4] },
+          }),
+          0.5,
+        ],
+        [N[4].dur, G()],
+      ],
+    },
+    // Somersault tail slam: flips forward and brings the tail crashing down in front.
+    PawN6: {
+      dur: N[5].dur,
+      fn: (p, t) => {
+        const crouch =
+            1 -
+            smooth(clamp01(t / 0.1)) +
+            smooth(clamp01((t - 0.62) / 0.08)) * (1 - smooth(clamp01((t - 0.72) / 0.14))),
+          flip = smooth(clamp01((t - 0.12) / 0.34)),
+          tuck = sin(PI * flip),
+          th = TAU * flip,
+          slam = smooth(clamp01((t - 0.38) / 0.12)),
+          over = sin(PI * clamp01((t - 0.3) / 0.25)) * (1 - slam);
+        return G({
+          hips: {
+            r: [360 * flip, 0, 0],
+            p: [0, -0.1 * crouch + (0.3 - 0.3 * cos(th)) * 0.5, -0.25 * sin(th)],
+          },
+          spine: [40 * tuck + 14 * slam * (1 - smooth(clamp01((t - 0.6) / 0.2))), 0, 0],
+          head: [30 * tuck, 0, 0],
+          legL: [-90 * tuck - 10 * crouch, 0, 8],
+          legR: [-90 * tuck - 10 * crouch, 0, -8],
+          footL: [40 * tuck, 0, 0],
+          footR: [40 * tuck, 0, 0],
+          ...D_ARMS(
+            [[lerp(0.6, 0.2, tuck), lerp(-0.4, -0.3, tuck), lerp(0.4, 1, tuck)]],
+            [[lerp(-0.6, -0.2, tuck), lerp(-0.4, -0.3, tuck), lerp(0.4, 1, tuck)]]
+          ),
+          wingL: { aim: [0.9, 0.7 - 0.6 * tuck, -0.4] },
+          wingR: { aim: [-0.9, 0.7 - 0.6 * tuck, -0.4] },
+          tail1: [60 * over - 25 * slam + 30 * tuck, 0, 0],
+          tail2: [45 * over - 20 * slam + 30 * tuck, 0, 0],
+          tail3: [30 * over - 10 * slam + 20 * tuck, 0, 0],
+          tail4: [20 * over, 0, 0],
+        });
+      },
+    },
+    // C2 wing uppercut: crouch, then explode upward with the right paw while the wings beat down.
+    PawC2: {
+      dur: Cc[1].dur,
+      keys: [
+        [0, G()],
+        [
+          0.1,
+          G({
+            hips: { r: [16, -20, 0], p: [0, -0.14, 0] },
+            spine: [24, -16, 0],
+            head: [-14, 10, 0],
+            legL: [-24, 0, 10],
+            legR: [14, 0, -10],
+            footL: [20, 0, 0],
+            armR: { aim: [-0.5, -0.9, 0.2] },
+            handR: { aim: [0, -0.3, 1] },
+            wingL: { aim: [0.9, 0.9, -0.2] },
+            wingR: { aim: [-0.9, 0.9, -0.2] },
+          }),
+          0.6,
+        ],
+        [
+          0.2,
+          G({
+            hips: { r: [-10, 24, 0], p: [0, 0.16, 0.06] },
+            spine: [-18, 26, 0],
+            head: [-26, -10, 0],
+            legL: [-5, 0, 4],
+            legR: [20, 0, -4],
+            footL: [30, 0, 0],
+            footR: [30, 0, 0],
+            armR: { aim: [-0.05, 1, 0.3] },
+            handR: { aim: [0, 1, 0.15] },
+            armL: { aim: [0.7, -0.6, 0.1] },
+            wingL: { aim: [0.8, -0.4, -0.4] },
+            wingR: { aim: [-0.8, -0.4, -0.4] },
+            wingtipL: [0, 0, -25],
+            wingtipR: [0, 0, 25],
+            tail1: [-20, 0, 0],
+            tail2: [-15, 0, 0],
+          }),
+          0.3,
+        ],
+        [
+          0.36,
+          G({
+            hips: { r: [-6, 18, 0], p: [0, 0.08, 0.05] },
+            spine: [-10, 20, 0],
+            head: [-20, -6, 0],
+            armR: { aim: [-0.1, 0.95, 0.3] },
+            handR: { aim: [0, 1, 0.3] },
+            wingL: { aim: [0.9, 0.5, -0.4] },
+            wingR: { aim: [-0.9, 0.5, -0.4] },
+          }),
+          0.5,
+        ],
+        [0.5, G({ hips: { p: [0, -0.08, 0.04] }, spine: [14, 0, 0] }), 0.4],
+        [Cc[1].dur, G()],
+      ],
+    },
+    // C3 tail-sweep trip: drops low and spins with the tail flat along the snow.
+    PawC3: {
+      dur: Cc[2].dur,
+      fn: spinKeys(0.06, 0.42, 1, (u, t) => {
+        const e = sin(PI * clamp01(t / 0.62)) ** 0.6;
+        return G({
+          hips: { r: [18 * e, 0, 0], p: [0, -0.17 * e, 0] },
+          spine: [28 * e, 0, 0],
+          head: [-22 * e, 0, 0],
+          legL: [-40 * e, 0, 18 * e],
+          legR: [20 * e, 0, -18 * e],
+          footL: [30 * e, 0, 0],
+          ...D_ARMS([[0.7, -0.75, 0.3]], [[-0.7, -0.75, 0.3]]),
+          tail1: [-14 * e, 25 * e, 0],
+          tail2: [-6 * e, 12 * e, 0],
+          tail3: [0, 0, 0],
+          wingL: { aim: [0.95, 0.45, -0.2] },
+          wingR: { aim: [-0.95, 0.45, -0.2] },
+        });
+      }),
+    },
+    // C4 snowball volley: left throw, right throw, then a big two-paw heave.
+    PawC4: {
+      dur: Cc[3].dur,
+      keys: [
+        [0, G()],
+        [
+          0.1,
+          G({
+            hips: { r: [0, 20, 0] },
+            spine: [-10, 20, 0],
+            armL: { aim: [0.5, 0.6, -0.8] },
+            handL: { aim: [0.1, 1, -0.3] },
+          }),
+          0.5,
+        ],
+        [
+          0.2,
+          G({
+            hips: { r: [8, -16, 0], p: [0, -0.04, 0.05] },
+            spine: [16, -26, 0],
+            legL: [-24, 0, 5],
+            legR: [18, 0, -5],
+            armL: { aim: [0.05, 0.25, 1] },
+            handL: { aim: [0, -0.2, 1] },
+            armR: { aim: [-0.5, 0.5, -0.7] },
+            handR: { aim: [-0.1, 1, -0.3] },
+          }),
+          0.4,
+        ],
+        [
+          0.36,
+          G({
+            hips: { r: [8, 20, 0], p: [0, -0.04, 0.06] },
+            spine: [16, 28, 0],
+            legL: [-20, 0, 5],
+            legR: [22, 0, -5],
+            armR: { aim: [-0.05, 0.25, 1] },
+            handR: { aim: [0, -0.2, 1] },
+            armL: { aim: [0.5, 0.6, -0.6] },
+            handL: { aim: [0.1, 1, -0.2] },
+          }),
+          0.4,
+        ],
+        [
+          0.44,
+          G({
+            hips: { r: [-8, 0, 0], p: [0, 0, -0.02] },
+            spine: [-22, 0, 0],
+            head: [-10, 0, 0],
+            ...D_ARMS(
+              [
+                [0.3, 0.9, -0.4],
+                [0, 1, -0.3],
+              ],
+              [
+                [-0.3, 0.9, -0.4],
+                [0, 1, -0.3],
+              ]
+            ),
+            wingL: { aim: [0.9, 0.8, -0.2] },
+            wingR: { aim: [-0.9, 0.8, -0.2] },
+          }),
+          0.5,
+        ],
+        [
+          0.52,
+          G({
+            hips: { r: [16, 0, 0], p: [0, -0.07, 0.08] },
+            spine: [26, 0, 0],
+            head: [-18, 0, 0],
+            legL: [-26, 0, 6],
+            legR: [22, 0, -6],
+            ...D_ARMS(
+              [
+                [0.15, 0.1, 1],
+                [0, -0.2, 1],
+              ],
+              [
+                [-0.15, 0.1, 1],
+                [0, -0.2, 1],
+              ]
+            ),
+            tail1: [20, 0, 0],
+          }),
+          0.3,
+        ],
+        [0.66, G({ hips: { r: [10, 0, 0], p: [0, -0.06, 0.06] }, spine: [16, 0, 0] }), 0.5],
+        [Cc[3].dur, G()],
+      ],
+    },
+    // C5 wing gust: wings sweep wide behind him, then beat forward in one big blast of wind.
+    PawC5: {
+      dur: Cc[4].dur,
+      keys: [
+        [0, G()],
+        [
+          0.22,
+          G({
+            hips: { r: [-10, 0, 0], p: [0, -0.03, -0.05] },
+            spine: [-20, 0, 0],
+            head: [-6, 0, 0],
+            ...D_ARMS([[0.9, 0.1, -0.4]], [[-0.9, 0.1, -0.4]]),
+            wingL: { aim: [0.8, 0.75, -0.75] },
+            wingR: { aim: [-0.8, 0.75, -0.75] },
+            wingtipL: [0, 0, 25],
+            wingtipR: [0, 0, -25],
+            tail1: [-15, 0, 0],
+          }),
+          0.5,
+        ],
+        [
+          0.34,
+          G({
+            hips: { r: [16, 0, 0], p: [0, -0.07, 0.08] },
+            spine: [26, 0, 0],
+            head: [-22, 0, 0],
+            legL: [-24, 0, 8],
+            legR: [20, 0, -8],
+            ...D_ARMS([[0.5, 0.1, 0.85]], [[-0.5, 0.1, 0.85]]),
+            wingL: { aim: [0.55, 0.2, 0.85] },
+            wingR: { aim: [-0.55, 0.2, 0.85] },
+            wingtipL: [0, 0, -30],
+            wingtipR: [0, 0, 30],
+            tail1: [25, 0, 0],
+            tail2: [15, 0, 0],
+          }),
+          0.2,
+        ],
+        [
+          0.5,
+          G({
+            hips: { r: [12, 0, 0], p: [0, -0.06, 0.06] },
+            spine: [18, 0, 0],
+            wingL: { aim: [0.75, 0.3, 0.5] },
+            wingR: { aim: [-0.75, 0.3, 0.5] },
+          }),
+          0.5,
+        ],
+        [Cc[4].dur, G()],
+      ],
+    },
+    // C6 belly flop: leaps up, belly out, and crashes down flat for a shockwave; up again with a wobble.
+    PawC6: {
+      dur: Cc[5].dur,
+      keys: [
+        [0, G()],
+        [
+          0.11,
+          {
+            hips: { r: [12, 0, 0], p: [0, -0.15, 0] },
+            spine: [18, 0, 0],
+            legL: [-20, 0, 10],
+            legR: [-20, 0, -10],
+            footL: [20, 0, 0],
+            footR: [20, 0, 0],
+            ...D_ARMS([[0.6, -0.6, -0.4]], [[-0.6, -0.6, -0.4]]),
+          },
+          0.5,
+        ],
+        [
+          0.3,
+          {
+            hips: { r: [-18, 0, 0], p: [0, 0.05, 0] },
+            spine: [-24, 0, 0],
+            head: [-16, 0, 0],
+            legL: [10, 0, 8],
+            legR: [10, 0, -8],
+            footL: [30, 0, 0],
+            footR: [30, 0, 0],
+            ...D_ARMS([[0.6, 0.9, 0.1]], [[-0.6, 0.9, 0.1]]),
+            wingL: { aim: [0.9, 0.9, -0.1] },
+            wingR: { aim: [-0.9, 0.9, -0.1] },
+            tail1: [-15, 0, 0],
+          },
+          0.5,
+        ],
+        [
+          0.55,
+          {
+            hips: { r: [40, 0, 0], p: [0, 0.1, 0.1] },
+            spine: [10, 0, 0],
+            head: [-30, 0, 0],
+            legL: [30, 0, 10],
+            legR: [30, 0, -10],
+            ...D_ARMS([[0.8, 0.3, 0.5]], [[-0.8, 0.3, 0.5]]),
+            wingL: { aim: [0.95, 0.5, -0.1] },
+            wingR: { aim: [-0.95, 0.5, -0.1] },
+            tail1: [-10, 0, 0],
+          },
+          0.5,
+        ],
+        [
+          0.84,
+          {
+            hips: { r: [82, 0, 0], p: [0, -0.1, 0.3] },
+            spine: [6, 0, 0],
+            head: [-50, 0, 0],
+            legL: [40, 0, 14],
+            legR: [40, 0, -14],
+            ...D_ARMS([[1, 0.05, 0.25]], [[-1, 0.05, 0.25]]),
+            wingL: { aim: [0.95, 0.1, -0.2] },
+            wingR: { aim: [-0.95, 0.1, -0.2] },
+            wingtipL: [0, 0, -20],
+            wingtipR: [0, 0, 20],
+            tail1: [-60, 0, 0],
+          },
+          0.1,
+        ],
+        [
+          0.9,
+          {
+            hips: { r: [80, 0, 0], p: [0, -0.12, 0.3] },
+            spine: [8, 0, 0],
+            head: [-48, 0, 0],
+            legL: [44, 0, 14],
+            legR: [44, 0, -14],
+            ...D_ARMS([[1, 0.15, 0.25]], [[-1, 0.15, 0.25]]),
+            tail1: [-55, 0, 0],
+            tail2: [10, 0, 0],
+          },
+          0.3,
+        ],
+        [
+          1.04,
+          {
+            hips: { r: [20, 0, 0], p: [0, -0.15, 0.1] },
+            spine: [30, 0, 0],
+            head: [-12, 0, 0],
+            legL: [-30, 0, 10],
+            legR: [-25, 0, -10],
+            footL: [30, 0, 0],
+            footR: [30, 0, 0],
+            ...D_ARMS([[0.6, -0.8, 0.2]], [[-0.6, -0.8, 0.2]]),
+          },
+          0.5,
+        ],
+        [Cc[5].dur, G()],
+      ],
+    },
+    // Jump attack: a corkscrew tail spin in the air.
+    PawJump: {
+      dur: M.jump.dur,
+      fn: spinKeys(0.02, 0.42, 2, (u, t) => {
+        const e = sin(PI * clamp01(t / 0.5)) ** 0.5;
+        return {
+          hips: { r: [10 * e, 0, 0] },
+          spine: [20 * e, 0, 0],
+          head: [-10 * e, 0, 0],
+          legL: [-60 * e, 0, 6],
+          legR: [-50 * e, 0, -6],
+          footL: [30 * e, 0, 0],
+          ...D_ARMS([[0.4, 0.2, 0.9]], [[-0.4, 0.2, 0.9]]),
+          wingL: { aim: [0.95, 0.4, -0.2] },
+          wingR: { aim: [-0.95, 0.4, -0.2] },
+          tail1: [20 * e, 25 * e, 0],
+          tail2: [5 * e, 10 * e, 0],
+        };
+      }),
+    },
+    // Dash attack: a rolling tackle into the crowd.
+    PawDash: { dur: M.dash.dur, fn: (p, t) => darrenRoll(clamp01(t / 0.5)) },
+    // Scarf-Star Blizzard: spins faster and faster flinging snow, then a big overhead burst.
+    PawSpecial: {
+      dur: M.special.dur,
+      fn: (p, t) => {
+        const up = smooth(clamp01(t / 0.3)),
+          end = smooth(clamp01((t - 2.02) / 0.13)),
+          after = smooth(clamp01((t - 2.15) / 0.25)),
+          spinA = 360 * (1.2 * t + 0.45 * t * t);
+        const air = up * (1 - end) * (0.18 + 0.03 * sin(t * 20));
+        return {
+          hips: { r: [0, -spinA * (1 - end), 0], p: [0, air - 0.12 * end * (1 - after), 0] },
+          spine: [-6 * up + 30 * end * (1 - after), 0, 0],
+          head: [-12 * up, 0, 0],
+          legL: [-20 * up, 0, 10 * up],
+          legR: [-10 * up, 0, -10 * up],
+          armL: {
+            aim: [
+              lerp(0.45, 1, up * (1 - end)) + 0.2 * end,
+              lerp(-1, 0.2, up) * (1 - end) - 0.7 * end + 1.2 * end * (1 - after),
+              lerp(0.18, -0.2, up) + 0.9 * end,
+            ],
+          },
+          armR: {
+            aim: [
+              lerp(-0.45, -1, up * (1 - end)) - 0.2 * end,
+              lerp(-1, 0.2, up) * (1 - end) - 0.7 * end + 1.2 * end * (1 - after),
+              lerp(0.18, -0.2, up) + 0.9 * end,
+            ],
+          },
+          wingL: { aim: [0.95, 0.6 + 0.3 * sin(t * 25), 0] },
+          wingR: { aim: [-0.95, 0.6 + 0.3 * sin(t * 25), 0] },
+          tail1: [10 * up, 0, 0],
+          tail2: [10 * up, 0, 0],
+        };
+      },
+    },
+  };
+}
 export const LIBRARY = {
-  Darren: { base: D_STANCE, clips: () => ({ ...darrenLocomotion() }) },
+  Darren: { base: D_STANCE, clips: () => ({ ...darrenLocomotion(), ...darrenPaws() }) },
 };
 
 // Builds every authored clip for one rig. Specs with fn/keys and dur become AnimationClips.

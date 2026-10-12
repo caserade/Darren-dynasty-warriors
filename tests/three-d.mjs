@@ -52,18 +52,105 @@ test('Switching cancels charge and preserves player location', () => {
   assert(!g.chargeRelease());
   assert(!g.switchTo(8));
 });
-test('Combo impacts occur once per action and cycle through three clips', () => {
+test("Pressing attack through a move chains Darren's six-hit Bare Paws string, one impact per hit", () => {
   const g = fresh();
-  place(g, 23, 52, Math.PI);
+  place(g, 23, 54.5, Math.PI);
   const names = [];
-  for (let i = 0; i < 3; i++) {
+  let hits = 0;
+  for (let i = 0; i < 6; i++) {
     assert(g.attack());
-    names.push(g.player.action.name);
-    tick(g, 1);
-    assert.equal(g.targets[0].hits, i + 1);
+    const q = g.player.action;
+    names.push(q.name);
+    // Press again before the cancel point; the next hit starts right at it.
+    while (g.player.action === q) tick(g, 1 / 60);
+    hits += q.move.hits.length;
   }
-  assert.deepEqual(names, ['Attack1', 'Attack2', 'Attack3']);
-  assert.equal(g.stats.attacks, 3);
+  tick(g, 1.5);
+  assert.deepEqual(names, ['PawN1', 'PawN2', 'PawN3', 'PawN4', 'PawN5', 'PawN6']);
+  assert.equal(g.stats.attacks, 6);
+  assert(g.targets.reduce((n, t) => n + t.hits, 0) >= 6);
+  assert(hits >= 7);
+});
+test('Charge after hit N of the string gives that finisher (C2-C6), and holding charge from neutral still charges', () => {
+  for (let n = 1; n <= 5; n++) {
+    const g = fresh();
+    for (let i = 0; i < n; i++) {
+      assert(g.attack());
+      while (!(g.player.action?.type === 'normal' && g.player.action.index === i)) tick(g, 1 / 60);
+    }
+    assert(g.chargeStart());
+    const q = g.player.action;
+    while (g.player.action === q) tick(g, 1 / 60);
+    assert.equal(g.player.action.name, 'PawC' + (n + 1));
+    assert(!g.player.charging);
+  }
+  const g = fresh();
+  assert(g.chargeStart());
+  assert(g.player.charging);
+});
+test('Jump attack in the air, dash attack after a sprint', () => {
+  const g = fresh();
+  place(g, 40, 52);
+  assert(g.jump());
+  tick(g, 0.15);
+  assert(g.attack());
+  assert.equal(g.player.action.name, 'PawJump');
+  assert(!g.attack() || g.player.buffer === 'attack');
+  tick(g, 1.5);
+  assert.equal(g.player.air, 0);
+  tick(g, 1.2, { x: 1, z: 0 });
+  assert(g.attack());
+  assert.equal(g.player.action.name, 'PawDash');
+});
+test('Special needs a full meter that fills from hits, keeps Darren untouchable and clears a crowd', () => {
+  const g = fresh();
+  place(g, 40, 52);
+  for (const a of g.actors) if (a !== g.player) Object.assign(a, { x: 10, z: 10 });
+  assert(!g.special());
+  const e = foe(g, 'gopher', 40, 53.6);
+  e.hp = e.max = 500;
+  assert(g.attack());
+  tick(g, 0.5);
+  assert(g.player.mus > 0);
+  e.hp = 0.1;
+  for (let k = 0; k < 6; k++) foe(g, 'gopher', 40 + Math.sin(k) * 2.4, 52 + Math.cos(k) * 2.4);
+  g.player.mus = 100;
+  assert(g.special());
+  assert.equal(g.player.action.name, 'PawSpecial');
+  assert.equal(g.player.mus, 0);
+  const hp = g.player.hp;
+  tick(g, 1);
+  assert(g.player.hp === hp && !g.hurtHero(20, 0));
+  tick(g, 2);
+  assert(g.ko >= 6);
+});
+test('Launchers pop grunts into the air and sweeps knock them down; lunges stop at the foe', () => {
+  const g = fresh();
+  place(g, 40, 52);
+  for (const a of g.actors) if (a !== g.player) Object.assign(a, { x: 10, z: 10 });
+  const e = foe(g, 'bale', 40, 53.5);
+  e.hp = e.max = 999;
+  const s = g.moveset();
+  g.startMove(g.player, s.charge[1], 'charge', 1);
+  tick(g, 0.3);
+  assert(e.air > 0 && e.state === 'air');
+  tick(g, 1.5);
+  assert.equal(e.air, 0);
+  g.startMove(g.player, s.charge[2], 'charge', 2);
+  tick(g, 0.3);
+  assert.equal(e.state, 'down');
+  for (let i = 0; i < 6; i++) {
+    g.startMove(g.player, s.normal[0], 'normal', 0);
+    tick(g, 0.4);
+  }
+  assert(Math.hypot(e.x - g.player.x, e.z - g.player.z) > e.r);
+});
+test('A pause between presses restarts the string at the first hit', () => {
+  const g = fresh();
+  assert(g.attack());
+  tick(g, 1.2);
+  assert(g.attack());
+  assert.equal(g.player.action.name, 'PawN1');
 });
 for (let i = 0; i < 3; i++)
   test(CAST[i] + ' charged attack reaches a practice post once', () => {
@@ -222,9 +309,15 @@ function fight(g, limit = 120) {
       }
       ang = world.direction(a, e, route.field, false);
     }
-    g.update(1 / 60, d > e.r + 0.9 ? { x: Math.sin(ang), z: Math.cos(ang) } : { x: 0, z: 0 });
-    if (!a.action && d < e.r + 2) {
-      a.yaw = ang;
+    g.update(
+      1 / 60,
+      d > e.r + 0.9 || Math.abs(e.y - a.y) > 1.2
+        ? { x: Math.sin(ang), z: Math.cos(ang) }
+        : { x: 0, z: 0 }
+    );
+    // Like a player, keep pressing attack while in range so the string chains.
+    if (d < e.r + 2 && Math.abs(e.y - a.y) < 1.6) {
+      if (!a.action) a.yaw = ang;
       g.attack();
     }
     if (g.defeated) g.retry();
@@ -388,11 +481,13 @@ test('Cookies heal, revive resting friends and grow Darren every 3, which hits h
     near(h, 40, 52, 0);
     const e = foe(h, 'bale', 40, 53.4);
     e.hp = e.max = 999;
-    for (let i = 0; i < 3; i++) {
-      h.player.cooldown = 0;
+    // The whole six-hit string; the last hit (somersault tail slam) grows with the belly.
+    for (let i = 0; i < 6; i++) {
       assert(h.attack());
-      tick(h, 1);
+      const q = h.player.action;
+      while (h.player.action === q) tick(h, 1 / 60);
     }
+    tick(h, 1.5);
     return 999 - e.hp;
   };
   assert(finisher(3) > finisher(0) + 10);
