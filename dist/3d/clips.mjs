@@ -26,8 +26,10 @@ const D_STANCE = {
   head: [-4, 0, 0],
   armL: { aim: [0.45, -1, 0.18] },
   armR: { aim: [-0.45, -1, 0.18] },
-  handL: { aim: [0.25, -1, 0.4] },
-  handR: { aim: [-0.25, -1, 0.4] },
+  // Elbows bent, paws held loosely in front of the tummy, as in the approved design
+  // (hand_L/R carry the forearm since studio pass 2).
+  handL: { aim: [0.12, -0.5, 1] },
+  handR: { aim: [-0.12, -0.5, 1] },
   wingL: { aim: [0.6, 0.55, -0.65] },
   wingR: { aim: [-0.6, 0.55, -0.65] },
   tail1: [-6, 0, 0],
@@ -38,6 +40,36 @@ const D_ARMS = (l, r) => ({
   armR: { aim: r[0] },
   handR: { aim: r[1] || r[0] },
 });
+// Knees (studio pass 4): Darren's legs gained a knee joint. Any pose that lowers the hips bends
+// both knees just enough to keep the feet on the ground (thigh forward, shin back, foot flat), and a
+// leg swung forward folds a little at the knee. A pose that sets shinL/shinR itself is left alone.
+const LEG = 0.39;
+function dKnees(pose) {
+  const drop = Math.max(0, -(pose.hips?.p?.[1] ?? 0)),
+    crouch = drop > 0 ? (2 * Math.acos(Math.max(0.2, 1 - drop / LEG)) * 180) / PI : 0;
+  let out = { ...pose };
+  for (const s of ['L', 'R']) {
+    if (pose['shin' + s]) continue;
+    const leg = pose['leg' + s],
+      swing = Math.max(0, -((Array.isArray(leg) ? leg : leg?.r)?.[0] ?? 0)),
+      flex = Math.min(85, crouch + swing * 0.55);
+    if (flex < 0.5) continue;
+    out['shin' + s] = [flex, 0, 0];
+    out = mix(out, {
+      ['leg' + s]: [-crouch / 2, 0, 0],
+      ['foot' + s]: [-crouch / 2 - swing * 0.4, 0, 0],
+    });
+  }
+  return out;
+}
+function withKnees(specs) {
+  const out = {};
+  for (const [name, sp] of Object.entries(specs))
+    out[name] = sp.fn
+      ? { ...sp, fn: (p, t) => dKnees(sp.fn(p, t)) }
+      : { ...sp, keys: sp.keys.map(([t, pose, f]) => [t, dKnees(pose || {}), f]) };
+  return out;
+}
 // A tucked forward roll; u runs 0..1 over the roll.
 function darrenRoll(u0) {
   const p = u0 * 0.8,
@@ -3840,7 +3872,7 @@ function darrenScarf() {
 export const LIBRARY = {
   Darren: {
     base: D_STANCE,
-    clips: () => ({ ...darrenLocomotion(), ...darrenPaws(), ...darrenScarf() }),
+    clips: () => withKnees({ ...darrenLocomotion(), ...darrenPaws(), ...darrenScarf() }),
   },
   Tormund: { base: T_BASE, clips: () => ({ ...tormundLocomotion(), ...tormundSword() }) },
   Bucky: { base: B_BASE, clips: () => ({ ...buckyLocomotion(), ...buckyMallet() }) },

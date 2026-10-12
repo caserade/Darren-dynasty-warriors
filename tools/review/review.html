@@ -4,8 +4,14 @@
     <meta charset="utf-8" />
     <title>Character review</title>
     <style>
-      html, body { margin: 0; background: #c9dbe6; }
-      canvas { display: block; }
+      html,
+      body {
+        margin: 0;
+        background: #c9dbe6;
+      }
+      canvas {
+        display: block;
+      }
     </style>
     <script type="importmap">
       { "imports": { "three": "/vendor/three.module.js", "three/addons/": "/vendor/" } }
@@ -18,12 +24,17 @@
       // animator, and poses it at any clip time and angle for turnaround and contact sheets.
       import * as THREE from 'three';
       import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-      import { buildRig, Animator } from '/anim.mjs';
+      import { buildRig, Animator, applyPose, mix } from '/anim.mjs';
+      import { LIBRARY } from '/clips.mjs';
       import { buildClips } from '/clips.mjs';
       const q = new URLSearchParams(location.search);
       const name = q.get('hero') || 'Darren';
       const canvas = document.getElementById('c');
-      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+      const renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: true,
+        preserveDrawingBuffer: true,
+      });
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = 1.1;
@@ -69,7 +80,9 @@
       scene.add(skel);
       // Colors each vertex by how much one named bone moves it (red = fully, blue = not at all).
       function weightMaterial(mesh, bone) {
-        const g = mesh.geometry, j = g.attributes.skinIndex, w = g.attributes.skinWeight;
+        const g = mesh.geometry,
+          j = g.attributes.skinIndex,
+          w = g.attributes.skinWeight;
         const bi = mesh.skeleton.bones.findIndex((b) => b.name === bone);
         const col = new Float32Array(g.attributes.position.count * 3);
         for (let i = 0; i < g.attributes.position.count; i++) {
@@ -87,8 +100,13 @@
           root.updateMatrixWorld(true);
           const box = new THREE.Box3();
           for (const m of meshes) {
-            const p = m.geometry.attributes.position, v = new THREE.Vector3();
-            for (let i = 0; i < p.count; i += 3) { m.getVertexPosition(i, v); m.localToWorld(v); box.expandByPoint(v); }
+            const p = m.geometry.attributes.position,
+              v = new THREE.Vector3();
+            for (let i = 0; i < p.count; i += 3) {
+              m.getVertexPosition(i, v);
+              m.localToWorld(v);
+              box.expandByPoint(v);
+            }
           }
           return { min: box.min.toArray(), max: box.max.toArray(), scale: root.scale.toArray() };
         },
@@ -96,18 +114,56 @@
         shot(o = {}) {
           const mode = o.mode || 'tex';
           for (const m of meshes)
-            m.material = mode === 'clay' ? clay : mode === 'wire' ? wire
-              : mode === 'weights' ? weightMaterial(m, o.bone) : m.userData.mat;
+            m.material =
+              mode === 'clay'
+                ? clay
+                : mode === 'wire'
+                  ? wire
+                  : mode === 'weights'
+                    ? weightMaterial(m, o.bone)
+                    : m.userData.mat;
           skel.visible = mode === 'skeleton';
-          if (mode === 'skeleton') for (const m of meshes) { m.material = clay; }
+          if (mode === 'skeleton')
+            for (const m of meshes) {
+              m.material = clay;
+            }
           animator.entries = [];
           animator.current = null;
-          animator.update(0, { key: 'k' + Math.random(), clip: o.clip || 'Idle', time: o.t || 0, blend: 0.001, speed: 0, yaw: 0, x: 0, y: 0, z: 0, air: 0 });
-          animator.update(0.001, { key: animator.current, clip: o.clip || 'Idle', time: o.t || 0, speed: 0, yaw: 0, x: 0, y: 0, z: 0, air: 0 });
+          animator.update(0, {
+            key: 'k' + Math.random(),
+            clip: o.clip || 'Idle',
+            time: o.t || 0,
+            blend: 0.001,
+            speed: 0,
+            yaw: 0,
+            x: 0,
+            y: 0,
+            z: 0,
+            air: 0,
+          });
+          animator.update(0.001, {
+            key: animator.current,
+            clip: o.clip || 'Idle',
+            time: o.t || 0,
+            speed: 0,
+            yaw: 0,
+            x: 0,
+            y: 0,
+            z: 0,
+            air: 0,
+          });
+          // A raw pose on top of the hero's base stance (for checking pose directions).
+          if (o.pose) applyPose(rig, mix(LIBRARY[name].base, o.pose));
           root.updateMatrixWorld(true);
-          const yaw = ((o.yaw ?? 25) * Math.PI) / 180, pitch = ((o.pitch ?? 12) * Math.PI) / 180;
-          const d = o.dist ?? 4.2, h = o.h ?? 0.75;
-          camera.position.set(Math.sin(yaw) * Math.cos(pitch) * d, h + Math.sin(pitch) * d, Math.cos(yaw) * Math.cos(pitch) * d);
+          const yaw = ((o.yaw ?? 25) * Math.PI) / 180,
+            pitch = ((o.pitch ?? 12) * Math.PI) / 180;
+          const d = o.dist ?? 4.2,
+            h = o.h ?? 0.75;
+          camera.position.set(
+            Math.sin(yaw) * Math.cos(pitch) * d,
+            h + Math.sin(pitch) * d,
+            Math.cos(yaw) * Math.cos(pitch) * d
+          );
           camera.lookAt(0, h, 0);
           renderer.render(scene, camera);
           return true;
