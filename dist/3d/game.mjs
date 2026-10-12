@@ -1338,7 +1338,8 @@ function heroPose(a, i, h) {
     if (!actionKeys.has(id)) actionKeys.set(id, 'act' + actionSerial++);
     let clip = act.anim || act.name;
     if (clip === 'Jump' && an.has('JumpUp')) clip = 'JumpUp';
-    if (!an.has(clip)) clip = /^(Hurt|Knock|GetUp)/.test(clip) ? 'Idle' : 'Attack1';
+    if (!an.has(clip))
+      clip = /^(Hurt|Knock|GetUp)/.test(clip) || !an.has('Attack1') ? 'Idle' : 'Attack1';
     const c = an.clips[clip],
       time = c && act.duration ? (act.time / act.duration) * c.duration : act.time;
     return {
