@@ -948,3 +948,34 @@ h1 span {
   font-size: 0.85rem;
   color: #ffe1a0;
 }
+/* Claude update 6: special meter, Darren's weapon style and the new touch buttons */
+.meter.special i {
+  background: linear-gradient(90deg, #f2c230, #ec5c9a);
+}
+.meter.special.full {
+  box-shadow: 0 0 10px #f6d23a;
+  animation: special-ready 0.9s ease-in-out infinite alternate;
+}
+@keyframes special-ready {
+  to {
+    box-shadow: 0 0 2px #f6d23a;
+  }
+}
+#vitals #style:not([hidden]) {
+  display: inline-block;
+  margin-top: 5px;
+  color: #f6d23a;
+}
+.touch-actions #touch-special {
+  background: #8a5a8fd9;
+  color: white;
+  opacity: 0.6;
+}
+.touch-actions #touch-special.ready {
+  opacity: 1;
+  box-shadow: 0 0 10px #f6d23a;
+}
+.touch-actions #touch-style {
+  background: #b94f7ad9;
+  color: white;
+}

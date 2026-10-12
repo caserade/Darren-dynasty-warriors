@@ -6,7 +6,7 @@
     "start": "node desktop-server.cjs",
     "pixel": "node desktop-server.cjs --pixel",
     "format": "prettier --write \"dist/**/*.{js,mjs,css,html}\" \"tests/*.{cjs,mjs}\" \"tools/*.cjs\" desktop-server.cjs",
-    "test": "node tests/three-d.mjs && node tests/shared-save.cjs && node tests/gameplay.cjs && node tests/firewood.cjs && node tests/phone.cjs && node tests/controllers.cjs && node tests/screen-fit.cjs && node tools/verify-scene.cjs"
+    "test": "node tests/three-d.mjs && node tests/shared-save.cjs && node tests/gameplay.cjs && node tests/firewood.cjs && node tests/phone.cjs && node tests/controllers.cjs && node tests/screen-fit.cjs && node tools/verify-scene.cjs && node --test tests/desktop-packaging.cjs tests/desktop-standalone.cjs"
   },
   "devDependencies": {"@napi-rs/canvas": "0.1.100"}
 }

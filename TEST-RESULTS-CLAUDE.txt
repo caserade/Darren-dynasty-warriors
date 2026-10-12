@@ -1,3 +1,125 @@
+TEST RESULTS · CLAUDE UPDATE 7 (FULL QUALITY CHECK, NO UPDATER, FRESH CLONE) · 2026-10-12
+All runs below were made in a Linux container on this branch (claude/full-qa-gdog2s), with
+headless Chromium using software WebGL (SwiftShader) at 1-3 fps. Earlier results further
+down are history, not verification of this branch.
+
+npm test (node 22.22): all pass.
+  tests/three-d.mjs 43 checks (new: a hero knocked out mid-air can jump-attack again;
+  it fails without the sim.mjs fix), shared-save 8, gameplay, firewood, phone,
+  controllers, screen-fit, tools/verify-scene.cjs, desktop packaging + standalone 9.
+Repeat runs: tests/firewood.cjs failed 2 of 30 before the robot fix (a guard out of the
+  friends' reach) and 0 of 40 after; tests/gameplay.cjs 10 of 10.
+tests/browser-qa.cjs: 63 of 63 before the fixes. After the fixes, one run gave 62 of 63:
+  "grunts hurt the hero" saw no hit inside 4 game-seconds while the machine was also
+  building the app. A 200-run simulation of that scene showed it happens about 1 run in
+  200 because grunts take turns (both were winding up when the window closed), so the
+  check now allows up to 8 game-seconds. A clean rerun on the fixes: 63 of 63.
+Extra browser play-through written for this check (not in the repo; script kept with the
+  QA report): each hero's full string (Paws N1-N6, Scarf N1-N6, Tormund N1-N5, Bucky
+  N1-N4), charge attack and special (PawSpecial, ScarfSpecial, TorSpecial, BukSpecial);
+  Q swaps Darren to the Polka Scarf; Tormund's parry; the 3D game stepped at 8 fps
+  through a jump landing and hits keeps every hero transform finite; the scarf choice is
+  in the save; no page errors. 16 of 16.
+tests/desktop-app.cjs under xvfb-run: 13 of 13 from the checkout and 13 of 13 from a
+  packaged Linux build of this code (new checks: a backslash path escape is refused, and
+  snowday://game/3d redirects to /3d/ and loads).
+Windows build: npm run build:win produced the 1.2.0 x64 zip (135 files); its
+  resources/game is byte-identical to dist/ and app.asar holds only main.cjs,
+  package.json and home/. Copied to project files desktop-app/Darren-Snowday-Windows.zip.
+Fresh clone: cloned the branch from GitHub into an empty folder; npm install, npm test
+  (pass), desktop-app npm install + npm run build:win (builds). Before the fixes npm test
+  left previews/Darren-Storybook-Weight-Levels.png modified; now the clone stays clean.
+  Launcher files keep CRLF (.cmd) and the executable bit (.command).
+Pixel game: no file under dist/ outside dist/3d/ differs from main.
+Merges: main is an ancestor of every PR branch; this branch contains PR #1 and PR #2.
+
+LIMITS
+- Not run on a real Windows PC (Linux build of the same code only), real GPU, physical
+  controller (Gamepad API simulated), real phone, Mac or Safari. SmartScreen not checked.
+- Frame rate, feel and balance on real hardware were not measured.
+
+TEST RESULTS · CLAUDE UPDATE 6 (FLUID ANIMATION, COMBOS, POLKA SCARF, SMARTER AI · 3D ONLY) · 2026-10-12
+Environment: Linux cloud container, Node 22.22, headless Chromium (Playwright 1.56),
+software WebGL (SwiftShader). This isn't a real GPU, Windows PC, phone or physical
+controller. Nothing below was checked on any of those.
+
+EXISTING SUITE (npm test) — all pass
+  tests/three-d.mjs       42 checks (28 before; the old 3-hit combo check replaced)
+  tests/shared-save.cjs   8 checks
+  tests/gameplay.cjs, firewood.cjs, phone.cjs, controllers.cjs, screen-fit.cjs  pass
+  tools/verify-scene.cjs  pass (it rewrites previews/Darren-Storybook-Weight-Levels.png;
+  restored afterwards). The pixel game was not changed.
+
+NEW SIMULATION CHECKS (tests/three-d.mjs, game logic without drawing)
+  Darren: Polka Scarf swap and save; scarf string reach; scarf finishers, Snare pull and
+  Polka Cyclone special. Tormund: 5-hit string and finishers; jump plunge and shield ram;
+  parry and counter. Bucky: string, super armor, finishers and the line crack. AI: grunts
+  ring and back off, step out of danger zones; crow and bale dashes; boss move choice and
+  fury below half health; friends walk over and join a fight.
+  The whole-adventure robot run still clears every camp and boss.
+
+REAL-BROWSER PASS (tests/browser-qa.cjs) — 63 of 63 pass after 4 test updates
+  First run: 59 of 63. All four were the test expecting update-5 behaviour, not game
+  faults, and each was looked at in the running game before the test was changed:
+  - "J starts combo animation": the first paw hit is now PawN1, not Attack1.
+  - "hold K charges": K straight after a combo hit now fires a finisher (as designed), so
+    the test waits for the combo window to close before holding K.
+  - "Restore standard buttons": the default pad layout gained style (LT) and special (RT).
+  - "grunts hurt the hero": the friends now join fights and knocked out every grunt first.
+    The test moves the friends away and puts two fresh grunts next to Darren.
+  Second run: 63 of 63. Console: no errors. Only the known harmless "net::ERR_ABORTED"
+  lines for .glb models when a test leaves the page while they load.
+
+ANIMATION REVIEW
+  Every new clip was rendered as contact sheets (Three.js, SwiftShader) from several
+  angles and read frame by frame, plus in-game strips captured right after each game
+  step. Problems found and fixed this way included spins ending backwards, the scarf
+  ribbon flying upward, a sword that couldn't point forward, a roll that floated and arms
+  that stayed out after spins. Sample sheets: /mnt/project-files/animation-pass/.
+  This is a still-frame review: how smooth it feels at full frame rate on a real GPU was
+  not seen.
+
+WINDOWS APP
+  Rebuilt from the PR #1 branch with this branch's dist/ and replaced the download.
+  A Linux build of the same app passed all 12 tests/desktop-app.cjs checks (xvfb).
+  The Windows .exe itself was not run.
+
+NOT TESTED
+  Real GPU frame rate, a real controller (new default: right trigger = Special, left
+  trigger = style swap), phones, Windows, and difficulty/feel with a human player.
+  Combat balance was only checked by the robot run.
+
+TEST RESULTS · CLAUDE UPDATE 5 (WINDOWS DESKTOP APP) · 2026-10-12
+Environment: Linux cloud container, Node 22.22, Electron 44.4.5 under Xvfb, driven by
+Playwright 1.56, software WebGL (SwiftShader). This isn't a Windows PC or a real GPU.
+
+DESKTOP APP (tests/desktop-app.cjs) — 12 of 12 pass, twice: run from the checkout and
+as a packaged Linux build of the same app (same folder layout as the Windows zip)
+  Opens on the start screen and its art loads; key 1 opens the pixel game; its title
+  shows and a new game starts with the HUD; the 3D valley loads all models and animation
+  clips; both games see the same saves; all four 3D models arrive byte-complete; no page
+  errors or missing files; a web address can't replace the game in the window; a path
+  outside the game folder is refused; saves are still there after closing and reopening.
+  Chromium reports streamed .glb reads from the app as "net::ERR_ABORTED" although every
+  byte arrives (the same harmless line the browser runs logged); the test checks the
+  byte counts instead of counting those lines.
+  Screenshots: qa-screenshots/desktop-0*.png.
+
+WINDOWS BUILD
+  Built on Linux with @electron/packager 20.3.0 for win32 x64 (no Wine). Checked the .exe's
+  resources: Darren's icon (7 sizes) and the name/version details are in it. The zip
+  holds the app, resources/app.asar (start screen and main.cjs only) and resources/game
+  (a copy of dist/).
+
+EXISTING SUITE (npm test) — all pass; dist/ is unchanged by this update
+  (it rewrites previews/Darren-Storybook-Weight-Levels.png; restored afterwards)
+
+NOT TESTED
+  A real Windows PC: double-clicking the .exe, the SmartScreen prompt, the window and
+  menu on Windows, full screen, and the save folder location. A real GPU and frame rate.
+  A physical controller (the browser runs only simulated one; the app uses the same
+  Chromium Gamepad support).
+
 TEST RESULTS · CLAUDE UPDATE 4 (SMALLER 3D MODELS, MAC LAUNCHERS) · 2026-10-12
 Environment: Linux cloud container, Node 22.22, headless Chromium (Playwright 1.56),
 software WebGL (SwiftShader). This isn't a real GPU or a real Mac.

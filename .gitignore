@@ -9,3 +9,6 @@ qa-screenshots/
 # local test setup
 node_modules
 .DS_Store
+
+desktop-app/out/
+desktop-app/update-token.txt

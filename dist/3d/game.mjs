@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { World, Game, CAST, KITS, BELLY, MOVE_WIND, clamp } from './sim.mjs';
+import { buildRig, Animator } from './anim.mjs';
+import { buildClips } from './clips.mjs';
+import { ScarfRibbon } from './ribbon.mjs';
+import { WeaponTrail } from './trail.mjs';
 
 const $ = (id) => document.getElementById(id),
   canvas = $('view'),
@@ -182,6 +186,8 @@ const gameKeys = [
   'ShiftLeft',
   'ShiftRight',
   'KeyE',
+  'KeyL',
+  'KeyQ',
   'KeyZ',
   'KeyX',
   'KeyC',
@@ -217,6 +223,8 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'Space') game.jump();
   if (e.code.startsWith('Shift')) game.dodge();
   if (e.code === 'KeyE') game.interact();
+  if (e.code === 'KeyL') game.special();
+  if (e.code === 'KeyQ') swapStyle();
   if (e.code === 'KeyC') cameraYaw = game.player.yaw + Math.PI;
   if (e.code.startsWith('Digit')) requestSwitch(Number(e.code.slice(-1)) - 1);
 });
@@ -258,6 +266,8 @@ stick.onpointerup =
       }
     };
 for (const [id, method] of [
+  ['special', 'special'],
+  ['style', 'switchStyle'],
   ['attack', 'attack'],
   ['jump', 'jump'],
   ['dodge', 'dodge'],
@@ -315,7 +325,17 @@ canvas.onwheel = (e) => {
   cameraDistance = clamp(cameraDistance + e.deltaY * 0.008, 4.5, 13);
 };
 const PAD_SAVE = 'snowday-3d-controls-v1',
-  PAD_DEFAULTS = { jump: 0, dodge: 1, combo: 2, charge: 3, switch: 4, interact: 5, pause: 9 },
+  PAD_DEFAULTS = {
+    jump: 0,
+    dodge: 1,
+    combo: 2,
+    charge: 3,
+    switch: 4,
+    interact: 5,
+    style: 6,
+    special: 7,
+    pause: 9,
+  },
   PAD_LABELS = {
     combo: 'Combo',
     charge: 'Hold charge',
@@ -323,6 +343,8 @@ const PAD_SAVE = 'snowday-3d-controls-v1',
     dodge: 'Dodge',
     interact: 'Talk / gather',
     switch: 'Next hero',
+    special: 'Special',
+    style: 'Paws / Scarf',
     pause: 'Pause',
   };
 let padBindings = { ...PAD_DEFAULTS },
@@ -336,8 +358,20 @@ try {
     Object.entries(saved).every(
       ([k, v]) => k in PAD_DEFAULTS && Number.isInteger(v) && v >= 0 && v < 32
     )
-  )
+  ) {
     padBindings = { ...PAD_DEFAULTS, ...saved };
+    // Saves from before Paws/Scarf and Special existed may already use LT/RT for something
+    // else; give a newer action a free button instead of letting one button do two things.
+    const FREE = [6, 7, 4, 5, 10, 11, 8, 3, 2, 1, 0, 12, 13, 14, 15];
+    for (const k of Object.keys(PAD_DEFAULTS)) {
+      if (k in saved) continue;
+      const used = Object.entries(padBindings)
+        .filter(([o]) => o !== k)
+        .map(([, v]) => v);
+      if (used.includes(padBindings[k]))
+        padBindings[k] = FREE.find((b) => !used.includes(b)) ?? padBindings[k];
+    }
+  }
 } catch {}
 // Combo, dodge and pause buttons chosen in either game carry over.
 const SHARED_BUTTON_NAMES = { attack: 'combo', dodge: 'dodge', pause: 'pause' };
@@ -382,7 +416,7 @@ function showBindings() {
   }
   const n = (k) => buttonName(padBindings[k]).split(' / ')[0];
   $('pad-help').textContent =
-    `Controller: ${n('combo')} combo · hold ${n('charge')} charge · ${n('jump')} jump · ${n('dodge')} dodge · ${n('interact')} interact · ${n('switch')} next hero`;
+    `Controller: ${n('combo')} combo · hold ${n('charge')} charge · ${n('jump')} jump · ${n('dodge')} dodge · ${n('interact')} interact · ${n('special')} special · ${n('style')} Darren's style · ${n('switch')} next hero`;
 }
 function saveBindings() {
   try {
@@ -427,6 +461,10 @@ $('pad-reset').onclick = () => {
   shared?.forgetButtons();
   padStatus('Standard controller buttons restored.');
 };
+function swapStyle() {
+  if (game.selected !== 0) toast('Only Darren swaps styles: Bare Paws or the Polka Scarf.');
+  else game.switchStyle();
+}
 function requestSwitch(i) {
   if (game.actors[i]?.down) {
     toast(`${CAST[i]} is resting. A cookie or a cleared camp gets them back up.`);
@@ -505,6 +543,8 @@ function padInput(dt) {
     if (edge(B.jump)) game.jump();
     if (edge(B.dodge)) game.dodge();
     if (edge(B.interact)) game.interact();
+    if (edge(B.special)) game.special();
+    if (edge(B.style)) swapStyle();
     if (edge(B.switch)) {
       const from = pendingSwitch ?? game.selected,
         next = [1, 2].map((k) => (from + k) % 3).find((i) => !game.actors[i].down);
@@ -644,6 +684,25 @@ function events() {
     }
     if (e.type === 'snowburst') ring(e);
     if (e.type === 'throw') tone(380, 0.2);
+    if (e.type === 'hitstop') {
+      hitstop = Math.max(hitstop, e.t);
+      // Bucky's heavy blows thump the camera.
+      if (e.actor === 2 && e.heavy) shake = Math.max(shake, 0.22);
+    }
+    if (e.type === 'parry') {
+      ring({ x: e.x, z: e.z, y: e.y - 1.2, r: 1.6, strong: true, color: 0xfff1b0 });
+      floater(e.x, e.y + 0.3, e.z, 'PARRY!', 'heal');
+      tone(1180, 0.12, 0.05);
+    }
+    if (e.type === 'special') {
+      banner(e.name, 'SPECIAL');
+      tone(196, 0.5, 0.06);
+      shake = Math.max(shake, 0.25);
+    }
+    if (e.type === 'style') {
+      toast(`Darren: ${e.name}`);
+      tone(520, 0.15);
+    }
     if (e.type === 'cookie') {
       tone(880, 0.18);
       toast(
@@ -655,6 +714,7 @@ function events() {
     if (e.type === 'hit' && e.damage)
       floater(e.x, e.y + 0.3, e.z, String(e.damage), e.power > 1 ? 'heavy' : '');
     if (e.type === 'hurt') {
+      if (heroes[e.actor]) heroes[e.actor].hurt = e.angle ?? null;
       tone(140, 0.22, 0.06);
       hurtFlash();
       shake = 0.3;
@@ -1009,18 +1069,26 @@ function updateFoes(dt) {
     } else {
       if (e.moving)
         o.body.position.y = Math.abs(Math.sin(t * (e.boss ? 6 : 11))) * (e.boss ? 0.12 : 0.08);
-      if (e.state === 'wind') {
+      if (e.state === 'wind' || e.state === 'aim') {
         sy = 0.9 + Math.sin(t * 30) * 0.03;
         tilt = -0.15;
-      } else if (e.state === 'rec') tilt = 0.12;
+      } else if (e.state === 'dash') tilt = 0.3;
+      else if (e.state === 'rec') tilt = 0.12;
       else if (e.state === 'hurt') tilt = 0.2;
       o.body.scale.set(1 / Math.sqrt(sy), sy, 1 / Math.sqrt(sy));
       o.body.rotation.x = tilt;
     }
     if (o.wings) o.wings.forEach((w, i) => (w.rotation.z = (i ? -1 : 1) * Math.sin(t * 14) * 0.6));
-    if (o.spin) o.spin.rotation.x += dt * (e.state === 'charge' ? 14 : e.moving ? 5 : 1);
+    if (o.spin)
+      o.spin.rotation.x +=
+        dt * (e.state === 'charge' || e.state === 'dash' ? 14 : e.moving ? 5 : 1);
     if (o.glow) for (const g of o.glow) g.material.emissiveIntensity = e.state === 'wind' ? 2.5 : 1;
-    const f = e.flash > 0 ? 0.7 : e.boss && e.state === 'wind' ? 0.25 + 0.2 * Math.sin(t * 25) : 0;
+    const f =
+      e.flash > 0
+        ? 0.7
+        : (e.boss && e.state === 'wind') || e.state === 'aim'
+          ? 0.25 + 0.2 * Math.sin(t * 25)
+          : 0;
     for (const m of o.mats)
       if (m.emissive && !(o.glow && o.glow.some((g) => g.material === m)))
         e.flash > 0 ? m.emissive.setRGB(f, f, f) : m.emissive.setRGB(f, 0, f * 0.2);
@@ -1043,7 +1111,7 @@ function updateFoes(dt) {
       }
       tv.group.position.set(e.x, e.y + 0.08, e.z);
       tv.group.rotation.y = e.cdir;
-      tv.mat.opacity = 0.18 + 0.32 * clamp(1 - e.st / MOVE_WIND[e.move], 0, 1);
+      tv.mat.opacity = 0.18 + 0.32 * clamp(1 - e.st / (e.windMax || MOVE_WIND[e.move]), 0, 1);
     } else removeTell(e.id);
   }
   for (const [id, o] of foeViews)
@@ -1134,6 +1202,7 @@ function updateFloaters(dt) {
   }
 }
 let bannerTime = 0,
+  hitstop = 0,
   shake = 0,
   defeatOpen = false;
 function banner(title, text = '') {
@@ -1228,31 +1297,152 @@ function resize() {
   camera.updateProjectionMatrix();
 }
 addEventListener('resize', resize);
+// How each hero moves (Claude update 6): natural walk/run speeds of the authored cycles, springy
+// tail bones, and Darren's wings.
+const HERO_MOTION = [
+  {
+    loco: { walk: 1.7, run: 5.8 },
+    chains: [['tail1', 'tail2', 'tail3', 'tail4', 'tail5']],
+    wings: ['wingL', 'wingR'],
+  },
+  { loco: { walk: 1.6, run: 5.5 }, chains: [['tail1', 'tail2', 'tail3']] },
+  { loco: { walk: 1.4, run: 5.1 }, chains: [['tail1', 'tail2', 'tail3']] },
+];
+let actionSerial = 0;
+const actionKeys = new WeakMap();
+// Picks the clip a hero should be showing from what the simulation says they are doing.
+function heroPose(a, i, h) {
+  const an = h.animator,
+    d = {
+      speed: a.action || a.charging ? 0 : a.speed,
+      vx: a.vx ?? 0,
+      vz: a.vz ?? 0,
+      air: a.air,
+      vy: a.vy,
+      yaw: a.yaw,
+      x: a.x,
+      y: a.y,
+      z: a.z,
+      hurt: h.hurt,
+      look: lookTarget(a),
+    };
+  if (a.down)
+    return { ...d, key: 'down', clip: an.has('Down') ? 'Down' : 'Idle', loop: true, blend: 0.3 };
+  const act =
+    a.action ||
+    (a.assist
+      ? { name: a.animation, time: a.assist.time, duration: a.assist.dur ?? 0.65, assist: a.assist }
+      : null);
+  if (act) {
+    const id = act.assist || act;
+    if (!actionKeys.has(id)) actionKeys.set(id, 'act' + actionSerial++);
+    let clip = act.anim || act.name;
+    if (clip === 'Jump' && an.has('JumpUp')) clip = 'JumpUp';
+    if (!an.has(clip)) clip = /^(Hurt|Knock|GetUp)/.test(clip) ? 'Idle' : 'Attack1';
+    const c = an.clips[clip],
+      time = c && act.duration ? (act.time / act.duration) * c.duration : act.time;
+    return {
+      ...d,
+      key: actionKeys.get(id),
+      clip,
+      time,
+      blend: act.blend ?? 0.07,
+      snapYaw: true,
+      noLook: act.name === 'Dodge',
+    };
+  }
+  if (a.charging) {
+    const clip =
+      i === 0 && game.style === 'scarf' && an.has('ScarfCharge') ? 'ScarfCharge' : 'Charge';
+    return { ...d, key: 'charge', clip, loop: true, blend: 0.12, still: true };
+  }
+  if (a.air > 0.02) {
+    if (an.has('Fall')) {
+      const up = a.vy > 1.2;
+      return {
+        ...d,
+        key: up ? 'jumpup' : 'fall',
+        clip: up ? 'JumpUp' : 'Fall',
+        loop: !up,
+        blend: up ? 0.06 : 0.22,
+      };
+    }
+    return { ...d, key: 'jump', clip: 'Jump', blend: 0.1 };
+  }
+  if (an.landT < 0.3 && an.has('Land') && a.speed < 2.5)
+    return { ...d, key: 'land', clip: 'Land', time: an.landT, blend: 0.05 };
+  return { ...d, key: 'loco', clip: 'Idle', blend: an.current === 'land' ? 0.2 : 0.18 };
+}
+// A weapon trail shows from just before a move's first hit until just after its last.
+function swinging(a) {
+  const q = a.action,
+    m = q?.move;
+  if (!m && q?.name === 'ChargeAttack') return q.time > 0.28 && q.time < 0.65;
+  if (!m && a.assist?.move)
+    return a.assist.move.hits.some((h) => a.assist.time > h.t - 0.12 && a.assist.time < h.t + 0.1);
+  if (!m) return false;
+  if (m.pulse && q.time > m.pulse.from - 0.1 && q.time < m.pulse.to + 0.1) return true;
+  return (m.hits || []).some((h) => q.time > h.t - 0.12 && q.time < h.t + 0.1);
+}
+// How hard Darren's scarf is drawn out straight: peaks on each lash's hit frame, steady in spins.
+function scarfPull(a) {
+  if (a.charging) return 0.25;
+  const q = a.action,
+    m = q?.move;
+  if (!m) return 0;
+  let k = 0;
+  for (const h of m.hits || []) {
+    const u = (q.time - h.t + 0.04) / (h.arc >= 6 ? 0.16 : 0.09);
+    k = Math.max(k, Math.exp(-u * u) * (h.arc >= 6 ? 0.6 : 1));
+  }
+  if (m.pulse && q.time > m.pulse.from - 0.1 && q.time < m.pulse.to + 0.1) k = Math.max(k, 0.55);
+  return k;
+}
+// The heroes glance at the boss they're fighting, or the nearest enemy, or the quest marker when close.
+function lookTarget(a) {
+  const boss = game.engaged;
+  if (boss && !boss.dead && Math.hypot(boss.x - a.x, boss.z - a.z) < 20)
+    return { x: boss.x, y: boss.y + 1.2, z: boss.z };
+  let best = null,
+    bd = 9;
+  for (const e of game.enemies) {
+    if (e.dead) continue;
+    const d = Math.hypot(e.x - a.x, e.z - a.z);
+    if (d < bd) {
+      bd = d;
+      best = e;
+    }
+  }
+  if (best) return { x: best.x, y: best.y, z: best.z };
+  const o = game.objective();
+  if (Math.hypot(o.x - a.x, o.z - a.z) < 6)
+    return { x: o.x, y: world.height(o.x, o.z) + 0.5, z: o.z };
+  return null;
+}
 function updateScene(dt) {
   for (let i = 0; i < 3; i++) {
     const a = game.actors[i],
-      h = heroes[i];
+      h = heroes[i],
+      an = h.animator;
+    an.update(game.paused ? 0 : dt, heroPose(a, i, h));
+    h.hurt = null;
     h.root.position.set(a.x, a.y + 0.01, a.z);
-    h.root.rotation.y = a.yaw;
-    if (h.current !== a.animation) {
-      const next = h.actions[a.animation];
-      if (next) {
-        h.actions[h.current]?.fadeOut(0.12);
-        next.reset().setEffectiveWeight(1).fadeIn(0.12).play();
-        if (!['Idle', 'Run', 'Charge'].includes(a.animation)) {
-          next.setLoop(THREE.LoopOnce, 1);
-          next.clampWhenFinished = true;
-        } else next.setLoop(THREE.LoopRepeat, Infinity);
-        h.current = a.animation;
-      }
+    h.root.rotation.y = an.yaw;
+    const belly = i === 0 ? game.belly : 0,
+      sq = an.squashY;
+    h.root.scale.set(
+      (h.base.x * (1 + 0.05 * belly)) / Math.sqrt(sq),
+      h.base.y * sq,
+      (h.base.z * (1 + 0.07 * belly)) / Math.sqrt(sq)
+    );
+    if (h.trail) h.trail.update(game.paused ? 0 : dt, swinging(a));
+    if (h.ribbon) {
+      h.ribbon.setActive(game.style === 'scarf');
+      h.ribbon.floor = world.height(a.x, a.z) + 0.03;
+      h.root.updateMatrixWorld(true);
+      h.ribbon.update(game.paused ? 0 : dt, scarfPull(a), camera, h.base.y);
     }
-    h.mixer.update(game.paused ? 0 : dt);
   }
-  heroes[0].root.scale.set(
-    heroes[0].base.x * (1 + 0.05 * game.belly),
-    heroes[0].base.y,
-    heroes[0].base.z * (1 + 0.07 * game.belly)
-  );
   updateFoes(dt);
   updateFloaters(dt);
   const a = game.player,
@@ -1346,6 +1536,12 @@ function hud() {
   $('name').textContent = a.name;
   $('kit').textContent = game.kit.charge;
   $('energy').style.width = a.energy + '%';
+  $('musou').style.width = (a.mus || 0) + '%';
+  $('musou').parentElement.classList.toggle('full', (a.mus || 0) >= 100);
+  $('style').hidden = game.selected !== 0;
+  $('style').textContent = game.selected === 0 ? game.moveset().name : '';
+  $('style-key').hidden = $('touch-style').hidden = game.selected !== 0;
+  $('touch-special').classList.toggle('ready', (a.mus || 0) >= 100);
   $('chargebox').hidden = !a.charging;
   $('chargebar').style.width = (a.charge / 1.2) * 100 + '%';
   $('chargelabel').textContent =
@@ -1405,7 +1601,11 @@ function frame(now) {
     x: x * Math.cos(cameraYaw) + z * Math.sin(cameraYaw),
     z: z * Math.cos(cameraYaw) - x * Math.sin(cameraYaw),
   };
-  accumulator += dt;
+  // Hit-stop: a heavy hit freezes the action for a few hundredths of a second so it lands with weight.
+  if (hitstop > 0) {
+    hitstop -= dt;
+    accumulator += dt * 0.08;
+  } else accumulator += dt;
   while (accumulator >= 1 / 60) {
     game.update(1 / 60, input);
     accumulator -= 1 / 60;
@@ -1488,24 +1688,44 @@ async function boot() {
         }
       });
       scene.add(root);
-      const mixer = new THREE.AnimationMixer(root),
-        actions = {};
-      for (const c of g.animations) actions[c.name] = mixer.clipAction(c);
+      // Authored clips (clips.mjs) replace the supplied ones of the same name; anything not yet
+      // authored keeps the supplied clip.
+      const rig = buildRig(root, CAST[i]),
+        authored = buildClips(rig),
+        names = new Set(authored.map((c) => c.name)),
+        all = [...authored, ...g.animations.filter((c) => !names.has(c.name))];
       for (const name of [
         'Idle',
         'Run',
-        'Jump',
         'Dodge',
-        'Attack1',
-        'Attack2',
-        'Attack3',
         'Charge',
         'ChargeAttack',
         'Interact',
         'Celebrate',
       ])
-        if (!actions[name]) throw Error(`${CAST[i]} is missing ${name}.`);
-      heroes.push({ root, mixer, actions, current: '', base: root.scale.clone() });
+        if (!all.some((c) => c.name === name)) throw Error(`${CAST[i]} is missing ${name}.`);
+      const animator = new Animator(root, rig, all, HERO_MOTION[i]);
+      // Darren's Polka Scarf weapon replaces the short scarf end (and its dots) while in use.
+      const hide = [];
+      if (i === 0)
+        root.traverse((o) => o.isMesh && /^Scarf_(tail|polka)/.test(o.name) && hide.push(o));
+      // Sword (Tormund) and mallet head (Bucky) leave a short trail through each swing.
+      const trail =
+        i === 1
+          ? new WeaponTrail(scene, rig, rig.role.handL, 0.2, 0.82, 0xffd77a)
+          : i === 2
+            ? new WeaponTrail(scene, rig, rig.role.handL, 0.3, 0.62, 0xbfe4ff)
+            : null;
+      heroes.push({
+        trail,
+        ribbon: i === 0 ? new ScarfRibbon(scene, rig, hide) : null,
+        root,
+        animator,
+        actions: animator.actions,
+        rig,
+        base: root.scale.clone(),
+        hurt: null,
+      });
     }
     createDetails();
     setQuality();
@@ -1532,6 +1752,17 @@ async function boot() {
         retry,
         foeViews,
         padBindings: () => ({ ...padBindings }),
+        // Deterministic stepping for screenshots: runs the simulation and the animation at a fixed
+        // frame rate (the browser's own frame loop keeps running too).
+        advance: (seconds, input = { x: 0, z: 0 }, fps = 30) => {
+          for (let t = 0; t < seconds - 1e-6; t += 1 / fps) {
+            for (let k = 0; k < 60 / fps; k++) game.update(1 / 60, input);
+            events();
+            updateScene(1 / fps);
+          }
+          hud();
+          renderer.render(scene, camera);
+        },
         setView: (yaw, pitch = 0.3, distance = 8.5) => {
           cameraYaw = yaw;
           cameraPitch = pitch;

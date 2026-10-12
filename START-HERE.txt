@@ -11,6 +11,21 @@ PUT THIS ON YOUR WINDOWS DESKTOP
 4. The resulting folder is Desktop\Darren-Dynasty-Warriors-Game.
    Windows may keep your Desktop under OneDrive; either Desktop location works.
 
+WINDOWS DESKTOP APP (no Node.js or Python needed)
+Unzip Darren-Snowday-Windows.zip (right-click, Extract All) and double-click
+"Darren Snowday.exe" inside the extracted folder. Keep the folder together. A start
+screen picks the pixel or the 3D game; Ctrl+H returns to it, F11 is full screen.
+The first time, Windows may say "Windows protected your PC" because the app is not
+signed: click "More info", then "Run anyway". Saves made in the app are kept in
+%APPDATA%\Darren's Snowday Search and are separate from browser saves.
+The app is built from desktop-app/ (see desktop-app/README.md). A fresh copy of the
+project from GitHub does not include the ZIP: build it there with npm install and
+npm run build:win, or use the copy kept with the project files.
+Version 1.2.0 is standalone: it never checks for or downloads game updates and
+needs no GitHub key. For a later version, close the old app, extract the new ZIP
+into a new folder and launch its EXE. Keep the same save folder; old downloaded
+game caches are ignored and left untouched.
+
 PLAY LOCALLY
 Double-click PLAY-3D.cmd for the 3D exploration game, or PLAY-PIXEL.cmd for the
 pixel game. The launchers use Node.js if installed, otherwise Python 3. If
@@ -61,10 +76,10 @@ After editing, double-click MAKE-CHATGPT-RETURN-ZIP.cmd. It creates a dated ZIP
 beside the game folder. Upload that ZIP to this ChatGPT conversation and say:
 "Review and test this Claude update, then apply it to my existing private
 Darren Site. Preserve its current Site identity and privacy."
-The return tool omits .git, node_modules, standard .env files and root ZIPs;
-remove any other private files you personally add before sharing the archive.
-If the packaging script is unavailable, right-click the entire project folder
-and choose Compress to ZIP, excluding node_modules and private environment files.
+The return tool requires Node.js. It omits .git, nested node_modules, prior app
+outputs and ZIPs, and refuses credential-like files, .env files and update settings
+with secret fields. Remove private files from the project before trying again.
+Use the guarded return tool rather than manually compressing a working folder.
 
 DEVELOPMENT TESTS
 With Node.js installed, open a terminal in this folder, run npm install, then

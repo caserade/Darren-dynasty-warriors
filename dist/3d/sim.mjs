@@ -1,9 +1,11 @@
+import { MOVESETS, movesetKey } from './moves.mjs';
+export { MOVESETS };
 export const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 export const CAST = ['Darren', 'Tormund', 'Bucky'];
 export const KITS = [
   { attack: 'Paw combo', charge: 'Packed snowball', color: 0xe64b42, speed: 5.8 },
-  { attack: 'Knight’s three cuts', charge: 'Crescent cleave', color: 0xe5bc61, speed: 5.5 },
-  { attack: 'Mallet combo', charge: 'Timber quake', color: 0x518fcb, speed: 5.1 },
+  { attack: 'Sword and shield', charge: 'Crescent cleave', color: 0xe5bc61, speed: 5.5 },
+  { attack: 'Mallet', charge: 'Timber quake', color: 0x518fcb, speed: 5.1 },
 ];
 const TAU = Math.PI * 2,
   S = 0.04;
@@ -260,6 +262,8 @@ export class Game {
     this.random = seeded(options.seed ?? Date.now());
     this.enemiesOn = options.enemies !== false;
     this.mode = 'adventure';
+    this.style = 'paws';
+    this.input = { x: 0, z: 0 };
     this.targets = [
       { x: 23, z: 50.5 },
       { x: 25, z: 52 },
@@ -290,8 +294,14 @@ export class Game {
         down: false,
         kx: 0,
         kz: 0,
+        vx: 0,
+        vz: 0,
         assist: null,
         assistCd: 0,
+        mus: 0,
+        sprint: 0,
+        buffer: null,
+        airAttacked: false,
       };
     });
     this.quest = {
@@ -360,6 +370,7 @@ export class Game {
       selected: this.selected,
       stats: this.stats,
       mode: this.mode,
+      style: this.style,
       bosses: this.bosses.slice(),
       ko: this.ko,
       bestCombo: this.bestCombo,
@@ -397,6 +408,7 @@ export class Game {
       );
       this.bosses[3] = this.quest.rescued || (Array.isArray(s.bosses) && s.bosses[3] === true);
       this.mode = s.mode === 'cozy' ? 'cozy' : 'adventure';
+      this.style = s.style === 'scarf' ? 'scarf' : 'paws';
       this.ko = clamp(Math.floor(Number(s.ko) || 0), 0, 1e7);
       this.nextKo = (Math.floor(this.ko / 100) + 1) * 100;
       this.bestCombo = clamp(Math.floor(Number(s.bestCombo) || 0), 0, 1e7);
@@ -440,6 +452,7 @@ export class Game {
       [p.y, q.y] = [q.y, p.y];
       q.yaw = p.yaw;
       q.assist = null;
+      [q.vx, q.vz, p.vx, p.vz] = [p.vx, p.vz, 0, 0];
     }
     this.selected = i;
     this.navAge = 99;
@@ -456,6 +469,8 @@ export class Game {
       y: this.world.height(p.x, p.z),
       animation: 'Idle',
       assist: null,
+      vx: 0,
+      vz: 0,
     });
     this.cancelCharge();
     const q = this.actors[i];
@@ -496,6 +511,8 @@ export class Game {
         inv: 1.5,
         kx: 0,
         kz: 0,
+        vx: 0,
+        vz: 0,
         assist: null,
       });
     }
@@ -610,25 +627,174 @@ export class Game {
     a.cooldown = 0.12;
     this.emit('animation', { actor: this.selected, name });
   }
+  // Hit reactions are short actions of their own so the right animation plays and the hero can't act mid-stagger.
+  react(a, name, duration, extra = {}) {
+    a.action = {
+      name,
+      time: 0,
+      duration,
+      impact: null,
+      done: true,
+      charge: 0,
+      kind: this.actors.indexOf(a),
+      react: true,
+      ...extra,
+    };
+    a.animation = name;
+    a.vx = a.vz = 0;
+  }
+  // The moveset of the hero being played (Darren's depends on his weapon style).
+  moveset(i = this.selected) {
+    return MOVESETS[movesetKey(i, this.style)];
+  }
+  // Starts a move from moves.mjs. The hero turns to the stick, or else toward the nearest foe in front.
+  startMove(a, m, type, index = 0) {
+    const i = this.actors.indexOf(a),
+      inp = this.input;
+    if (a === this.player && inp && Math.hypot(inp.x, inp.z) > 0.2)
+      a.yaw = Math.atan2(inp.x, inp.z);
+    else {
+      let best = null,
+        bd = 5.5;
+      for (const e of this.enemies) {
+        if (e.dead || (e.boss && !e.active)) continue;
+        const d = Math.hypot(e.x - a.x, e.z - a.z) - e.r;
+        if (d < bd && Math.abs(angleDiff(Math.atan2(e.x - a.x, e.z - a.z), a.yaw)) < 2) {
+          bd = d;
+          best = e;
+        }
+      }
+      if (best) a.yaw = Math.atan2(best.x - a.x, best.z - a.z);
+    }
+    a.action = {
+      name: m.anim,
+      anim: m.anim,
+      move: m,
+      type,
+      index,
+      time: 0,
+      duration: m.dur,
+      impact: null,
+      done: true,
+      next: 0,
+      shot: 0,
+      pulse: m.pulse ? m.pulse.from : null,
+      hopped: false,
+      charge: 0,
+      kind: i,
+      armor: !!m.armor,
+      blend: m.blend,
+    };
+    a.animation = m.anim;
+    a.cooldown = 0.08;
+    a.buffer = null;
+    a.charging = false;
+    a.charge = 0;
+    if (type === 'normal') a.combo = index;
+    if (type === 'jump' && m.dive !== undefined) a.vy = Math.min(a.vy, 1.5);
+    this.stats.attacks++;
+    this.emit('animation', { actor: i, name: m.anim, type });
+    if (type === 'special') this.emit('special', { actor: i, name: m.name });
+  }
   attack() {
     const a = this.player;
-    if (this.paused || a.action || a.charging || a.cooldown > 0) return false;
-    a.combo = a.comboWindow > 0 ? (a.combo + 1) % 3 : 0;
-    a.comboWindow = 1.3;
-    this.startAction(
-      'Attack' + (a.combo + 1),
-      [0.55, 0.65, 0.9][a.combo],
-      [0.24, 0.3, 0.43][a.combo]
-    );
-    this.stats.attacks++;
+    if (this.paused || a.charging || a.down || this.defeated) return false;
+    const set = this.moveset();
+    if (a.action) {
+      // Pressed during a move: remembered and used at the move's cancel point (the next hit of the string).
+      if (a.action.move && a.action.type !== 'special') {
+        a.buffer = 'attack';
+        return true;
+      }
+      return false;
+    }
+    if (a.cooldown > 0) return false;
+    if (a.air > 0) {
+      if (!set.jump || a.airAttacked) return false;
+      a.airAttacked = true;
+      this.startMove(a, set.jump, 'jump');
+      return true;
+    }
+    if (set.dash && a.sprint > 0.7) {
+      this.startMove(a, set.dash, 'dash');
+      return true;
+    }
+    const i = a.comboWindow > 0 ? (a.combo + 1) % set.normal.length : 0;
+    this.startMove(a, set.normal[i], 'normal', i);
     return true;
+  }
+  // The finisher that follows normal hit n, if this hero has one.
+  finisher(n) {
+    return this.moveset().charge[n] || null;
   }
   chargeStart() {
     const a = this.player;
-    if (this.paused || a.action || a.cooldown > 0 || a.energy < 15) return false;
+    if (this.paused || a.down || this.defeated) return false;
+    const q = a.action;
+    if (q?.move && q.type === 'normal' && this.finisher(q.index + 1)) {
+      a.buffer = 'charge';
+      return true;
+    }
+    if (!q && a.comboWindow > 0 && a.air <= 0 && this.finisher(a.combo + 1)) {
+      this.startMove(a, this.finisher(a.combo + 1), 'charge', a.combo + 1);
+      a.comboWindow = 0;
+      return true;
+    }
+    if (q || a.cooldown > 0 || a.energy < 15 || a.air > 0) return false;
     a.charging = true;
     a.charge = 0;
     a.animation = 'Charge';
+    return true;
+  }
+  // A buffered button fires at the cancel point of the current move.
+  followUp(a) {
+    const q = a.action,
+      b = a.buffer,
+      set = this.moveset();
+    a.buffer = null;
+    if (b === 'attack') {
+      if (q.type === 'normal') {
+        this.startMove(
+          a,
+          set.normal[(q.index + 1) % set.normal.length],
+          'normal',
+          (q.index + 1) % set.normal.length
+        );
+        return;
+      }
+      a.action = null;
+      a.cooldown = 0;
+      a.comboWindow = 0;
+      this.attack();
+    } else if (b === 'charge' && q.type === 'normal') {
+      const c = this.finisher(q.index + 1);
+      if (c) this.startMove(a, c, 'charge', q.index + 1);
+    }
+  }
+  special() {
+    const a = this.player;
+    if (this.paused || a.down || this.defeated || a.charging || (a.mus || 0) < 100) return false;
+    if (a.action && !(a.action.move && a.action.type !== 'special' && a.action.time > 0.1))
+      return false;
+    const m = this.moveset().special;
+    if (!m) return false;
+    a.mus = 0;
+    a.air = Math.max(0, a.air);
+    this.startMove(a, m, 'special');
+    a.inv = Math.max(a.inv, 0.3);
+    return true;
+  }
+  // Darren switches between Bare Paws and the Polka Scarf.
+  switchStyle(style) {
+    const a = this.player;
+    if (this.selected !== 0 || this.paused || a.action || a.charging) return false;
+    const next = style || (this.style === 'paws' ? 'scarf' : 'paws');
+    if ((next !== 'paws' && next !== 'scarf') || next === this.style) return false;
+    this.style = next;
+    a.combo = 0;
+    a.comboWindow = 0;
+    this.emit('style', { style: next, name: MOVESETS[next].name });
+    this.emit('save');
     return true;
   }
   chargeRelease() {
@@ -639,21 +805,46 @@ export class Game {
     a.charge = 0;
     if (this.paused) return false;
     a.energy = Math.max(0, a.energy - (15 + q * 20));
-    this.startAction('ChargeAttack', 1.05, 0.42, q);
+    const hold = this.moveset().charge[0];
+    if (hold) {
+      // A hold move from moves.mjs, stretched by how long it was charged (Polka Snare).
+      const h = hold.hits[0];
+      this.startMove(
+        a,
+        { ...hold, hits: [{ ...h, r: h.r + q * 2.5, dmg: Math.round(h.dmg + q * 30) }] },
+        'hold'
+      );
+      a.action.charge = q;
+    } else this.startAction('ChargeAttack', 1.05, 0.42, q);
     this.stats.charged++;
     return true;
   }
+  // Jumping is free movement now (no locked action), so the hero can steer and attack in the air.
   jump() {
     const a = this.player;
     if (this.paused || a.air > 0 || a.action || a.charging) return false;
     a.air = 0.01;
-    a.vy = 7;
-    this.startAction('Jump', 0.75);
+    a.vy = 7.2;
+    // A hero knocked out mid-air never touched down, so clear the jump-attack flag here too.
+    a.airAttacked = false;
+    a.animation = 'Jump';
+    a.cooldown = 0.12;
+    this.emit('jump', { actor: this.selected });
     return true;
   }
   dodge() {
-    const a = this.player;
-    if (this.paused || a.action || a.charging || a.energy < 18) return false;
+    const a = this.player,
+      inp = this.input;
+    if (this.paused || a.action || a.charging) return false;
+    // Tormund standing still raises his shield instead: a parry window that answers with a counter-cut.
+    const set = this.moveset();
+    if (set.parry && a.air <= 0 && !(inp && Math.hypot(inp.x, inp.z) > 0.2)) {
+      if (a.energy < 10) return false;
+      a.energy -= 10;
+      this.startAction('Parry', set.parry.dur);
+      return true;
+    }
+    if (a.energy < 18) return false;
     a.energy -= 18;
     this.startAction('Dodge', 0.55);
     return true;
@@ -693,6 +884,123 @@ export class Game {
         }
       }
     return count;
+  }
+  // One hit of a move: everything inside reach and arc (centre pushed forward by off) takes it.
+  strike(a, h, q) {
+    const off = h.off || 0,
+      c = { x: a.x + Math.sin(a.yaw) * off, z: a.z + Math.cos(a.yaw) * off, y: a.y },
+      dmg = h.dmg + (q.kind === 0 && h.belly ? this.belly * h.belly : 0),
+      heavy = !!(h.down || h.launch || h.kb >= 10);
+    let count = 0;
+    for (const t of this.targets) {
+      const d = Math.hypot(t.x - c.x, t.z - c.z);
+      if (
+        d <= h.r &&
+        Math.abs(t.y - a.y) < 1.4 &&
+        (h.arc >= TAU - 0.01 ||
+          Math.abs(angleDiff(Math.atan2(t.x - c.x, t.z - c.z), a.yaw)) < h.arc / 2)
+      ) {
+        t.hits++;
+        t.last = this.time;
+        this.stats.hits++;
+        count++;
+        this.emit('hit', { x: t.x, z: t.z, y: t.y + 1, power: heavy ? 2 : 1 });
+      }
+    }
+    for (const e of this.enemies) {
+      if (e.dead) continue;
+      const d = Math.hypot(e.x - c.x, e.z - c.z),
+        angle = Math.atan2(e.x - c.x, e.z - c.z);
+      if (
+        d <= h.r + e.r * 0.85 &&
+        Math.abs(e.y - a.y) < (e.boss ? 2.6 : h.launch ? 2.4 : 1.8) &&
+        (h.line
+          ? this.inLine(a, e, h.r)
+          : h.arc >= TAU - 0.01 ||
+            Math.abs(angleDiff(angle, a.yaw)) < h.arc / 2 + (d < e.r + 0.6 ? 0.8 : 0)) &&
+        this.world.visible(c, e)
+      ) {
+        let kb = h.kb;
+        if (h.pull) {
+          // Drag the foe in to just in front of the hero (knockback travels kb*2.4/8 m), never past.
+          const reach = Math.hypot(e.x - a.x, e.z - a.z) - e.r - 1.2;
+          kb = Math.min(h.pull, Math.max(0, (reach * 8) / 2.4 / (e.boss ? 0.22 : 1)));
+        }
+        this.damageFoe(
+          e,
+          dmg,
+          h.pull ? Math.atan2(e.x - a.x, e.z - a.z) + Math.PI : angle,
+          kb,
+          heavy,
+          h
+        );
+        count++;
+      }
+    }
+    this.emit('swing', {
+      actor: q.kind,
+      x: c.x,
+      z: c.z,
+      y: a.y + 0.1,
+      r: h.ring || 1.2,
+      strong: !!h.ring,
+      power: heavy ? 1 : 0,
+      move: q.anim,
+    });
+    if (count && !q.friend)
+      this.emit('hitstop', {
+        t: h.down || h.launch ? 0.075 : heavy ? 0.06 : 0.035,
+        actor: q.kind,
+        heavy,
+      });
+    return count;
+  }
+  // A straight crack along the hero's facing: ahead of him and within about a metre of the line.
+  inLine(a, e, r) {
+    const dx = e.x - a.x,
+      dz = e.z - a.z,
+      along = dx * Math.sin(a.yaw) + dz * Math.cos(a.yaw),
+      side = Math.abs(dx * Math.cos(a.yaw) - dz * Math.sin(a.yaw));
+    return along > -0.5 && along <= r + e.r && side < 1 + e.r;
+  }
+  throwBall(a, angle, speed, dmg, r, power = 0) {
+    this.shots.push({
+      x: a.x + Math.sin(angle) * 0.8,
+      z: a.z + Math.cos(angle) * 0.8,
+      y: a.y + 1.1,
+      vx: Math.sin(angle) * speed,
+      vz: Math.cos(angle) * speed,
+      vy: 1.5,
+      life: 1.6,
+      r,
+      power,
+      damage: dmg,
+      struck: new Set(),
+    });
+  }
+  // Runs the timed parts of a move: hits, snowballs, hops and repeating special pulses.
+  runMove(a, q) {
+    const m = q.move;
+    while (m.hits && q.next < m.hits.length && q.time >= m.hits[q.next].t)
+      this.strike(a, m.hits[q.next++], q);
+    while (m.shots && q.shot < m.shots.length && q.time >= m.shots[q.shot].t) {
+      const s = m.shots[q.shot++];
+      this.throwBall(a, a.yaw + s.spread, s.speed, s.dmg, s.r, 0.3);
+      this.emit('throw');
+    }
+    if (m.hop && !q.hopped && q.time >= m.hop.t) {
+      q.hopped = true;
+      a.air = Math.max(a.air, 0.01);
+      a.vy = m.hop.vy;
+    }
+    if (m.dive !== undefined && q.time > 0.1 && a.air > 0) a.vy = Math.min(a.vy, m.dive);
+    const p = m.pulse;
+    while (p && q.pulse !== null && q.pulse <= p.to && q.time >= q.pulse) {
+      this.strike(a, { r: p.r, arc: TAU, dmg: p.dmg, kb: p.kb, pull: p.pull }, q);
+      for (let k = 0; k < (p.shots || 0); k++)
+        this.throwBall(a, (k / p.shots) * TAU + q.time * 1.7, 12, 10, 0.2, 0.2);
+      q.pulse += p.every;
+    }
   }
   impact(a, action) {
     const strong = action.name === 'ChargeAttack',
@@ -737,7 +1045,7 @@ export class Game {
       });
     }
   }
-  damageFoe(e, damage, angle, kb = 4, heavy = false) {
+  damageFoe(e, damage, angle, kb = 4, heavy = false, h = null) {
     if (e.dead) return;
     if (e.boss && !e.active) this.engage(e);
     damage = Math.round(damage * this.rand(0.9, 1.15));
@@ -747,12 +1055,26 @@ export class Game {
     e.kx += Math.sin(angle) * kb * res * 2.4;
     e.kz += Math.cos(angle) * kb * res * 2.4;
     if (!e.boss) {
-      e.state = 'hurt';
-      e.st = 0.32;
+      // Launchers pop grunts into the air (they can be juggled); sweeps knock them flat.
+      if (h?.launch) {
+        e.vy = h.launch * (e.type === 'bale' ? 0.7 : 1);
+        e.air = Math.max(e.air || 0, 0.01);
+        e.state = 'air';
+      } else if (e.air > 0) {
+        e.vy = Math.max(e.vy, 3.2);
+      } else if (h?.down) {
+        e.state = 'down';
+        e.st = 0.95;
+      } else if (e.state !== 'down') {
+        e.state = 'hurt';
+        e.st = 0.32;
+      }
     } else if (e.state === 'idle' || e.state === 'hurt') {
       e.state = 'hurt';
       e.st = 0.1;
     }
+    const p = this.player;
+    if (!(p.action?.type === 'special')) p.mus = Math.min(100, (p.mus || 0) + (e.boss ? 3.2 : 2.3));
     this.combo++;
     this.comboTime = 2.4;
     this.bestCombo = Math.max(this.bestCombo, this.combo);
@@ -848,22 +1170,55 @@ export class Game {
       this.defeated ||
       a.inv > 0 ||
       a.down ||
-      (a.action?.name === 'Dodge' && a.action.time < 0.45)
+      (a.action?.name === 'Dodge' && a.action.time < 0.45) ||
+      (a.action?.move?.inv &&
+        a.action.time >= a.action.move.inv[0] &&
+        a.action.time <= a.action.move.inv[1])
     )
       return false;
+    const parry = this.moveset().parry;
+    if (
+      parry &&
+      a.action?.name === 'Parry' &&
+      a.action.time <= parry.window &&
+      Math.abs(angleDiff(angle, a.yaw + Math.PI)) < Math.PI * 0.6
+    ) {
+      // Blocked from the front: the attacker reels and Tormund cuts back at once.
+      for (const e of this.enemies)
+        if (!e.dead && Math.hypot(e.x - a.x, e.z - a.z) < 3.2 + e.r && !e.boss) {
+          e.state = 'hurt';
+          e.st = 0.6;
+        }
+      this.stats.parries = (this.stats.parries || 0) + 1;
+      a.mus = Math.min(100, (a.mus || 0) + 6);
+      this.emit('parry', { actor: this.selected, x: a.x, z: a.z, y: a.y + 1.3 });
+      this.emit('hitstop', { t: 0.09 });
+      this.startMove(a, parry.counter, 'counter');
+      a.inv = Math.max(a.inv, 0.35);
+      return false;
+    }
     damage = Math.max(1, Math.round(damage * (this.mode === 'cozy' ? 0.55 : 1)));
     a.hp -= damage;
     a.inv = 0.7;
     a.kx += Math.sin(angle) * 6;
     a.kz += Math.cos(angle) * 6;
     this.combo = 0;
-    if (damage >= 12 && a.action && a.air <= 0) {
-      a.action = null;
-      a.animation = 'Idle';
+    // Big blows knock the hero down (then up again, untouchable meanwhile); medium ones stagger;
+    // small ones only make the body flinch. Armoured moves (Bucky's heavy swings) shrug them off.
+    const front = Math.abs(angleDiff(angle, a.yaw + Math.PI)) < Math.PI / 2,
+      armored = a.action?.armor && damage < 20;
+    if (!armored && a.air <= 0 && damage >= 14) {
+      this.react(a, 'Knockdown', 0.8, { then: { name: 'GetUp', duration: 0.62 } });
+      a.inv = 1.6;
+      a.kx += Math.sin(angle) * 4;
+      a.kz += Math.cos(angle) * 4;
+    } else if (!armored && a.air <= 0 && damage >= 7)
+      this.react(a, front ? 'HurtF' : 'HurtB', 0.36);
+    if (!armored) {
+      a.charging = false;
+      a.charge = 0;
     }
-    a.charging = false;
-    a.charge = 0;
-    this.emit('hurt', { damage, actor: this.selected, x: a.x, z: a.z, y: a.y + 1.6 });
+    this.emit('hurt', { damage, actor: this.selected, x: a.x, z: a.z, y: a.y + 1.6, angle });
     if (a.hp <= 0) {
       a.hp = 0;
       a.down = true;
@@ -1035,6 +1390,7 @@ export class Game {
     if (this.paused || this.defeated) return;
     dt = clamp(dt, 0, 0.05);
     this.time += dt;
+    this.input = input;
     const a = this.player,
       kit = this.kit;
     for (const actor of this.actors) {
@@ -1060,21 +1416,69 @@ export class Game {
       dz /= n;
       n = 1;
     }
-    if (n > 0.05 && !a.action && !a.charging) a.yaw = Math.atan2(dx, dz);
-    let speed = kit.speed * (a.charging ? 0.2 : a.action ? 0.12 : 1);
-    if (a.action?.name === 'Dodge') {
-      dx = Math.sin(a.yaw);
-      dz = Math.cos(a.yaw);
-      speed = 10;
-      n = 1;
+    // Smooth movement (Claude update 6): the hero accelerates and turns instead of snapping.
+    const steer = !a.action && !a.charging;
+    if (n > 0.05 && steer) {
+      const want = Math.atan2(dx, dz),
+        diff = angleDiff(want, a.yaw),
+        rate = a.speed < 0.5 || Math.abs(diff) > 2.6 ? 26 : 15;
+      a.yaw += clamp(diff, -rate * dt, rate * dt);
+      a.yaw = Math.atan2(Math.sin(a.yaw), Math.cos(a.yaw));
     }
+    let speed = kit.speed * (a.charging ? 0.2 : a.action ? 0.12 : 1),
+      tx = dx * speed,
+      tz = dz * speed,
+      accel = n > 0.05 ? (a.air > 0 ? 6 : 13) : a.air > 0 ? 2 : 16;
+    const mv = a.action?.move;
+    if (mv) {
+      // Moves carry their own footwork: lunges forward, and some can be steered (specials).
+      let lunge = 0;
+      for (const [t0, t1, v] of mv.lunge || [])
+        if (a.action.time >= t0 && a.action.time < t1) lunge = v;
+      // Lunges stop at the foe in front instead of running through it.
+      if (lunge)
+        for (const e of this.enemies)
+          if (
+            !e.dead &&
+            Math.hypot(e.x - a.x, e.z - a.z) < e.r + 0.75 &&
+            Math.abs(angleDiff(Math.atan2(e.x - a.x, e.z - a.z), a.yaw)) < 1.1
+          ) {
+            lunge = -1;
+            break;
+          }
+      const blocked = lunge < 0;
+      if (blocked) lunge = 0;
+      tx = Math.sin(a.yaw) * lunge + (mv.steer ? dx * mv.steer : 0);
+      tz = Math.cos(a.yaw) * lunge + (mv.steer ? dz * mv.steer : 0);
+      accel = lunge || blocked ? 30 : a.air > 0 ? 2 : 14;
+      if (a.air > 0 && !lunge && !blocked && !mv.steer) {
+        tx = a.vx;
+        tz = a.vz;
+      }
+    }
+    if (a.action?.name === 'Dodge') {
+      const t = a.action.time,
+        v = 10.5 * (1 - clamp((t - 0.3) / 0.25, 0, 1) ** 2);
+      tx = Math.sin(a.yaw) * v;
+      tz = Math.cos(a.yaw) * v;
+      accel = 40;
+    }
+    a.vx += (tx - a.vx) * (1 - Math.exp(-accel * dt));
+    a.vz += (tz - a.vz) * (1 - Math.exp(-accel * dt));
+    if (Math.hypot(a.vx, a.vz) < 0.03 && n < 0.05) a.vx = a.vz = 0;
     const ox = a.x,
       oz = a.z;
-    this.world.move(a, dx * speed * dt + a.kx * dt, dz * speed * dt + a.kz * dt);
+    this.world.move(a, a.vx * dt + a.kx * dt, a.vz * dt + a.kz * dt);
+    // Bumping into a wall stops the push into it, so the hero doesn't keep "running" on the spot.
+    const mx = (a.x - ox) / Math.max(dt, 1e-4) - a.kx,
+      mz = (a.z - oz) / Math.max(dt, 1e-4) - a.kz;
+    if (Math.abs(mx) < Math.abs(a.vx) * 0.5) a.vx = mx;
+    if (Math.abs(mz) < Math.abs(a.vz) * 0.5) a.vz = mz;
     a.kx *= Math.exp(-8 * dt);
     a.kz *= Math.exp(-8 * dt);
     a.speed = Math.hypot(a.x - ox, a.z - oz) / Math.max(dt, 0.0001);
     a.moving = a.speed > 0.1;
+    a.sprint = !a.action && a.air <= 0 && a.speed > kit.speed * 0.8 ? (a.sprint || 0) + dt : 0;
     this.stats.distance += a.speed * dt;
     const ground = this.world.height(a.x, a.z);
     if (a.air > 0) {
@@ -1085,6 +1489,10 @@ export class Game {
         a.y = ground;
         a.air = 0;
         a.vy = 0;
+        a.airAttacked = false;
+        // A jump attack ends when it touches down.
+        if (a.action?.type === 'jump' && a.action.time > 0.15)
+          a.action.time = Math.max(a.action.time, a.action.duration - 0.12);
       }
     } else a.y = ground;
     if (a.action) {
@@ -1094,9 +1502,22 @@ export class Game {
         q.done = true;
         this.impact(a, q);
       }
-      if (q.time >= q.duration) {
+      if (q.move) this.runMove(a, q);
+      if (a.action === q && a.buffer && q.move && q.type === 'normal' && q.time >= q.move.chain)
+        this.followUp(a);
+      else if (a.action === q && q.time >= q.duration) {
         a.action = null;
-        a.animation = a.moving ? 'Run' : 'Idle';
+        a.animation = a.air > 0 ? 'Jump' : a.moving ? 'Run' : 'Idle';
+        if (q.react && q.then) this.react(a, q.then.name, q.then.duration);
+        if (q.move) {
+          a.comboWindow = q.type === 'normal' ? 0.5 : 0;
+          if (a.buffer) {
+            const b = a.buffer;
+            a.buffer = null;
+            a.cooldown = 0;
+            if (b === 'attack') this.attack();
+          }
+        }
       }
     } else if (!a.charging) a.animation = a.air > 0 ? 'Jump' : a.moving ? 'Run' : 'Idle';
     this.navAge += dt;
@@ -1110,7 +1531,7 @@ export class Game {
       if (i === this.selected) continue;
       const b = this.actors[i],
         side = follower++ === 0 ? -1 : 1;
-      if (b.assist) continue;
+      if (b.assist || b.engaging) continue;
       const dist = Math.hypot(a.x - b.x, a.z - b.z),
         goal = this.world.safe(
           a.x - Math.sin(a.yaw) * 2.8 + Math.cos(a.yaw) * side * 1.8,
@@ -1230,66 +1651,84 @@ export class Game {
       this.updateFoeShots(dt);
     }
   }
-  // Friends who aren't being played swing at foes right beside them (Tormund one target, Bucky's mallet all around).
+  // Friends who aren't being played (Claude update 6): they pick a foe near the hero, walk over and
+  // fight it with their own string (every fourth swing is a finisher), step out of a boss's marked
+  // attack, and drop the fight to catch up when the hero moves on.
   assistFriends(dt) {
+    const a = this.player;
     for (let i = 0; i < 3; i++) {
       if (i === this.selected) continue;
-      const b = this.actors[i];
+      const b = this.actors[i],
+        set = this.moveset(i);
+      b.engaging = false;
       if (b.assist) {
-        const q = b.assist;
+        const q = b.assist,
+          m = q.move;
         q.time += dt;
-        if (!q.done && q.time >= 0.3) {
-          q.done = true;
-          const reach = i === 2 ? 2.6 : 2.2;
-          let any = false;
-          for (const e of this.enemies) {
-            if (e.dead) continue;
-            const d = Math.hypot(e.x - b.x, e.z - b.z);
-            if (d > reach + e.r * 0.6 || Math.abs(e.y - b.y) > 1.6 || (i !== 2 && e !== q.target))
-              continue;
-            this.damageFoe(
-              e,
-              [16, 18, 26][i],
-              Math.atan2(e.x - b.x, e.z - b.z),
-              i === 2 ? 9 : 4,
-              i === 2
-            );
-            any = true;
-          }
-          if (any)
-            this.emit('swing', {
-              actor: i,
-              x: b.x,
-              z: b.z,
-              y: b.y + 0.1,
-              r: i === 2 ? 2 : 1.2,
-              strong: false,
-              power: 0,
-            });
+        while (q.next < m.hits.length && q.time >= m.hits[q.next].t) {
+          const h = m.hits[q.next++];
+          this.strike(
+            b,
+            { ...h, dmg: Math.round(h.dmg * 0.8) },
+            { kind: i, anim: m.anim, friend: true }
+          );
         }
-        if (q.time >= 0.65) {
+        if (q.time >= q.dur) {
           b.assist = null;
           b.animation = 'Idle';
         }
         continue;
       }
-      if (b.down || b.assistCd > 0 || !this.enemies.length) continue;
+      if (b.down) continue;
+      const out = this.escape(b);
+      if (out !== null) {
+        b.engaging = true;
+        this.world.move(b, Math.sin(out) * 6 * dt, Math.cos(out) * 6 * dt);
+        b.yaw = out;
+        b.moving = true;
+        b.animation = 'Run';
+        b.y = this.world.height(b.x, b.z);
+        continue;
+      }
       let target = null,
         best = Infinity;
       for (const e of this.enemies) {
-        if (e.dead || (e.boss && !e.active)) continue;
-        const d = Math.hypot(e.x - b.x, e.z - b.z) - e.r;
-        if (d < best && d < 1.9 && Math.abs(e.y - b.y) < 1.6) {
+        if (e.dead || (e.boss && !e.active) || e.air > 0) continue;
+        const d = Math.hypot(e.x - b.x, e.z - b.z) - e.r,
+          fromHero = Math.hypot(e.x - a.x, e.z - a.z);
+        if (d < best && d < 7 && fromHero < 8 && Math.abs(e.y - b.y) < 1.6) {
           best = d;
           target = e;
         }
       }
-      if (!target || Math.hypot(this.player.x - b.x, this.player.z - b.z) > 9) continue;
-      b.yaw = Math.atan2(target.x - b.x, target.z - b.z);
-      b.assist = { time: 0, done: false, target };
-      b.assistCd = i === 2 ? 1.8 : 1.4;
-      b.animation = b.animation === 'Attack1' ? 'Attack2' : 'Attack1';
+      if (!target || Math.hypot(a.x - b.x, a.z - b.z) > 9) continue;
+      const k = b.combo || 0,
+        m =
+          k % 4 === 3 && set.charge[2] && set.charge[2].hits
+            ? set.charge[2]
+            : set.normal[k % set.normal.length],
+        reach = Math.min(2.2, m.hits?.[0]?.r ?? 2) + target.r * 0.5,
+        ang = Math.atan2(target.x - b.x, target.z - b.z);
+      b.engaging = true;
+      if (best > reach - target.r * 0.5) {
+        // Walk over to the fight.
+        const sp = Math.min(5.5, (best - reach + 1) * 4);
+        this.world.move(b, Math.sin(ang) * sp * dt, Math.cos(ang) * sp * dt);
+        b.yaw = ang;
+        b.moving = true;
+        b.speed = sp;
+        b.animation = 'Run';
+        b.y = this.world.height(b.x, b.z);
+        continue;
+      }
+      b.speed = 0;
       b.moving = false;
+      if (b.assistCd > 0 || !m.hits) continue;
+      b.yaw = ang;
+      b.assist = { time: 0, next: 0, move: m, dur: m.dur, target };
+      b.assistCd = (i === 2 ? 0.7 : 0.5) + this.rand(0, 0.4);
+      b.combo = k + 1;
+      b.animation = m.anim;
     }
   }
   spawnFoes(dt) {
@@ -1348,10 +1787,50 @@ export class Game {
       break;
     }
   }
+  // Smarter grunts (Claude update 6): the nearest few press the attack while the rest circle in a
+  // loose ring waiting their turn; they back off from a charging hero, the badly hurt run, crows
+  // dive-bomb, hay bales roll-charge, and all of them step out of their boss's marked attack.
+  planFoes() {
+    const a = this.player,
+      near = [];
+    for (const e of this.enemies)
+      if (!e.boss && !e.dead) {
+        e.dist = Math.hypot(e.x - a.x, e.z - a.z);
+        e.role = 'engage';
+        if (e.dist < 14) near.push(e);
+      }
+    near.sort((p, q) => p.dist - q.dist);
+    near.forEach((e, k) => (e.role = k < 4 ? 'engage' : 'wait'));
+    // The boss's marked attack, if one is winding up: a circle (slam) or a lane (charge, swipe).
+    const b = this.engaged;
+    this.danger = null;
+    if (b && !b.dead && b.state === 'wind') {
+      if (b.move === 'slam') this.danger = { x: b.x, z: b.z, r: this.slamRadius(b) + 0.8 };
+      else if (b.move === 'charge')
+        this.danger = { x: b.x, z: b.z, dir: b.cdir, len: 14, w: b.r + 1.2 };
+      else if (b.move === 'swipe') this.danger = { x: b.x, z: b.z, r: b.r + 4 };
+    }
+  }
+  // Which way (if any) a foe or friend at p should step to get out of the marked attack.
+  escape(p) {
+    const z = this.danger;
+    if (!z) return null;
+    if (z.r) {
+      const d = Math.hypot(p.x - z.x, p.z - z.z);
+      return d < z.r ? Math.atan2(p.x - z.x, p.z - z.z) : null;
+    }
+    const dx = p.x - z.x,
+      dz = p.z - z.z,
+      along = dx * Math.sin(z.dir) + dz * Math.cos(z.dir),
+      side = dx * Math.cos(z.dir) - dz * Math.sin(z.dir);
+    if (along < -1 || along > z.len || Math.abs(side) > z.w) return null;
+    return z.dir + (side >= 0 ? -Math.PI / 2 : Math.PI / 2);
+  }
   updateFoes(dt) {
     const a = this.player;
     let winding = 0;
     for (const e of this.enemies) if (!e.boss && e.state === 'wind') winding++;
+    this.planFoes();
     for (let i = 0; i < this.enemies.length; i++) {
       const e = this.enemies[i];
       e.t += dt;
@@ -1379,8 +1858,24 @@ export class Game {
         dz = a.z - e.z,
         d = Math.hypot(dx, dz);
       e.moving = false;
+      if (!e.boss && (e.air > 0 || e.state === 'air')) {
+        e.vy -= 24 * dt;
+        e.y += e.vy * dt;
+        const g = this.world.height(e.x, e.z);
+        if (e.y <= g) {
+          e.y = g;
+          e.air = 0;
+          e.vy = 0;
+          e.state = 'down';
+          e.st = 0.55;
+        } else e.air = e.y - g;
+        continue;
+      }
       if (e.boss) this.updateBoss(e, dt, dx, dz, d);
-      else {
+      else if (e.state === 'down') {
+        e.st -= dt;
+        if (e.st <= 0) e.state = 'idle';
+      } else {
         if (e.state !== 'rec') e.yaw = Math.atan2(dx, dz);
         if (e.state === 'hurt') {
           e.st -= dt;
@@ -1396,15 +1891,112 @@ export class Game {
         } else if (e.state === 'rec') {
           e.st -= dt;
           if (e.st <= 0) e.state = 'idle';
+        } else if (e.state === 'aim') {
+          // Telegraph before a crow's dive or a bale's roll: it squats, glowing, locked on.
+          e.st -= dt;
+          e.cdir = Math.atan2(dx, dz);
+          if (e.st <= 0) {
+            e.state = 'dash';
+            e.st = e.type === 'crow' ? 0.42 : 0.85;
+            e.struck = false;
+          }
+        } else if (e.state === 'dash') {
+          e.st -= dt;
+          e.yaw = e.cdir;
+          const sp = e.type === 'crow' ? 13 : 9.5,
+            ox = e.x,
+            oz = e.z;
+          this.world.move(e, Math.sin(e.cdir) * sp * dt, Math.cos(e.cdir) * sp * dt);
+          e.moving = true;
+          if (!e.struck && d < e.r + 0.6 && Math.abs(a.y - e.y) < 1.2) {
+            e.struck = true;
+            this.hurtHero(e.dmg + 3, e.cdir);
+          }
+          if (e.st <= 0 || Math.hypot(e.x - ox, e.z - oz) < sp * dt * 0.25) {
+            e.state = 'rec';
+            e.st = 0.7;
+            e.cd = this.rand(1.5, 2.6);
+            e.special = this.rand(4, 7);
+          }
+        } else if (e.state === 'flee') {
+          // Badly hurt: runs off for a moment, then comes back for more.
+          e.st -= dt;
+          const away = Math.atan2(-dx, -dz);
+          this.world.move(
+            e,
+            Math.sin(away) * e.speed * 1.1 * dt,
+            Math.cos(away) * e.speed * 1.1 * dt
+          );
+          e.yaw = away;
+          e.moving = true;
+          if (e.st <= 0) e.state = 'idle';
         } else {
           e.cd -= dt;
+          e.special = (e.special ?? this.rand(2, 5)) - dt;
+          const level = Math.abs(a.y - e.y) < 1.2,
+            out = this.escape(e);
+          // A hero's special leaves grunts too dazed to do anything clever.
+          if (a.action?.type === 'special' && d < 8) continue;
+          if (!e.fled && !e.guard && e.type !== 'bale' && e.hp < e.max * 0.25 && d < 6) {
+            e.fled = true;
+            e.state = 'flee';
+            e.st = 1.6;
+            continue;
+          }
+          if (out !== null) {
+            this.world.move(
+              e,
+              Math.sin(out) * e.speed * 1.2 * dt,
+              Math.cos(out) * e.speed * 1.2 * dt
+            );
+            e.yaw = out;
+            e.moving = true;
+            continue;
+          }
+          if (
+            e.special <= 0 &&
+            level &&
+            e.role === 'engage' &&
+            ((e.type === 'crow' && d > 2.5 && d < 7) || (e.type === 'bale' && d > 3.5 && d < 9)) &&
+            this.world.visible(e, a)
+          ) {
+            e.state = 'aim';
+            e.st = e.type === 'crow' ? 0.5 : 0.65;
+            e.cdir = Math.atan2(dx, dz);
+            this.emit('tell', { grunt: e.type });
+            continue;
+          }
+          if (a.charging && d < 4.2 && e.state === 'idle') {
+            // Wary of a charging hero: back off out of reach.
+            const away = Math.atan2(-dx, -dz);
+            this.world.move(
+              e,
+              Math.sin(away) * e.speed * 0.8 * dt,
+              Math.cos(away) * e.speed * 0.8 * dt
+            );
+            e.moving = true;
+            continue;
+          }
+          if (e.role === 'wait' && d < 9 && level) {
+            // Circle at the edge of the fight, drifting round to a free spot.
+            e.slotA = (e.slotA ?? this.rand(0, TAU)) + dt * 0.35 * (e.id % 2 ? 1 : -1);
+            const gx = a.x + Math.sin(e.slotA) * 3.8,
+              gz = a.z + Math.cos(e.slotA) * 3.8,
+              gd = Math.hypot(gx - e.x, gz - e.z);
+            if (gd > 0.4) {
+              const ang = Math.atan2(gx - e.x, gz - e.z),
+                sp = Math.min(e.speed * 0.75, gd * 3);
+              this.world.move(e, Math.sin(ang) * sp * dt, Math.cos(ang) * sp * dt);
+              e.moving = true;
+            }
+            continue;
+          }
           if (d < e.r + 0.9 && e.cd <= 0 && winding < 3 && Math.abs(a.y - e.y) < 1.2) {
             e.state = 'wind';
             e.st = 0.55;
             e.cd = this.rand(1.3, 2.4);
             winding++;
           } else {
-            const level = Math.abs(a.y - e.y) < 1.2;
             let goal = null;
             if (d < 28.8) {
               if (d > e.r + 0.7 || !level) goal = a;
@@ -1488,6 +2080,11 @@ export class Game {
       return;
     }
     e.st -= dt;
+    // How long the hero has stood their ground near this boss (standing still or guarding).
+    e.planted =
+      d < 9 && (a.speed || 0) < 0.6
+        ? (e.planted || 0) + dt
+        : Math.max(0, (e.planted || 0) - dt * 2);
     if (e.state !== 'charge') e.yaw = Math.atan2(dx, dz);
     switch (e.state) {
       case 'hurt':
@@ -1503,17 +2100,15 @@ export class Game {
           e.moving = true;
         }
         if (e.cd <= 0 && d < 24.8 && (reach || d > 8)) {
-          const moves = BOSSES[e.type].moves;
-          let m = moves[Math.floor(this.random() * moves.length)];
-          if (d < e.r + 3.2 && moves.includes('swipe') && this.random() < 0.5) m = 'swipe';
-          if (m === 'swipe' && d > e.r + 4.8)
-            m = moves.includes('charge') ? 'charge' : moves.includes('eggs') ? 'eggs' : 'slam';
-          if (m === 'slam' && d > 10.4) m = moves.includes('charge') ? 'charge' : 'swipe';
+          const m = this.chooseBossMove(e, d, reach);
+          const enraged = e.hp < e.max * 0.5;
           e.move = m;
           e.state = 'wind';
-          e.st = MOVE_WIND[m];
-          e.cd = this.rand(1.1, 2) * (baron ? 0.75 : 1);
+          // Phase two: faster wind-ups (still always shown) and less rest between attacks.
+          e.windMax = e.st = MOVE_WIND[m] * (enraged ? 0.8 : 1);
+          e.cd = this.rand(1.1, 2) * (baron ? 0.75 : 1) * (enraged ? 0.7 : 1);
           e.cdir = Math.atan2(dx, dz);
+          e.last = m;
           this.emit('tell', { boss: e.type, move: m });
         }
         break;
@@ -1563,9 +2158,50 @@ export class Game {
         break;
       }
       case 'rec':
-        if (e.st <= 0) e.state = 'idle';
+        if (e.st <= 0) {
+          e.state = 'idle';
+          // Enraged bosses often go straight into a second attack.
+          if (e.hp < e.max * 0.5 && !e.chained && this.random() < 0.45) {
+            e.cd = 0;
+            e.chained = true;
+          } else e.chained = false;
+        }
         break;
     }
+    if (!e.enraged && e.hp < e.max * 0.5 && !e.dead) {
+      e.enraged = true;
+      this.emit('banner', {
+        title: e.name.toUpperCase() + ' IS FURIOUS',
+        text: 'Faster attacks: watch the warnings!',
+      });
+    }
+  }
+  // Picks a boss's next attack from where the hero is and how they've been fighting: close heroes get
+  // swiped, heroes who plant themselves (standing still or charging) get slammed or shot at, far
+  // ones get charged; the same move rarely comes twice in a row.
+  chooseBossMove(e, d, reach) {
+    const a = this.player,
+      moves = [...new Set(BOSSES[e.type].moves)],
+      planted = (e.planted || 0) > 1.4 || a.charging,
+      w = {};
+    for (const m of moves) {
+      let k = 1;
+      if (m === 'swipe') k = d < e.r + 3.2 ? 3 : d < e.r + 4.8 ? 1 : 0;
+      if (m === 'slam')
+        k = d < this.slamRadius(e) - 0.5 ? (planted ? 3.5 : 1.6) : d < 10.4 ? 0.4 : 0;
+      if (m === 'charge') k = d > 7 ? 3 : d > 4 ? 1.2 : 0.3;
+      if (m === 'thorns') k = planted ? 2.5 : d > 5 ? 1.6 : 0.8;
+      if (m === 'eggs') k = d > 5 ? (planted ? 3 : 2) : 0.6;
+      if (!reach && m !== 'thorns' && m !== 'eggs' && m !== 'charge') k *= 0.2;
+      if (m === e.last) k *= 0.25;
+      w[m] = k;
+    }
+    let total = 0;
+    for (const m of moves) total += w[m];
+    if (total <= 0) return moves[0];
+    let r = this.random() * total;
+    for (const m of moves) if ((r -= w[m]) <= 0) return m;
+    return moves[moves.length - 1];
   }
   slamRadius(e) {
     return e.type === 'baron' ? 7.6 : 6.4;

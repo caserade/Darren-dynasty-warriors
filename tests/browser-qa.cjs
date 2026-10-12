@@ -192,7 +192,8 @@ function rec(area, check, ok, note = '') {
       p.waitForFunction(
         () => {
           const a = snowdayTest.game.player;
-          return !a.action && a.air === 0 && a.cooldown <= 0 && !a.charging;
+          // after a combo hit the charge button fires a finisher until the combo window closes
+          return !a.action && a.air === 0 && a.cooldown <= 0 && !a.charging && !(a.comboWindow > 0);
         },
         null,
         { timeout: 60000 }
@@ -228,7 +229,7 @@ function rec(area, check, ok, note = '') {
     rec(
       '3d',
       'J starts combo animation',
-      (await pos()).anim.startsWith('Attack'),
+      /^(Attack|PawN|ScarfN)/.test((await pos()).anim),
       (await pos()).anim
     );
     await idle();
@@ -514,7 +515,17 @@ function rec(area, check, ok, note = '') {
       '3d remap',
       'Restore standard buttons',
       JSON.stringify(await p.evaluate(() => snowdayTest.padBindings())) ===
-        JSON.stringify({ jump: 0, dodge: 1, combo: 2, charge: 3, switch: 4, interact: 5, pause: 9 })
+        JSON.stringify({
+          jump: 0,
+          dodge: 1,
+          combo: 2,
+          charge: 3,
+          switch: 4,
+          interact: 5,
+          style: 6,
+          special: 7,
+          pause: 9,
+        })
     );
     await p.evaluate(() => {
       window.__pad = {
@@ -667,7 +678,25 @@ function rec(area, check, ok, note = '') {
           snowdayTest.game.ko > 0
       )
     );
-    await gt(4);
+    // Since update 6 the friends join fights and the combo knocks grunts away, so fresh grunts
+    // stand next to Darren while the friends wait back down the path.
+    await p.evaluate(() => {
+      const g = snowdayTest.game,
+        w = snowdayTest.world,
+        a = g.player;
+      for (const i of [1, 2]) Object.assign(g.actors[i], { x: 20, z: 48, y: w.height(20, 48) });
+      for (const [t, dx, dz] of [
+        ['gopher', 1.6, 0.4],
+        ['gopher', -0.4, 1.7],
+      ])
+        g.enemies.push(g.makeFoe(t, a.x + dx, a.z + dz));
+    });
+    // Grunts take turns and back off after striking, so the first hit can land a little
+    // after 4 s (about 1 run in 200 in the simulation); allow up to 8 game-seconds.
+    for (let i = 0; i < 4; i++) {
+      await gt(i ? 1 : 4);
+      if (await p.evaluate(() => snowdayTest.game.player.hp < 100)) break;
+    }
     rec(
       '3d fight',
       'grunts hurt the hero and the health bar follows',

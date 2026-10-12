@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Darren's Snowday Search</title>
+    <link rel="icon" href="icon.png" />
+    <style>
+      :root {
+        --ink: #18394b;
+        --paper: #fbf3dd;
+        --gold: #e9b949;
+        --red: #d8433a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+      body {
+        background: radial-gradient(circle at 50% 20%, #2f6683, var(--ink) 70%);
+        color: var(--paper);
+        font:
+          16px/1.45 system-ui,
+          'Segoe UI',
+          sans-serif;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+      main {
+        width: min(920px, 100%);
+        text-align: center;
+      }
+      img.hero {
+        width: min(560px, 90%);
+        border-radius: 18px;
+        border: 4px solid var(--paper);
+        box-shadow: 0 10px 40px #0007;
+      }
+      h1 {
+        margin: 18px 0 4px;
+        font-size: clamp(28px, 4vw, 44px);
+        letter-spacing: 0.02em;
+      }
+      p.sub {
+        margin: 0 0 22px;
+        opacity: 0.85;
+      }
+      .games {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+      }
+      a.game {
+        display: block;
+        text-decoration: none;
+        color: var(--ink);
+        background: var(--paper);
+        border: 4px solid var(--gold);
+        border-radius: 16px;
+        padding: 18px 16px;
+        outline: none;
+        transition: transform 0.12s;
+      }
+      a.game:hover,
+      a.game:focus {
+        transform: translateY(-3px);
+        border-color: var(--red);
+        box-shadow: 0 0 0 4px #fff6;
+      }
+      a.game b {
+        display: block;
+        font-size: 22px;
+      }
+      a.game span {
+        font-size: 14px;
+      }
+      p.help {
+        margin-top: 22px;
+        font-size: 13px;
+        opacity: 0.75;
+      }
+      @media (max-width: 640px) {
+        .games {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img class="hero" src="darren.jpg" alt="Darren the red Shoyru in his yellow scarf" />
+      <h1>Darren's Snowday Search</h1>
+      <p class="sub">Pick a game. Saves, sound and controller buttons are shared between them.</p>
+      <div class="games">
+        <a class="game" id="pixel" href="/">
+          <b>Pixel adventure</b>
+          <span>The storybook isometric game: rescue Ruffy, then the firewood chapter.</span>
+        </a>
+        <a class="game" id="three" href="/3d/">
+          <b>3D adventure</b>
+          <span>Third-person snowfields with Darren, Tormund and Bucky.</span>
+        </a>
+      </div>
+      <p class="help">
+        Keys 1 and 2 or a controller (left/right, then A) also pick a game. Back here any time with
+        Ctrl+H; F11 for full screen.
+      </p>
+    </main>
+    <script>
+      const cards = [document.getElementById('pixel'), document.getElementById('three')];
+      let pick = 0;
+      cards[0].focus();
+      document.addEventListener('keydown', (e) => {
+        if (e.key === '1') cards[0].click();
+        if (e.key === '2') cards[1].click();
+      });
+      // Controller: d-pad or left stick moves between the two games, A (or Start) opens one.
+      // A button already down when this page opens (coming back from a game) is ignored until
+      // released; a pad that only appears later (Chromium shows it after the first press) is
+      // read at once, so the first A press already opens a game.
+      let held = false,
+        firstPoll = true;
+      (function poll() {
+        const pad = [...(navigator.getGamepads ? navigator.getGamepads() : [])].find(Boolean);
+        if (pad) {
+          const x = pad.axes[0] || 0;
+          const left = x < -0.5 || pad.buttons[14]?.pressed || pad.buttons[12]?.pressed;
+          const right = x > 0.5 || pad.buttons[15]?.pressed || pad.buttons[13]?.pressed;
+          const go = pad.buttons[0]?.pressed || pad.buttons[9]?.pressed;
+          if (firstPoll) held = !!(left || right || go);
+          if (!held) {
+            if (left || right) {
+              pick = left ? 0 : 1;
+              cards[pick].focus();
+            } else if (go) {
+              cards[pick].click();
+              return;
+            }
+          }
+          held = !!(left || right || go);
+        }
+        firstPoll = false;
+        requestAnimationFrame(poll);
+      })();
+    </script>
+  </body>
+</html>
