@@ -295,3 +295,22 @@ real private-GitHub update flow was tested in this change. No real update creden
 was read, embedded, configured or revoked. This fixes a design risk, not evidence that
 a previously distributed ZIP contained a key. Known-pattern guards cannot identify
 every arbitrary secret hidden in an asset. No dependency versions changed.
+2026-10-12 — STANDALONE 1.2.0 (UPDATER REMOVAL)
+Supersedes the updater-enabled delivery. PR4 had already merged into the updater
+branch at f5e4909670a7c127ce2dc4b1193db70009febeec; its packaging safeguards are retained.
+No merge to main, gameplay/art change, credential setup or real-save modification.
+
+Passed npm test after removal: all existing gameplay/scene regressions plus seven
+packaging checks and two standalone checks. Removed obsolete updater-specific tests.
+Standalone checks exercise bundled-only serving despite old update env/settings and
+cached game files, no network fetch, no update endpoint/menu/UI and unchanged save/cache
+files. The desktop Playwright suite retains chooser/game/save checks, removing updater
+scenarios. Generated scene-preview changes were restored.
+
+Built a real Windows x64 1.2.0 ZIP. Inspection confirms no updater config/manifest and
+only five approved runtime files in app.asar; synthetic stray-file sentinel excluded.
+Windows smoke used a verified temporary userData profile and a localhost trap server:
+chooser/art, pixel and 3D titles, model/animation loading, absent updater endpoint/menu/
+prompt, ignored old downloaded games, no updater HTTP requests despite legacy settings.
+Real user saves were not opened or changed. Physical controllers, extended gameplay
+and SmartScreen behavior on another PC remain untested. No dependency changes.

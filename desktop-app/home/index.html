@@ -84,22 +84,6 @@
         font-size: 13px;
         opacity: 0.75;
       }
-      #update {
-        margin-top: 10px;
-        font-size: 13px;
-        opacity: 0.8;
-        min-height: 1.4em;
-      }
-      #update.news {
-        opacity: 1;
-        display: inline-block;
-        background: var(--paper);
-        color: var(--ink);
-        border: 3px solid var(--gold);
-        border-radius: 12px;
-        padding: 8px 14px;
-        font-size: 15px;
-      }
       @media (max-width: 640px) {
         .games {
           grid-template-columns: 1fr;
@@ -126,40 +110,8 @@
         Keys 1 and 2 or a controller (left/right, then A) also pick a game. Back here any time with
         Ctrl+H; F11 for full screen.
       </p>
-      <p id="update" role="status"></p>
     </main>
     <script>
-      // Game version and update news from the app (desktop-app/updater.cjs).
-      const when = (build) =>
-        new Date(build * 1000).toLocaleString(undefined, {
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        });
-      (async function showUpdate() {
-        let s;
-        try {
-          s = await (await fetch('update.json', { cache: 'no-store' })).json();
-        } catch {
-          return;
-        }
-        // A finished download is switched in when this page loads, so load it again.
-        if (s.state === 'ready') return location.reload();
-        const box = document.getElementById('update');
-        const version =
-          s.build > 1000000000 ? 'Game from ' + when(s.build) : 'Game from this folder';
-        if (s.justUpdated) {
-          box.className = 'news';
-          box.textContent =
-            'The game was updated! ' + version + (s.notes ? '. New: ' + s.notes : '') + '.';
-        } else {
-          box.textContent = version + (s.message ? ' · ' + s.message : '');
-        }
-        if (s.state === 'checking' || s.state === 'downloading') setTimeout(showUpdate, 1000);
-      })();
-
       const cards = [document.getElementById('pixel'), document.getElementById('three')];
       let pick = 0;
       cards[0].focus();

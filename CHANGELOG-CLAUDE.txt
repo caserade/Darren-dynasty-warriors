@@ -439,3 +439,11 @@ CREDENTIAL-FREE PACKAGING FIX · 2026-10-12
   No binary was published; source integration and a later approved release are needed.
 - Added 10 synthetic packaging/runtime tests to npm test. No dependencies changed.
   Windows ZIP generation uses .NET compression without PowerShell module autoloading.
+CURRENT DESKTOP BEHAVIOR — STANDALONE 1.2.0 — 2026-10-12
+At Michael's request the updater has been removed. Historical update 7 and the
+credential fix elsewhere describe earlier builds, not the current desktop behavior.
+The app always runs the bundled game, with no checks, downloads, automatic switches,
+update messages, updater menu or credentials. Old downloaded games are ignored.
+The existing save location, origin, gameplay, art and desktop wrapper are preserved.
+Future versions are installed manually by extracting a new ZIP and launching its EXE.
+PR4's packaging safeguards remain. Updater modules/config/publisher/workflow are removed.

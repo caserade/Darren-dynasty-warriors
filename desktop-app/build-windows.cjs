@@ -7,8 +7,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const { execFileSync } = require('node:child_process');
-const { gameManifest } = require('../tools/publish-game-update.cjs');
-const { publicSettings } = require('./update-settings.cjs');
 const { assertBuildEnvironment, assertSafeTree, stageApp } = require('./package-security.cjs');
 
 const here = __dirname;
@@ -24,7 +22,6 @@ const exeName = 'Darren Snowday';
   assertBuildEnvironment();
   // Validate before creating any distributable; never read update-token.txt.
   assertSafeTree(here, { skip: (rel) => /^(?:node_modules|out)(?:\/|$)/.test(rel) });
-  const config = publicSettings(JSON.parse(fs.readFileSync(path.join(here, 'update-config.json'), 'utf8')));
   assertSafeTree(path.join(here, '..', 'dist'));
   const staging = fs.mkdtempSync(path.join(os.tmpdir(), 'snowday-package-'));
   try {
@@ -69,13 +66,6 @@ const exeName = 'Darren Snowday';
     fs.cpSync(path.join(here, '..', 'dist'), path.join(dest, 'resources', 'game'), {
       recursive: true,
     });
-    // What the bundled game is, so the app downloads only newer games and only changed files.
-    const manifest = gameManifest(path.join(dest, 'resources', 'game'));
-    fs.writeFileSync(path.join(dest, 'resources', 'game-manifest.json'), JSON.stringify(manifest));
-    // Only public source settings are distributed. Authentication is supplied at launch.
-    fs.writeFileSync(path.join(dest, 'resources', 'update-config.json'), JSON.stringify(config));
-    console.log(`Bundled game build ${manifest.build} (${manifest.commit}) "${manifest.notes}"`);
-
     fs.writeFileSync(
       path.join(dest, 'HOW-TO-PLAY.txt'),
       [
@@ -92,12 +82,10 @@ const exeName = 'Darren Snowday';
         'to it, Ctrl+1 / Ctrl+2 jump straight to a game, F11 is full screen. Controllers,',
         'keyboard and mouse work as in the browser versions.',
         '',
-        'Updates: the app checks for a newer game every time it starts and downloads only the',
-        'changed game files. The start screen says when it updated. You do not need to',
-        'download this folder again unless the start screen says a new copy of the app is needed.',
-        'This folder and ZIP contain no update key. Private updates require your own local',
-        'SNOWDAY_UPDATE_TOKEN environment variable when launching; never put a key in this folder.',
-        'Without access, the bundled game still works. Public updates require no key.',
+        'This standalone app always plays the game included in this folder.',
+        'It never checks for or downloads updates, and no GitHub key is needed.',
+        'For a future version, close this app, extract the new ZIP to a new folder,',
+        'and launch the new EXE. Do not delete your save folder.',
         '',
         "Saves live in %APPDATA%\\Darren's Snowday Search (Test > Open save folder).",
         'They are separate from saves made in a web browser.',
