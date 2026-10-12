@@ -945,7 +945,7 @@ export class Game {
       power: heavy ? 1 : 0,
       move: q.anim,
     });
-    if (count)
+    if (count && !q.friend)
       this.emit('hitstop', {
         t: h.down || h.launch ? 0.075 : heavy ? 0.06 : 0.035,
         actor: q.kind,
@@ -1529,7 +1529,7 @@ export class Game {
       if (i === this.selected) continue;
       const b = this.actors[i],
         side = follower++ === 0 ? -1 : 1;
-      if (b.assist) continue;
+      if (b.assist || b.engaging) continue;
       const dist = Math.hypot(a.x - b.x, a.z - b.z),
         goal = this.world.safe(
           a.x - Math.sin(a.yaw) * 2.8 + Math.cos(a.yaw) * side * 1.8,
@@ -1649,68 +1649,84 @@ export class Game {
       this.updateFoeShots(dt);
     }
   }
-  // Friends who aren't being played swing at foes right beside them (Tormund one target, Bucky's mallet all around).
+  // Friends who aren't being played (Claude update 6): they pick a foe near the hero, walk over and
+  // fight it with their own string (every fourth swing is a finisher), step out of a boss's marked
+  // attack, and drop the fight to catch up when the hero moves on.
   assistFriends(dt) {
+    const a = this.player;
     for (let i = 0; i < 3; i++) {
       if (i === this.selected) continue;
-      const b = this.actors[i];
+      const b = this.actors[i],
+        set = this.moveset(i);
+      b.engaging = false;
       if (b.assist) {
-        const q = b.assist;
+        const q = b.assist,
+          m = q.move;
         q.time += dt;
-        if (!q.done && q.time >= 0.3) {
-          q.done = true;
-          const reach = i === 2 ? 2.6 : 2.2;
-          let any = false;
-          for (const e of this.enemies) {
-            if (e.dead) continue;
-            const d = Math.hypot(e.x - b.x, e.z - b.z);
-            if (d > reach + e.r * 0.6 || Math.abs(e.y - b.y) > 1.6 || (i !== 2 && e !== q.target))
-              continue;
-            this.damageFoe(
-              e,
-              [16, 18, 26][i],
-              Math.atan2(e.x - b.x, e.z - b.z),
-              i === 2 ? 9 : 4,
-              i === 2
-            );
-            any = true;
-          }
-          if (any)
-            this.emit('swing', {
-              actor: i,
-              x: b.x,
-              z: b.z,
-              y: b.y + 0.1,
-              r: i === 2 ? 2 : 1.2,
-              strong: false,
-              power: 0,
-            });
+        while (q.next < m.hits.length && q.time >= m.hits[q.next].t) {
+          const h = m.hits[q.next++];
+          this.strike(
+            b,
+            { ...h, dmg: Math.round(h.dmg * 0.8) },
+            { kind: i, anim: m.anim, friend: true }
+          );
         }
-        if (q.time >= 0.65) {
+        if (q.time >= q.dur) {
           b.assist = null;
           b.animation = 'Idle';
         }
         continue;
       }
-      if (b.down || b.assistCd > 0 || !this.enemies.length) continue;
+      if (b.down) continue;
+      const out = this.escape(b);
+      if (out !== null) {
+        b.engaging = true;
+        this.world.move(b, Math.sin(out) * 6 * dt, Math.cos(out) * 6 * dt);
+        b.yaw = out;
+        b.moving = true;
+        b.animation = 'Run';
+        b.y = this.world.height(b.x, b.z);
+        continue;
+      }
       let target = null,
         best = Infinity;
       for (const e of this.enemies) {
-        if (e.dead || (e.boss && !e.active)) continue;
-        const d = Math.hypot(e.x - b.x, e.z - b.z) - e.r;
-        if (d < best && d < 1.9 && Math.abs(e.y - b.y) < 1.6) {
+        if (e.dead || (e.boss && !e.active) || e.air > 0) continue;
+        const d = Math.hypot(e.x - b.x, e.z - b.z) - e.r,
+          fromHero = Math.hypot(e.x - a.x, e.z - a.z);
+        if (d < best && d < 7 && fromHero < 8 && Math.abs(e.y - b.y) < 1.6) {
           best = d;
           target = e;
         }
       }
-      if (!target || Math.hypot(this.player.x - b.x, this.player.z - b.z) > 9) continue;
-      b.yaw = Math.atan2(target.x - b.x, target.z - b.z);
-      b.assist = { time: 0, done: false, target };
-      b.assistCd = i === 2 ? 1.8 : 1.4;
-      // Friends use the first two hits of their own string.
-      const names = this.moveset(i).normal.map((m) => m.anim);
-      b.animation = b.animation === names[0] ? names[1] : names[0];
+      if (!target || Math.hypot(a.x - b.x, a.z - b.z) > 9) continue;
+      const k = b.combo || 0,
+        m =
+          k % 4 === 3 && set.charge[2] && set.charge[2].hits
+            ? set.charge[2]
+            : set.normal[k % set.normal.length],
+        reach = Math.min(2.2, m.hits?.[0]?.r ?? 2) + target.r * 0.5,
+        ang = Math.atan2(target.x - b.x, target.z - b.z);
+      b.engaging = true;
+      if (best > reach - target.r * 0.5) {
+        // Walk over to the fight.
+        const sp = Math.min(5.5, (best - reach + 1) * 4);
+        this.world.move(b, Math.sin(ang) * sp * dt, Math.cos(ang) * sp * dt);
+        b.yaw = ang;
+        b.moving = true;
+        b.speed = sp;
+        b.animation = 'Run';
+        b.y = this.world.height(b.x, b.z);
+        continue;
+      }
+      b.speed = 0;
       b.moving = false;
+      if (b.assistCd > 0 || !m.hits) continue;
+      b.yaw = ang;
+      b.assist = { time: 0, next: 0, move: m, dur: m.dur, target };
+      b.assistCd = (i === 2 ? 0.7 : 0.5) + this.rand(0, 0.4);
+      b.combo = k + 1;
+      b.animation = m.anim;
     }
   }
   spawnFoes(dt) {
@@ -1769,10 +1785,50 @@ export class Game {
       break;
     }
   }
+  // Smarter grunts (Claude update 6): the nearest few press the attack while the rest circle in a
+  // loose ring waiting their turn; they back off from a charging hero, the badly hurt run, crows
+  // dive-bomb, hay bales roll-charge, and all of them step out of their boss's marked attack.
+  planFoes() {
+    const a = this.player,
+      near = [];
+    for (const e of this.enemies)
+      if (!e.boss && !e.dead) {
+        e.dist = Math.hypot(e.x - a.x, e.z - a.z);
+        e.role = 'engage';
+        if (e.dist < 14) near.push(e);
+      }
+    near.sort((p, q) => p.dist - q.dist);
+    near.forEach((e, k) => (e.role = k < 4 ? 'engage' : 'wait'));
+    // The boss's marked attack, if one is winding up: a circle (slam) or a lane (charge, swipe).
+    const b = this.engaged;
+    this.danger = null;
+    if (b && !b.dead && b.state === 'wind') {
+      if (b.move === 'slam') this.danger = { x: b.x, z: b.z, r: this.slamRadius(b) + 0.8 };
+      else if (b.move === 'charge')
+        this.danger = { x: b.x, z: b.z, dir: b.cdir, len: 14, w: b.r + 1.2 };
+      else if (b.move === 'swipe') this.danger = { x: b.x, z: b.z, r: b.r + 4 };
+    }
+  }
+  // Which way (if any) a foe or friend at p should step to get out of the marked attack.
+  escape(p) {
+    const z = this.danger;
+    if (!z) return null;
+    if (z.r) {
+      const d = Math.hypot(p.x - z.x, p.z - z.z);
+      return d < z.r ? Math.atan2(p.x - z.x, p.z - z.z) : null;
+    }
+    const dx = p.x - z.x,
+      dz = p.z - z.z,
+      along = dx * Math.sin(z.dir) + dz * Math.cos(z.dir),
+      side = dx * Math.cos(z.dir) - dz * Math.sin(z.dir);
+    if (along < -1 || along > z.len || Math.abs(side) > z.w) return null;
+    return z.dir + (side >= 0 ? -Math.PI / 2 : Math.PI / 2);
+  }
   updateFoes(dt) {
     const a = this.player;
     let winding = 0;
     for (const e of this.enemies) if (!e.boss && e.state === 'wind') winding++;
+    this.planFoes();
     for (let i = 0; i < this.enemies.length; i++) {
       const e = this.enemies[i];
       e.t += dt;
@@ -1833,15 +1889,112 @@ export class Game {
         } else if (e.state === 'rec') {
           e.st -= dt;
           if (e.st <= 0) e.state = 'idle';
+        } else if (e.state === 'aim') {
+          // Telegraph before a crow's dive or a bale's roll: it squats, glowing, locked on.
+          e.st -= dt;
+          e.cdir = Math.atan2(dx, dz);
+          if (e.st <= 0) {
+            e.state = 'dash';
+            e.st = e.type === 'crow' ? 0.42 : 0.85;
+            e.struck = false;
+          }
+        } else if (e.state === 'dash') {
+          e.st -= dt;
+          e.yaw = e.cdir;
+          const sp = e.type === 'crow' ? 13 : 9.5,
+            ox = e.x,
+            oz = e.z;
+          this.world.move(e, Math.sin(e.cdir) * sp * dt, Math.cos(e.cdir) * sp * dt);
+          e.moving = true;
+          if (!e.struck && d < e.r + 0.6 && Math.abs(a.y - e.y) < 1.2) {
+            e.struck = true;
+            this.hurtHero(e.dmg + 3, e.cdir);
+          }
+          if (e.st <= 0 || Math.hypot(e.x - ox, e.z - oz) < sp * dt * 0.25) {
+            e.state = 'rec';
+            e.st = 0.7;
+            e.cd = this.rand(1.5, 2.6);
+            e.special = this.rand(4, 7);
+          }
+        } else if (e.state === 'flee') {
+          // Badly hurt: runs off for a moment, then comes back for more.
+          e.st -= dt;
+          const away = Math.atan2(-dx, -dz);
+          this.world.move(
+            e,
+            Math.sin(away) * e.speed * 1.1 * dt,
+            Math.cos(away) * e.speed * 1.1 * dt
+          );
+          e.yaw = away;
+          e.moving = true;
+          if (e.st <= 0) e.state = 'idle';
         } else {
           e.cd -= dt;
+          e.special = (e.special ?? this.rand(2, 5)) - dt;
+          const level = Math.abs(a.y - e.y) < 1.2,
+            out = this.escape(e);
+          // A hero's special leaves grunts too dazed to do anything clever.
+          if (a.action?.type === 'special' && d < 8) continue;
+          if (!e.fled && !e.guard && e.type !== 'bale' && e.hp < e.max * 0.25 && d < 6) {
+            e.fled = true;
+            e.state = 'flee';
+            e.st = 1.6;
+            continue;
+          }
+          if (out !== null) {
+            this.world.move(
+              e,
+              Math.sin(out) * e.speed * 1.2 * dt,
+              Math.cos(out) * e.speed * 1.2 * dt
+            );
+            e.yaw = out;
+            e.moving = true;
+            continue;
+          }
+          if (
+            e.special <= 0 &&
+            level &&
+            e.role === 'engage' &&
+            ((e.type === 'crow' && d > 2.5 && d < 7) || (e.type === 'bale' && d > 3.5 && d < 9)) &&
+            this.world.visible(e, a)
+          ) {
+            e.state = 'aim';
+            e.st = e.type === 'crow' ? 0.5 : 0.65;
+            e.cdir = Math.atan2(dx, dz);
+            this.emit('tell', { grunt: e.type });
+            continue;
+          }
+          if (a.charging && d < 4.2 && e.state === 'idle') {
+            // Wary of a charging hero: back off out of reach.
+            const away = Math.atan2(-dx, -dz);
+            this.world.move(
+              e,
+              Math.sin(away) * e.speed * 0.8 * dt,
+              Math.cos(away) * e.speed * 0.8 * dt
+            );
+            e.moving = true;
+            continue;
+          }
+          if (e.role === 'wait' && d < 9 && level) {
+            // Circle at the edge of the fight, drifting round to a free spot.
+            e.slotA = (e.slotA ?? this.rand(0, TAU)) + dt * 0.35 * (e.id % 2 ? 1 : -1);
+            const gx = a.x + Math.sin(e.slotA) * 3.8,
+              gz = a.z + Math.cos(e.slotA) * 3.8,
+              gd = Math.hypot(gx - e.x, gz - e.z);
+            if (gd > 0.4) {
+              const ang = Math.atan2(gx - e.x, gz - e.z),
+                sp = Math.min(e.speed * 0.75, gd * 3);
+              this.world.move(e, Math.sin(ang) * sp * dt, Math.cos(ang) * sp * dt);
+              e.moving = true;
+            }
+            continue;
+          }
           if (d < e.r + 0.9 && e.cd <= 0 && winding < 3 && Math.abs(a.y - e.y) < 1.2) {
             e.state = 'wind';
             e.st = 0.55;
             e.cd = this.rand(1.3, 2.4);
             winding++;
           } else {
-            const level = Math.abs(a.y - e.y) < 1.2;
             let goal = null;
             if (d < 28.8) {
               if (d > e.r + 0.7 || !level) goal = a;
@@ -1925,6 +2078,11 @@ export class Game {
       return;
     }
     e.st -= dt;
+    // How long the hero has stood their ground near this boss (standing still or guarding).
+    e.planted =
+      d < 9 && (a.speed || 0) < 0.6
+        ? (e.planted || 0) + dt
+        : Math.max(0, (e.planted || 0) - dt * 2);
     if (e.state !== 'charge') e.yaw = Math.atan2(dx, dz);
     switch (e.state) {
       case 'hurt':
@@ -1940,17 +2098,15 @@ export class Game {
           e.moving = true;
         }
         if (e.cd <= 0 && d < 24.8 && (reach || d > 8)) {
-          const moves = BOSSES[e.type].moves;
-          let m = moves[Math.floor(this.random() * moves.length)];
-          if (d < e.r + 3.2 && moves.includes('swipe') && this.random() < 0.5) m = 'swipe';
-          if (m === 'swipe' && d > e.r + 4.8)
-            m = moves.includes('charge') ? 'charge' : moves.includes('eggs') ? 'eggs' : 'slam';
-          if (m === 'slam' && d > 10.4) m = moves.includes('charge') ? 'charge' : 'swipe';
+          const m = this.chooseBossMove(e, d, reach);
+          const enraged = e.hp < e.max * 0.5;
           e.move = m;
           e.state = 'wind';
-          e.st = MOVE_WIND[m];
-          e.cd = this.rand(1.1, 2) * (baron ? 0.75 : 1);
+          // Phase two: faster wind-ups (still always shown) and less rest between attacks.
+          e.windMax = e.st = MOVE_WIND[m] * (enraged ? 0.8 : 1);
+          e.cd = this.rand(1.1, 2) * (baron ? 0.75 : 1) * (enraged ? 0.7 : 1);
           e.cdir = Math.atan2(dx, dz);
+          e.last = m;
           this.emit('tell', { boss: e.type, move: m });
         }
         break;
@@ -2000,9 +2156,50 @@ export class Game {
         break;
       }
       case 'rec':
-        if (e.st <= 0) e.state = 'idle';
+        if (e.st <= 0) {
+          e.state = 'idle';
+          // Enraged bosses often go straight into a second attack.
+          if (e.hp < e.max * 0.5 && !e.chained && this.random() < 0.45) {
+            e.cd = 0;
+            e.chained = true;
+          } else e.chained = false;
+        }
         break;
     }
+    if (!e.enraged && e.hp < e.max * 0.5 && !e.dead) {
+      e.enraged = true;
+      this.emit('banner', {
+        title: e.name.toUpperCase() + ' IS FURIOUS',
+        text: 'Faster attacks: watch the warnings!',
+      });
+    }
+  }
+  // Picks a boss's next attack from where the hero is and how they've been fighting: close heroes get
+  // swiped, heroes who plant themselves (standing still or charging) get slammed or shot at, far
+  // ones get charged; the same move rarely comes twice in a row.
+  chooseBossMove(e, d, reach) {
+    const a = this.player,
+      moves = [...new Set(BOSSES[e.type].moves)],
+      planted = (e.planted || 0) > 1.4 || a.charging,
+      w = {};
+    for (const m of moves) {
+      let k = 1;
+      if (m === 'swipe') k = d < e.r + 3.2 ? 3 : d < e.r + 4.8 ? 1 : 0;
+      if (m === 'slam')
+        k = d < this.slamRadius(e) - 0.5 ? (planted ? 3.5 : 1.6) : d < 10.4 ? 0.4 : 0;
+      if (m === 'charge') k = d > 7 ? 3 : d > 4 ? 1.2 : 0.3;
+      if (m === 'thorns') k = planted ? 2.5 : d > 5 ? 1.6 : 0.8;
+      if (m === 'eggs') k = d > 5 ? (planted ? 3 : 2) : 0.6;
+      if (!reach && m !== 'thorns' && m !== 'eggs' && m !== 'charge') k *= 0.2;
+      if (m === e.last) k *= 0.25;
+      w[m] = k;
+    }
+    let total = 0;
+    for (const m of moves) total += w[m];
+    if (total <= 0) return moves[0];
+    let r = this.random() * total;
+    for (const m of moves) if ((r -= w[m]) <= 0) return m;
+    return moves[moves.length - 1];
   }
   slamRadius(e) {
     return e.type === 'baron' ? 7.6 : 6.4;

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { World, Game, CAST, GRUNTS, BOSSES, BELLY } from '../dist/3d/sim.mjs';
+import { World, Game, CAST, GRUNTS, BOSSES, BELLY, MOVE_WIND } from '../dist/3d/sim.mjs';
 const data = JSON.parse(fs.readFileSync(new URL('../dist/3d/world.json', import.meta.url)));
 const world = new World(data);
 world.prepareNav();
@@ -496,7 +496,7 @@ function fight(g, limit = 120, boss = null) {
     const a = g.player;
     let e = g.engaged && !g.engaged.dead ? g.engaged : null;
     if (!e) {
-      let best = 7;
+      let best = 14;
       for (const o of g.enemies) {
         if (o.dead || (o.boss && !o.active)) continue;
         const d = Math.hypot(o.x - a.x, o.z - a.z);
@@ -537,6 +537,127 @@ function fight(g, limit = 120, boss = null) {
   }
   return limit;
 }
+test('Smarter grunts: a few press in while the rest circle; they back off from a charge and dodge boss warnings', () => {
+  const g = fresh();
+  place(g, 40, 52);
+  for (const a of g.actors) if (a !== g.player) Object.assign(a, { x: 10, z: 10 });
+  g.enemies = g.enemies.filter((e) => e.boss);
+  const pack = [];
+  for (let k = 0; k < 9; k++) {
+    const e = foe(g, 'gopher', 40 + Math.sin(k * 0.7) * 6, 52 + Math.cos(k * 0.7) * 6);
+    e.hp = e.max = 999;
+    pack.push(e);
+  }
+  g.player.hp = g.player.max = 9999;
+  tick(g, 4);
+  const close = pack.filter((e) => Math.hypot(e.x - g.player.x, e.z - g.player.z) < 2.2).length,
+    ring = pack.filter((e) => {
+      const d = Math.hypot(e.x - g.player.x, e.z - g.player.z);
+      return d > 2.8 && d < 5.5;
+    }).length;
+  assert(close <= 4 && close >= 2, 'pressing in: ' + close);
+  assert(ring >= 4, 'circling: ' + ring);
+  // Charging makes the nearby ones give ground.
+  const before = pack.map((e) => Math.hypot(e.x - g.player.x, e.z - g.player.z));
+  assert(g.chargeStart());
+  tick(g, 0.8);
+  const backed = pack.filter(
+    (e, k) => Math.hypot(e.x - g.player.x, e.z - g.player.z) > before[k] + 0.3
+  );
+  assert(backed.length >= 2, 'backed off: ' + backed.length);
+  g.chargeRelease();
+  // A boss winding up a slam: grunts inside the marked circle walk out of it.
+  const h = fresh();
+  const b = h.enemies[0];
+  near(h, b.x + 5, b.z + 5);
+  tick(h, 0.1);
+  const grunt = foe(h, 'gopher', b.x + 2.5, b.z);
+  grunt.hp = grunt.max = 999;
+  Object.assign(b, { state: 'wind', move: 'slam', st: 1, windMax: 1 });
+  h.planFoes();
+  assert(h.escape(grunt) !== null);
+  const r0 = Math.hypot(grunt.x - b.x, grunt.z - b.z);
+  for (let t = 0; t < 0.6; t += 1 / 60) {
+    b.st = 1;
+    h.update(1 / 60);
+  }
+  assert(Math.hypot(grunt.x - b.x, grunt.z - b.z) > r0 + 1, 'stepped out of the slam');
+});
+test('Crows dive-bomb and hay bales roll-charge after a telegraph', () => {
+  for (const type of ['crow', 'bale']) {
+    const g = fresh();
+    place(g, 18, 48);
+    for (const a of g.actors) if (a !== g.player) Object.assign(a, { x: 10, z: 10 });
+    g.enemies = g.enemies.filter((e) => e.boss);
+    const e = foe(g, type, 18, 53);
+    e.hp = e.max = 999;
+    e.special = 0;
+    const seen = new Set();
+    let hurt = false;
+    for (let t = 0; t < 3; t += 1 / 60) {
+      g.update(1 / 60);
+      seen.add(e.state);
+      if (g.events.splice(0).some((v) => v.type === 'hurt')) {
+        hurt = true;
+        assert(seen.has('aim') && seen.has('dash'), type + ' warned before hitting');
+      }
+    }
+    assert(seen.has('aim') && seen.has('dash'), type + ' states ' + [...seen]);
+    assert(hurt, type + ' hit the hero');
+  }
+});
+test('Bosses pick moves by range, rarely repeat, and turn furious below half health', () => {
+  const g = fresh();
+  const b = g.makeFoe('baron', 60, 60, true);
+  let repeats = 0,
+    last = null;
+  const counts = {};
+  for (let k = 0; k < 200; k++) {
+    b.last = last;
+    const m = g.chooseBossMove(b, 9, true);
+    if (m === last) repeats++;
+    counts[m] = (counts[m] || 0) + 1;
+    last = m;
+  }
+  assert(repeats < 60, 'repeats ' + repeats);
+  assert(counts.charge > (counts.swipe || 0), 'far away: charges more than swipes');
+  b.last = null;
+  const closeCounts = {};
+  for (let k = 0; k < 200; k++) {
+    const m = g.chooseBossMove(b, b.r + 1.5, true);
+    closeCounts[m] = (closeCounts[m] || 0) + 1;
+  }
+  assert(closeCounts.swipe > (closeCounts.charge || 0), 'up close: swipes more than charges');
+  const c = g.enemies.find((e) => e.type === 'spud');
+  near(g, c.x + 3, c.z + 3);
+  tick(g, 0.1);
+  c.hp = c.max * 0.4;
+  g.events.length = 0;
+  c.cd = 0;
+  for (let t = 0; t < 3 && c.state !== 'wind'; t += 1 / 60) g.update(1 / 60);
+  assert(g.events.some((e) => e.type === 'banner' && /FURIOUS/.test(e.title)));
+  assert.equal(c.state, 'wind');
+  assert(c.windMax < MOVE_WIND[c.move] - 1e-6, 'enraged wind-ups are quicker');
+});
+test('Friends walk over to a fight near the hero and use their own moves', () => {
+  const g = fresh();
+  place(g, 18, 48);
+  g.enemies = g.enemies.filter((e) => e.boss);
+  tick(g, 2);
+  const e = foe(g, 'bale', 18, 53);
+  e.hp = e.max = 999;
+  e.speed = 0;
+  const anims = new Set();
+  for (let t = 0; t < 7; t += 1 / 60) {
+    g.update(1 / 60);
+    for (const b of g.actors) if (b !== g.player && b.assist) anims.add(b.assist.move.anim);
+  }
+  assert(e.hp < 999, 'friends hurt the bale');
+  assert(
+    [...anims].some((n) => /^Tor/.test(n)) && [...anims].some((n) => /^Buk/.test(n)),
+    [...anims].join()
+  );
+});
 test('Grunts wander in away from the cottage, never beside it', () => {
   const g = fresh();
   tick(g, 30);

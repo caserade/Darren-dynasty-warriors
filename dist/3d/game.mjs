@@ -1057,18 +1057,26 @@ function updateFoes(dt) {
     } else {
       if (e.moving)
         o.body.position.y = Math.abs(Math.sin(t * (e.boss ? 6 : 11))) * (e.boss ? 0.12 : 0.08);
-      if (e.state === 'wind') {
+      if (e.state === 'wind' || e.state === 'aim') {
         sy = 0.9 + Math.sin(t * 30) * 0.03;
         tilt = -0.15;
-      } else if (e.state === 'rec') tilt = 0.12;
+      } else if (e.state === 'dash') tilt = 0.3;
+      else if (e.state === 'rec') tilt = 0.12;
       else if (e.state === 'hurt') tilt = 0.2;
       o.body.scale.set(1 / Math.sqrt(sy), sy, 1 / Math.sqrt(sy));
       o.body.rotation.x = tilt;
     }
     if (o.wings) o.wings.forEach((w, i) => (w.rotation.z = (i ? -1 : 1) * Math.sin(t * 14) * 0.6));
-    if (o.spin) o.spin.rotation.x += dt * (e.state === 'charge' ? 14 : e.moving ? 5 : 1);
+    if (o.spin)
+      o.spin.rotation.x +=
+        dt * (e.state === 'charge' || e.state === 'dash' ? 14 : e.moving ? 5 : 1);
     if (o.glow) for (const g of o.glow) g.material.emissiveIntensity = e.state === 'wind' ? 2.5 : 1;
-    const f = e.flash > 0 ? 0.7 : e.boss && e.state === 'wind' ? 0.25 + 0.2 * Math.sin(t * 25) : 0;
+    const f =
+      e.flash > 0
+        ? 0.7
+        : (e.boss && e.state === 'wind') || e.state === 'aim'
+          ? 0.25 + 0.2 * Math.sin(t * 25)
+          : 0;
     for (const m of o.mats)
       if (m.emissive && !(o.glow && o.glow.some((g) => g.material === m)))
         e.flash > 0 ? m.emissive.setRGB(f, f, f) : m.emissive.setRGB(f, 0, f * 0.2);
@@ -1091,7 +1099,7 @@ function updateFoes(dt) {
       }
       tv.group.position.set(e.x, e.y + 0.08, e.z);
       tv.group.rotation.y = e.cdir;
-      tv.mat.opacity = 0.18 + 0.32 * clamp(1 - e.st / MOVE_WIND[e.move], 0, 1);
+      tv.mat.opacity = 0.18 + 0.32 * clamp(1 - e.st / (e.windMax || MOVE_WIND[e.move]), 0, 1);
     } else removeTell(e.id);
   }
   for (const [id, o] of foeViews)
@@ -1311,7 +1319,7 @@ function heroPose(a, i, h) {
   const act =
     a.action ||
     (a.assist
-      ? { name: a.animation, time: a.assist.time, duration: 0.65, assist: a.assist }
+      ? { name: a.animation, time: a.assist.time, duration: a.assist.dur ?? 0.65, assist: a.assist }
       : null);
   if (act) {
     const id = act.assist || act;
@@ -1358,7 +1366,9 @@ function swinging(a) {
   const q = a.action,
     m = q?.move;
   if (!m && q?.name === 'ChargeAttack') return q.time > 0.28 && q.time < 0.65;
-  if (!m) return !!(a.assist && a.assist.time > 0.1 && a.assist.time < 0.45);
+  if (!m && a.assist?.move)
+    return a.assist.move.hits.some((h) => a.assist.time > h.t - 0.12 && a.assist.time < h.t + 0.1);
+  if (!m) return false;
   if (m.pulse && q.time > m.pulse.from - 0.1 && q.time < m.pulse.to + 0.1) return true;
   return (m.hits || []).some((h) => q.time > h.t - 0.12 && q.time < h.t + 0.1);
 }
