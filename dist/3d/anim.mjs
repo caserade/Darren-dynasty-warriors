@@ -429,9 +429,16 @@ class Spring {
     this.v = 0;
   }
   step(target, dt) {
-    const a = (target - this.x) * this.k - this.v * this.d;
-    this.v += a * dt;
-    this.x += this.v * dt;
+    // Small fixed sub-steps keep the stiff springs (squash, flinch) stable on slow frames;
+    // one big step at 10-12 fps used to blow up to NaN and hide the hero for good.
+    const n = Math.min(12, Math.ceil(dt * 120));
+    const h = n ? dt / n : 0;
+    for (let i = 0; i < n; i++) {
+      const a = (target - this.x) * this.k - this.v * this.d;
+      this.v += a * h;
+      this.x += this.v * h;
+    }
+    if (!Number.isFinite(this.x) || !Number.isFinite(this.v)) this.x = this.v = 0;
     return this.x;
   }
 }
@@ -481,6 +488,8 @@ export class Animator {
   // Called each frame with what the hero is doing.
   // d = { key, clip, time?, loop?, blend?, speed, air, vy, yaw, x, z, look: {x, y, z} | null, hurt: angle|null, still }
   update(dt, d) {
+    // Idle breathing follows game time, so it holds still while the game is paused.
+    this.idleT = (this.idleT || 0) + dt;
     // --- root yaw: follows the simulation, smoothed a little, and remembers how fast it turned
     if (this.yaw === null) this.yaw = d.yaw;
     const diff = wrapAngle(d.yaw - this.yaw),
@@ -568,7 +577,7 @@ export class Animator {
       const w = Math.max(0, e.w) / (total || 1);
       if (e.key === 'loco') {
         const idleW = 1 - moveW;
-        this.setW('Idle', w * idleW, (performance.now() / 1000) % (this.clips.Idle?.duration || 1));
+        this.setW('Idle', w * idleW, this.idleT % (this.clips.Idle?.duration || 1));
         this.setW(walkName, w * moveW * (1 - runW), this.phase * (walkClip?.duration || 1));
         this.setW('Run', w * moveW * runW, this.phase * (runClip?.duration || 1));
       } else this.setW(e.clip, w, e.t);

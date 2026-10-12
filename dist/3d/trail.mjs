@@ -49,7 +49,11 @@ export class WeaponTrail {
     }
     this.bone.updateWorldMatrix(true, false);
     const m = this.bone.matrixWorld;
-    if (active && dt > 0) {
+    // Sample at most 60 times a second so the trail is the same length on a 144 Hz screen
+    // as at 60 Hz (the fight itself steps at 60 Hz, so extra samples were only duplicates).
+    this.acc = (this.acc || 0) + dt;
+    if (active && dt > 0 && (this.acc >= 1 / 61 || this.pts.length === 0)) {
+      this.acc = 0;
       this.pts.unshift([this.a.clone().applyMatrix4(m), this.b.clone().applyMatrix4(m)]);
       if (this.pts.length > N) this.pts.length = N;
     }

@@ -945,6 +945,20 @@ test('Whole adventure with enemies: three camp bosses, the Baron, Ruffy home, th
   }
   assert(g.quest.delivered);
 });
+test('A hero knocked out mid-air can jump-attack again after coming back', () => {
+  const g = fresh();
+  assert(g.jump());
+  tick(g, 0.2);
+  assert(g.attack(), 'first jump attack');
+  g.forceSwitch(1);
+  tick(g, 1);
+  assert(g.switchTo(0));
+  tick(g, 1);
+  g.player.cooldown = 0;
+  assert(g.jump());
+  tick(g, 0.2);
+  assert(g.attack(), 'jump attack works again');
+});
 // Firewood can open early when Ruffy was rescued in the pixel game (shared-save.js).
 test('Firewood started before the 3D rescue can switch back without losing rescue progress', () => {
   const g = fresh();

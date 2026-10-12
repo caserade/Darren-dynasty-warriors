@@ -358,8 +358,20 @@ try {
     Object.entries(saved).every(
       ([k, v]) => k in PAD_DEFAULTS && Number.isInteger(v) && v >= 0 && v < 32
     )
-  )
+  ) {
     padBindings = { ...PAD_DEFAULTS, ...saved };
+    // Saves from before Paws/Scarf and Special existed may already use LT/RT for something
+    // else; give a newer action a free button instead of letting one button do two things.
+    const FREE = [6, 7, 4, 5, 10, 11, 8, 3, 2, 1, 0, 12, 13, 14, 15];
+    for (const k of Object.keys(PAD_DEFAULTS)) {
+      if (k in saved) continue;
+      const used = Object.entries(padBindings)
+        .filter(([o]) => o !== k)
+        .map(([, v]) => v);
+      if (used.includes(padBindings[k]))
+        padBindings[k] = FREE.find((b) => !used.includes(b)) ?? padBindings[k];
+    }
+  }
 } catch {}
 // Combo, dodge and pause buttons chosen in either game carry over.
 const SHARED_BUTTON_NAMES = { attack: 'combo', dodge: 'dodge', pause: 'pause' };

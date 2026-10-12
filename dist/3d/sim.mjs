@@ -825,6 +825,8 @@ export class Game {
     if (this.paused || a.air > 0 || a.action || a.charging) return false;
     a.air = 0.01;
     a.vy = 7.2;
+    // A hero knocked out mid-air never touched down, so clear the jump-attack flag here too.
+    a.airAttacked = false;
     a.animation = 'Jump';
     a.cooldown = 0.12;
     this.emit('jump', { actor: this.selected });
