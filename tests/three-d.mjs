@@ -311,6 +311,58 @@ test('Tormund parries from a standstill and counters; with the stick held he sti
   assert(g.dodge());
   assert.equal(g.player.action.name, 'Dodge');
 });
+test("Bucky's four-hit mallet string carries armor; finishers, ground pound and rolling dash", () => {
+  const g = fresh();
+  g.switchTo(2);
+  place(g, 40, 52);
+  for (const a of g.actors) if (a !== g.player) Object.assign(a, { x: 10, z: 10 });
+  const names = [];
+  for (let i = 0; i < 4; i++) {
+    assert(g.attack());
+    const q = g.player.action;
+    names.push(q.name);
+    if (i === 1) {
+      // A grunt's jab doesn't interrupt a heavy swing.
+      g.hurtHero(8, 0);
+      assert.equal(g.player.action, q);
+    }
+    while (g.player.action === q) tick(g, 1 / 60);
+  }
+  assert.deepEqual(names, ['BukN1', 'BukN2', 'BukN3', 'BukN4']);
+  for (let n = 1; n <= 4; n++) {
+    const h = fresh();
+    h.switchTo(2);
+    for (let i = 0; i < n; i++) {
+      assert(h.attack());
+      while (!(h.player.action?.type === 'normal' && h.player.action.index === i)) tick(h, 1 / 60);
+    }
+    assert(h.chargeStart());
+    const q = h.player.action;
+    while (h.player.action === q) tick(h, 1 / 60);
+    assert.equal(h.player.action.name, 'BukC' + (n + 1));
+  }
+  tick(g, 2);
+  assert(g.jump());
+  tick(g, 0.2);
+  assert(g.attack());
+  assert.equal(g.player.action.name, 'BukJump');
+  tick(g, 1.5);
+  tick(g, 1.2, { x: 1, z: 0 });
+  assert(g.attack());
+  assert.equal(g.player.action.name, 'BukDash');
+  // The log splitter cracks a straight line well beyond arm's reach, but not off to the side.
+  const k = fresh();
+  k.switchTo(2);
+  place(k, 40, 52, 0);
+  for (const a of k.actors) if (a !== k.player) Object.assign(a, { x: 10, z: 10 });
+  const ahead = foe(k, 'bale', 40, 57.5),
+    side = foe(k, 'bale', 43.5, 53);
+  for (const e of [ahead, side]) ((e.hp = e.max = 500), (e.speed = 0));
+  k.startMove(k.player, k.moveset().charge[4], 'charge', 4);
+  k.player.yaw = 0;
+  tick(k, 1);
+  assert(ahead.hp < 500 && side.hp === 500);
+});
 for (let i = 0; i < 3; i++)
   test(CAST[i] + ' charged attack reaches a practice post once', () => {
     const g = fresh();

@@ -16,6 +16,7 @@
 //   shots  [{ t, spread, speed, dmg, r }] snowballs thrown forward
 //   lunge  [[t0, t1, speed]] forward travel     hop  { t, vy } small jump
 //   pulse  { from, to, every, r, dmg, kb, shots } repeated hits (specials)
+//   line   the hit is a straight crack along his facing (r long, about 2 m wide)
 //   inv    [t0, t1] untouchable      armor  shrugs off staggers    steer  move while attacking
 //   parry  (moveset) { dur, window, counter }: dodge from standing blocks hits, then counters
 const TAU = Math.PI * 2;
@@ -375,37 +376,112 @@ const TORMUND = {
   },
 };
 
-// Bucky keeps his first three-hit string until his own passes.
-const legacy = (dmg, clipPrefix = 'Attack') => ({
-  name: 'Standard',
+// ---- Bucky · Mallet: slow, heavy and hard to stop; every swing carries him into the next ----
+// Holding Charge from neutral keeps his Timber quake power move (ChargeAttack in sim.mjs).
+const BUCKY = {
+  name: 'Mallet',
   normal: [
     {
-      anim: clipPrefix + '1',
-      dur: 0.55,
-      chain: 0.4,
-      hits: [{ t: 0.24, r: 2.1, arc: Math.PI * 1.4, dmg: dmg[0], kb: 4 }],
+      anim: 'BukN1',
+      dur: 0.6,
+      chain: 0.36,
+      armor: true,
+      lunge: [[0.05, 0.28, 2.6]],
+      hits: [{ t: 0.24, r: 2.6, arc: 2.6, dmg: 22, kb: 6 }],
     },
     {
-      anim: clipPrefix + '2',
-      dur: 0.65,
-      chain: 0.48,
-      hits: [{ t: 0.3, r: 2.1, arc: Math.PI * 1.4, dmg: dmg[1], kb: 4 }],
+      anim: 'BukN2',
+      dur: 0.62,
+      chain: 0.38,
+      armor: true,
+      lunge: [[0.05, 0.28, 2.6]],
+      hits: [{ t: 0.24, r: 2.6, arc: 2.6, dmg: 24, kb: 7 }],
     },
     {
-      anim: clipPrefix + '3',
-      dur: 0.9,
-      chain: 0.75,
-      hits: [{ t: 0.43, r: 2.1, arc: Math.PI * 1.4, dmg: dmg[2], kb: 8 }],
+      anim: 'BukN3',
+      dur: 0.8,
+      chain: 0.54,
+      armor: true,
+      lunge: [[0.1, 0.34, 2.4]],
+      hits: [{ t: 0.38, r: 2.4, arc: 1.5, dmg: 32, kb: 9, off: 0.8, down: true, ring: 1.9 }],
+    },
+    {
+      anim: 'BukN4',
+      dur: 1.0,
+      chain: 0.86,
+      armor: true,
+      hits: [
+        { t: 0.32, r: 3, arc: TAU, dmg: 20, kb: 8 },
+        { t: 0.54, r: 3.1, arc: TAU, dmg: 26, kb: 12, down: true, ring: 3.1 },
+      ],
     },
   ],
-  charge: [null],
-});
+  charge: [
+    null,
+    {
+      anim: 'BukC2',
+      dur: 0.66,
+      lunge: [[0.08, 0.26, 4.5]],
+      hits: [{ t: 0.24, r: 2, arc: 1.8, dmg: 24, kb: 18 }],
+    },
+    {
+      anim: 'BukC3',
+      dur: 0.78,
+      armor: true,
+      hits: [{ t: 0.32, r: 2.5, arc: 1.7, dmg: 28, kb: 2, launch: 10 }],
+    },
+    {
+      anim: 'BukC4',
+      dur: 1.4,
+      armor: true,
+      steer: 2.4,
+      pulse: { from: 0.18, to: 1.08, every: 0.15, r: 3.2, dmg: 9, kb: 8 },
+      hits: [{ t: 1.2, r: 3.4, arc: TAU, dmg: 24, kb: 16, down: true, ring: 3.4 }],
+    },
+    {
+      anim: 'BukC5',
+      dur: 1.1,
+      armor: true,
+      hits: [{ t: 0.6, r: 7, arc: 0.5, dmg: 46, kb: 14, down: true, line: true, ring: 2.4 }],
+    },
+  ],
+  jump: {
+    anim: 'BukJump',
+    dur: 0.62,
+    dive: -16,
+    hits: [{ t: 0.3, r: 3.2, arc: TAU, dmg: 30, kb: 12, down: true, ring: 3.2 }],
+  },
+  dash: {
+    anim: 'BukDash',
+    dur: 0.8,
+    armor: true,
+    lunge: [[0, 0.62, 8]],
+    hits: [
+      { t: 0.2, r: 1.9, arc: 2, dmg: 12, kb: 10 },
+      { t: 0.4, r: 1.9, arc: 2, dmg: 12, kb: 10 },
+      { t: 0.6, r: 2, arc: 2, dmg: 14, kb: 14, down: true },
+    ],
+  },
+  special: {
+    anim: 'BukSpecial',
+    name: 'TIMBER AVALANCHE',
+    dur: 2.6,
+    inv: [0, 2.6],
+    steer: 1.4,
+    hits: [
+      { t: 0.5, r: 4, arc: TAU, dmg: 22, kb: 10, down: true, ring: 4 },
+      { t: 1.0, r: 4, arc: TAU, dmg: 22, kb: 10, down: true, ring: 4 },
+      { t: 1.5, r: 4.5, arc: TAU, dmg: 24, kb: 10, down: true, ring: 4.5 },
+      { t: 2.2, r: 7, arc: TAU, dmg: 50, kb: 16, down: true, ring: 7 },
+    ],
+  },
+};
 
 export const MOVESETS = {
   paws: PAWS,
   scarf: SCARF,
   tormund: TORMUND,
-  bucky: legacy([20, 22, 34]),
+  bucky: BUCKY,
 };
 // Which moveset a hero uses (Darren's depends on his chosen weapon style).
 export function movesetKey(hero, style = 'paws') {

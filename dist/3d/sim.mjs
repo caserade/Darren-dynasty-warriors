@@ -5,7 +5,7 @@ export const CAST = ['Darren', 'Tormund', 'Bucky'];
 export const KITS = [
   { attack: 'Paw combo', charge: 'Packed snowball', color: 0xe64b42, speed: 5.8 },
   { attack: 'Sword and shield', charge: 'Crescent cleave', color: 0xe5bc61, speed: 5.5 },
-  { attack: 'Mallet combo', charge: 'Timber quake', color: 0x518fcb, speed: 5.1 },
+  { attack: 'Mallet', charge: 'Timber quake', color: 0x518fcb, speed: 5.1 },
 ];
 const TAU = Math.PI * 2,
   S = 0.04;
@@ -945,7 +945,12 @@ export class Game {
       power: heavy ? 1 : 0,
       move: q.anim,
     });
-    if (count) this.emit('hitstop', { t: h.down || h.launch ? 0.075 : heavy ? 0.06 : 0.035 });
+    if (count)
+      this.emit('hitstop', {
+        t: h.down || h.launch ? 0.075 : heavy ? 0.06 : 0.035,
+        actor: q.kind,
+        heavy,
+      });
     return count;
   }
   // A straight crack along the hero's facing: ahead of him and within about a metre of the line.

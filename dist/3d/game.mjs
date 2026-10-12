@@ -672,7 +672,11 @@ function events() {
     }
     if (e.type === 'snowburst') ring(e);
     if (e.type === 'throw') tone(380, 0.2);
-    if (e.type === 'hitstop') hitstop = Math.max(hitstop, e.t);
+    if (e.type === 'hitstop') {
+      hitstop = Math.max(hitstop, e.t);
+      // Bucky's heavy blows thump the camera.
+      if (e.actor === 2 && e.heavy) shake = Math.max(shake, 0.22);
+    }
     if (e.type === 'parry') {
       ring({ x: e.x, z: e.z, y: e.y - 1.2, r: 1.6, strong: true, color: 0xfff1b0 });
       floater(e.x, e.y + 0.3, e.z, 'PARRY!', 'heal');

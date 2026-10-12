@@ -2633,6 +2633,613 @@ function buckyLocomotion() {
   return L;
 }
 
+// ---- Bucky · Mallet attacks (timed to moves.mjs) ----
+const BG_M = [
+  [0.5, -0.6, 0.5],
+  [0.2, 0.3, 0.95],
+  [0.2, 0.85, 0.4],
+];
+const B_GUARD = {
+  ...crouch(0.2, 0.5, 10),
+  hips: { p: [0, -0.04, 0] },
+  spine: [4, 0, 0],
+  chest: [2, 0, 0],
+  head: [-6, 0, 0],
+  ...B_MAL(...BG_M),
+  ...B_FREE([-0.45, -0.55, 0.6], [-0.1, -0.2, 1], [0, 0, 1]),
+};
+const BGd = (p = {}) => mix(B_GUARD, p);
+const BM = (arm, fore, axis) => B_MAL(arm, fore, axis);
+// Bucky curled into a ball, rolling turns times over u (0..1).
+function buckyBall(u0, turns) {
+  const u = u0,
+    th = TAU * turns * u,
+    tuck = sin(PI * clamp01(u0 / 0.95)) ** 0.4,
+    oy = 0.3,
+    oz = 0.1,
+    cy = lerp(0.55 + oy, 0.62, tuck);
+  return {
+    hips: {
+      r: [360 * turns * u, 0, 0],
+      p: [0, cy - (oy * cos(th) - oz * sin(th)) - 0.55, oz - (oy * sin(th) + oz * cos(th))],
+    },
+    spine: [35 * tuck, 0, 0],
+    chest: [25 * tuck, 0, 0],
+    neck: [25 * tuck, 0, 0],
+    head: [20 * tuck, 0, 0],
+    ...legs([90 * tuck, 110 * tuck, 0, 10], [90 * tuck, 110 * tuck, 0, 10]),
+    ...BM([0.5, -0.5, 0.6], [0, 0.4, 0.9], [0.2, 0.6, -0.8]),
+    ...B_FREE([-0.5, -0.5, 0.6], [0, -0.3, 0.95]),
+    tail1: [40 * tuck, 0, 0],
+    tail2: [30 * tuck, 0, 0],
+  };
+}
+function buckyMallet() {
+  const M = MOVESETS.bucky,
+    N = M.normal,
+    Cc = M.charge;
+  const smashUp = BM([0.3, 0.95, -0.1], [0.1, 0.4, -0.9], [0, 0.2, -1]),
+    smashDown = BM([0.15, -0.2, 1], [0, -0.6, 0.8], [0, -0.6, 0.8]);
+  return {
+    // N1: a big flat swing from his left across to his right; the weight drags him round.
+    BukN1: {
+      dur: N[0].dur,
+      keys: [
+        [0, BGd()],
+        [
+          0.13,
+          BGd({
+            hips: { r: [0, 30, 0] },
+            chest: [0, 14, 0],
+            head: [0, -20, 0],
+            ...BM([0.9, 0, -0.3], [0.8, 0.1, -0.6], [0.5, 0.2, -0.85]),
+          }),
+          0.8,
+        ],
+        [
+          0.24,
+          BGd({
+            hips: { r: [4, -18, 4], p: [0, -0.06, 0.08] },
+            chest: [4, -20, 0],
+            head: [-4, 12, 0],
+            ...legs([30, 30, 0, 10], [-10, 20, 0, 10]),
+            ...BM([0.1, 0, 1], [-0.5, 0, 0.85], [-0.6, 0.15, 0.8]),
+            tail1: [0, 25, 0],
+          }),
+          0.8,
+        ],
+        [
+          0.4,
+          BGd({
+            hips: { r: [4, -34, 4] },
+            chest: [4, -26, 0],
+            ...BM([-0.6, -0.2, 0.6], [-0.9, -0.1, 0.2], [-0.8, 0, -0.5]),
+            tail1: [0, 30, 0],
+          }),
+          0.4,
+        ],
+        [
+          N[0].dur,
+          BGd({
+            hips: { r: [0, -20, 0] },
+            ...BM([-0.3, -0.4, 0.8], [-0.6, -0.1, 0.8], [-0.4, 0.4, 0.8]),
+          }),
+        ],
+      ],
+    },
+    // N2: the backswing from his right back across to his left.
+    BukN2: {
+      dur: N[1].dur,
+      keys: [
+        [
+          0,
+          BGd({
+            hips: { r: [0, -20, 0] },
+            ...BM([-0.3, -0.4, 0.8], [-0.6, -0.1, 0.8], [-0.4, 0.4, 0.8]),
+          }),
+        ],
+        [
+          0.12,
+          BGd({
+            hips: { r: [0, -34, 0] },
+            chest: [0, -16, 0],
+            head: [0, 20, 0],
+            ...BM([-0.6, 0, 0.6], [-0.95, 0.1, -0.1], [-0.6, 0.2, -0.75]),
+          }),
+          0.8,
+        ],
+        [
+          0.24,
+          BGd({
+            hips: { r: [4, 22, -4], p: [0, -0.06, 0.08] },
+            chest: [4, 24, 0],
+            head: [-4, -14, 0],
+            ...legs([-10, 20, 0, 10], [30, 30, 0, 10]),
+            ...BM([0.25, 0, 1], [0.6, 0, 0.8], [0.8, 0.1, 0.55]),
+            tail1: [0, -25, 0],
+          }),
+          0.8,
+        ],
+        [
+          0.4,
+          BGd({
+            hips: { r: [4, 32, -4] },
+            chest: [4, 26, 0],
+            ...BM([0.9, -0.1, 0], [0.8, -0.1, -0.5], [0.6, 0, -0.8]),
+            tail1: [0, -30, 0],
+          }),
+          0.4,
+        ],
+        [N[1].dur, BGd()],
+      ],
+    },
+    // N3: overhead smash, up over his head and straight down in front.
+    BukN3: {
+      dur: N[2].dur,
+      keys: [
+        [0, BGd()],
+        [
+          0.26,
+          BGd({
+            hips: { r: [-10, 0, 0], p: [0, 0.03, -0.04] },
+            spine: [-12, 0, 0],
+            chest: [-10, 0, 0],
+            head: [-10, 0, 0],
+            ...legs([0, 4, 0, 10], [0, 4, 0, 10]),
+            ...smashUp,
+            ...B_FREE([-0.4, 0.9, 0], [-0.1, 0.4, -0.9]),
+            tail1: [-20, 0, 0],
+          }),
+          0.2,
+        ],
+        [
+          0.38,
+          BGd({
+            ...crouch(0.6, 0.5, 12),
+            hips: { r: [20, 0, 0], p: [0, -0.1, 0.12] },
+            spine: [18, 0, 0],
+            chest: [10, 0, 0],
+            head: [-24, 0, 0],
+            ...smashDown,
+            ...B_FREE([-0.3, -0.3, 0.9], [0, -0.6, 0.8]),
+            tail1: [25, 0, 0],
+          }),
+          0.05,
+        ],
+        [
+          0.6,
+          BGd({
+            ...crouch(0.55, 0.5, 12),
+            hips: { r: [16, 0, 0], p: [0, -0.09, 0.1] },
+            spine: [14, 0, 0],
+            ...smashDown,
+          }),
+          0.4,
+        ],
+        [N[2].dur, BGd()],
+      ],
+    },
+    // N4: full-body spin twice round with the mallet out at arm's length.
+    BukN4: {
+      dur: N[3].dur,
+      fn: spinKeys(0.16, 0.62, 2, (u, t) => {
+        const e = sin(PI * clamp01((t - 0.04) / 0.86));
+        return BGd({
+          ...crouch(0.3 * e, 0.5, 16),
+          hips: { r: [-8 * e, 0, 0] },
+          spine: [-8 * e, 0, -10 * e],
+          head: [6 * e, -10 * e, 0],
+          ...BM(
+            lerpV(BG_M[0], [1, 0.05, 0.1], e),
+            lerpV(BG_M[1], [1, 0.08, 0.2], e),
+            lerpV(BG_M[2], [0.25, 0.15, 1], e)
+          ),
+          ...B_FREE([-0.8, -0.2, 0.3], [-0.5, 0, 0.8]),
+          tail1: [-10 * e, -30 * e, 0],
+          tail2: [0, -20 * e, 0],
+        });
+      }),
+    },
+    // C2 belly bump: rocks back, then shoves the big belly forward into them.
+    BukC2: {
+      dur: Cc[1].dur,
+      keys: [
+        [0, BGd()],
+        [
+          0.12,
+          BGd({
+            hips: { r: [12, 0, 0], p: [0, -0.04, -0.08] },
+            spine: [14, 0, 0],
+            ...BM([0.7, -0.5, -0.4], [0.5, 0.3, -0.8], [0.3, 0.6, -0.7]),
+            ...B_FREE([-0.7, -0.5, -0.4], [-0.5, -0.3, -0.8]),
+          }),
+          0.6,
+        ],
+        [
+          0.24,
+          BGd({
+            hips: { r: [-22, 0, 0], p: [0, 0.02, 0.18] },
+            spine: [-18, 0, 0],
+            chest: [-6, 0, 0],
+            head: [14, 0, 0],
+            ...legs([30, 20, 0, 10], [-25, 10, 0, 10]),
+            ...BM([0.85, -0.2, -0.45], [0.6, 0.4, -0.7], [0.3, 0.7, -0.6]),
+            ...B_FREE([-0.85, -0.2, -0.45], [-0.6, 0, -0.8]),
+            tail1: [-20, 0, 0],
+          }),
+          0.2,
+        ],
+        [
+          0.42,
+          BGd({
+            hips: { r: [-10, 0, 0], p: [0, 0, 0.12] },
+            spine: [-8, 0, 0],
+            ...legs([24, 20, 0, 10], [-18, 12, 0, 10]),
+          }),
+          0.5,
+        ],
+        [Cc[1].dur, BGd()],
+      ],
+    },
+    // C3 uppercut: squats with the mallet low, then heaves it up from the snow.
+    BukC3: {
+      dur: Cc[2].dur,
+      keys: [
+        [0, BGd()],
+        [
+          0.16,
+          BGd({
+            ...crouch(0.7, 0.5, 12),
+            spine: [22, 0, 0],
+            chest: [10, 0, 0],
+            ...BM([0.3, -0.9, 0.3], [0.1, -0.7, 0.7], [0.1, -0.6, 0.8]),
+          }),
+          0.7,
+        ],
+        [
+          0.32,
+          BGd({
+            hips: { r: [-12, 0, 0], p: [0, 0.05, 0.05] },
+            spine: [-14, 0, 0],
+            chest: [-10, 0, 0],
+            head: [-16, 0, 0],
+            ...legs([10, 4, -25, 10], [-6, 4, -25, 10]),
+            ...BM([0.25, 0.95, 0.2], [0.1, 1, 0], [0.05, 0.6, -0.8]),
+            ...B_FREE([-0.6, 0.6, 0.2], [-0.3, 0.9, 0.2]),
+            tail1: [-25, 0, 0],
+          }),
+          0.4,
+        ],
+        [
+          0.52,
+          BGd({
+            hips: { r: [-4, 0, 0] },
+            ...BM([0.35, 0.8, 0.3], [0.2, 0.9, -0.3], [0.1, 0.1, -1]),
+          }),
+          0.4,
+        ],
+        [Cc[2].dur, BGd()],
+      ],
+    },
+    // C4 hammer-throw whirl: leans back against the mallet's weight and spins four times.
+    BukC4: {
+      dur: Cc[3].dur,
+      fn: spinKeys(0.1, 1.22, 4, (u, t) => {
+        const e = smooth(clamp01(t / 0.14)) * (1 - smooth(clamp01((t - 1.2) / 0.18)));
+        return BGd({
+          ...crouch(0.25 * e, 0.5, 16),
+          hips: { r: [-14 * e, 0, 0], p: [0, 0, -0.06 * e] },
+          spine: [-14 * e, 0, 0],
+          chest: [-6 * e, 0, 0],
+          head: [10 * e, 0, 0],
+          ...BM(
+            lerpV(BG_M[0], [1, 0.12, 0.15], e),
+            lerpV(BG_M[1], [1, 0.15, 0.25], e),
+            lerpV(BG_M[2], [0.25, 0.2, 1], e)
+          ),
+          ...B_FREE(
+            lerpV([-0.45, -0.55, 0.6], [0.5, 0.1, 0.8], e),
+            lerpV([-0.1, -0.2, 1], [0.9, 0.1, 0.3], e)
+          ),
+          tail1: [-15 * e, -30 * e, 0],
+          tail2: [-10 * e, -20 * e, 0],
+        });
+      }),
+    },
+    // C5 log splitter: a hop and a huge two-paw overhead chop that cracks the ground in a line.
+    BukC5: {
+      dur: Cc[4].dur,
+      keys: [
+        [0, BGd()],
+        [
+          0.14,
+          BGd({
+            ...crouch(0.6, 0.5, 12),
+            spine: [16, 0, 0],
+            ...BM([0.4, -0.7, -0.4], [0.2, -0.3, -0.9], [0.1, 0.2, -1]),
+          }),
+          0.6,
+        ],
+        [
+          0.42,
+          BGd({
+            hips: { r: [-16, 0, 0], p: [0, 0.18, -0.04] },
+            spine: [-18, 0, 0],
+            chest: [-12, 0, 0],
+            head: [-14, 0, 0],
+            ...legs([20, 50, 0, 10], [10, 40, 0, 10]),
+            ...smashUp,
+            ...B_FREE([0.2, 0.95, -0.2], [0.3, 0.4, -0.85]),
+            tail1: [-30, 0, 0],
+          }),
+          0.3,
+        ],
+        [
+          0.6,
+          BGd({
+            ...crouch(0.75, 0.5, 14),
+            hips: { r: [26, 0, 0], p: [0, -0.14, 0.16] },
+            spine: [22, 0, 0],
+            chest: [12, 0, 0],
+            head: [-30, 0, 0],
+            ...smashDown,
+            ...B_FREE([0.15, -0.25, 1], [0.2, -0.6, 0.8]),
+            tail1: [35, 0, 0],
+          }),
+          0.05,
+        ],
+        [
+          0.86,
+          BGd({
+            ...crouch(0.65, 0.5, 14),
+            hips: { r: [20, 0, 0], p: [0, -0.12, 0.14] },
+            spine: [18, 0, 0],
+            ...smashDown,
+            ...B_FREE([0.15, -0.25, 1], [0.2, -0.6, 0.8]),
+          }),
+          0.4,
+        ],
+        [Cc[4].dur, BGd()],
+      ],
+    },
+    // Jump attack, ground pound: mallet overhead in the air, then everything comes down at once.
+    BukJump: {
+      dur: M.jump.dur,
+      keys: [
+        [
+          0,
+          {
+            ...legs([30, 50, 0, 10], [20, 40, 0, 10]),
+            ...BM([0.6, 0.5, 0], [0.4, 0.9, 0], [0.2, 0.9, -0.3]),
+          },
+        ],
+        [
+          0.16,
+          {
+            hips: { r: [-14, 0, 0] },
+            spine: [-14, 0, 0],
+            ...legs([40, 70, 0, 12], [30, 60, 0, 12]),
+            ...smashUp,
+            ...B_FREE([-0.3, 0.9, 0], [-0.1, 0.4, -0.9]),
+          },
+          0.3,
+        ],
+        [
+          0.3,
+          {
+            ...crouch(0.75, 0.5, 14),
+            hips: { r: [24, 0, 0], p: [0, -0.14, 0.12] },
+            spine: [22, 0, 0],
+            head: [-28, 0, 0],
+            ...smashDown,
+            ...B_FREE([-0.3, -0.3, 0.9], [0, -0.6, 0.8]),
+            tail1: [35, 0, 0],
+          },
+          0.05,
+        ],
+        [
+          0.5,
+          {
+            ...crouch(0.6, 0.5, 14),
+            hips: { r: [18, 0, 0], p: [0, -0.1, 0.1] },
+            spine: [16, 0, 0],
+            ...smashDown,
+          },
+          0.5,
+        ],
+        [M.jump.dur, BGd()],
+      ],
+    },
+    // Dash attack: curls into a ball and bowls through them.
+    BukDash: { dur: M.dash.dur, fn: (p, t) => buckyBall(clamp01(t / 0.7), 2) },
+    // Timber Avalanche: three hopping slams, then one leap and a slam that shakes the whole valley.
+    BukSpecial: {
+      dur: M.special.dur,
+      fn: (p, t) => {
+        const slams = [0.5, 1.0, 1.5],
+          final = 2.2;
+        let pose = BGd();
+        for (const h of slams) {
+          const u = (t - (h - 0.3)) / 0.45;
+          if (u >= 0 && u <= 1) {
+            const air = sin(PI * clamp01(u / 0.66)),
+              impact = Math.exp(-(((t - h) / 0.06) ** 2)),
+              down = clamp01((u - 0.5) / 0.2);
+            pose = BGd({
+              ...crouch(0.6 * impact + 0.2 * (1 - air), 0.5, 14),
+              hips: {
+                r: [-12 * air + 24 * impact, 0, 0],
+                p: [0, 0.22 * air - 0.12 * impact, 0.1 * impact],
+              },
+              spine: [-14 * air + 20 * impact, 0, 0],
+              head: [-14 * air - 20 * impact, 0, 0],
+              ...BM(
+                lerpV([0.3, 0.95, -0.1], [0.15, -0.2, 1], down),
+                lerpV([0.1, 0.4, -0.9], [0, -0.6, 0.8], down),
+                lerpV([0, 0.2, -1], [0, -0.6, 0.8], down)
+              ),
+              ...B_FREE(
+                lerpV([-0.3, 0.9, 0], [-0.3, -0.3, 0.9], down),
+                lerpV([-0.1, 0.4, -0.9], [0, -0.6, 0.8], down)
+              ),
+              tail1: [-20 * air + 30 * impact, 0, 0],
+            });
+          }
+        }
+        const u = (t - (final - 0.55)) / 0.85;
+        if (u >= 0) {
+          const air = sin(PI * clamp01(u / 0.65)),
+            impact = Math.exp(-(((t - final) / 0.08) ** 2)),
+            down = clamp01((u - 0.55) / 0.12),
+            rest = smooth(clamp01((t - 2.35) / 0.25));
+          pose = BGd({
+            ...crouch((0.75 * Math.max(impact, down) + 0.2 * (1 - air)) * (1 - rest), 0.5, 14),
+            hips: {
+              r: [(-18 * air + 28 * down) * (1 - rest), 0, 0],
+              p: [0, 0.35 * air - 0.14 * down * (1 - rest), 0.14 * down * (1 - rest)],
+            },
+            spine: [(-18 * air + 24 * down) * (1 - rest), 0, 0],
+            head: [(-16 * air - 30 * down) * (1 - rest), 0, 0],
+            ...legs([30 * air, 60 * air, 0, 12], [20 * air, 50 * air, 0, 12]),
+            ...BM(
+              lerpV(lerpV([0.3, 0.95, -0.1], [0.15, -0.2, 1], down), BG_M[0], rest),
+              lerpV(lerpV([0.1, 0.4, -0.9], [0, -0.6, 0.8], down), BG_M[1], rest),
+              lerpV(lerpV([0, 0.2, -1], [0, -0.6, 0.8], down), BG_M[2], rest)
+            ),
+            ...B_FREE(
+              lerpV([0.2, 0.95, -0.2], [0.15, -0.25, 1], down),
+              lerpV([0.3, 0.4, -0.85], [0.2, -0.6, 0.8], down)
+            ),
+            tail1: [(-30 * air + 35 * down) * (1 - rest), 0, 0],
+          });
+        }
+        return pose;
+      },
+    },
+    // Charging the Timber quake: mallet dragged back low behind him, knees bent, tail thumping.
+    Charge: {
+      dur: 0.5,
+      loop: true,
+      fn: (p) =>
+        BGd({
+          ...crouch(0.45, 0.5, 14),
+          hips: { r: [8, 20, 0], p: [0, -0.06, 0] },
+          spine: [10, 0, 0],
+          head: [-12, -16, 0],
+          ...BM([0.75, -0.55, -0.4], [0.5, -0.4, -0.75], [0.3, 0.3 + 0.05 * S(p, 2), -0.9]),
+          ...B_FREE([-0.4, -0.5, 0.7], [-0.1, -0.2, 1]),
+          tail1: [10 + 10 * S(p, 2), 0, 0],
+        }),
+    },
+    // Timber quake (hold move): impact at 0.42 of 1.05 s, a leaping slam that rings out all round.
+    ChargeAttack: {
+      dur: 1.05,
+      keys: [
+        [
+          0,
+          BGd({
+            ...crouch(0.45, 0.5, 14),
+            ...BM([0.75, -0.55, -0.4], [0.5, -0.4, -0.75], [0.3, 0.3, -0.9]),
+          }),
+        ],
+        [
+          0.28,
+          BGd({
+            hips: { r: [-16, 0, 0], p: [0, 0.16, -0.04] },
+            spine: [-18, 0, 0],
+            head: [-14, 0, 0],
+            ...legs([20, 50, 0, 10], [10, 40, 0, 10]),
+            ...smashUp,
+            ...B_FREE([0.2, 0.95, -0.2], [0.3, 0.4, -0.85]),
+          }),
+          0.3,
+        ],
+        [
+          0.42,
+          BGd({
+            ...crouch(0.75, 0.5, 14),
+            hips: { r: [26, 0, 0], p: [0, -0.14, 0.16] },
+            spine: [22, 0, 0],
+            head: [-30, 0, 0],
+            ...smashDown,
+            ...B_FREE([0.15, -0.25, 1], [0.2, -0.6, 0.8]),
+            tail1: [35, 0, 0],
+          }),
+          0.05,
+        ],
+        [
+          0.7,
+          BGd({
+            ...crouch(0.6, 0.5, 14),
+            hips: { r: [18, 0, 0], p: [0, -0.1, 0.12] },
+            spine: [16, 0, 0],
+            ...smashDown,
+          }),
+          0.4,
+        ],
+        [1.05, BGd()],
+      ],
+    },
+    // Victory flex: plants the mallet, both arms up in a strongman flex, tail wagging.
+    Celebrate: {
+      dur: 1.8,
+      fn: (p, t) => {
+        const k = smooth(clamp01((t - 0.15) / 0.35)) * (1 - smooth(clamp01((t - 1.45) / 0.3))),
+          pump = 0.12 * sin(TAU * 3 * t) * k;
+        return {
+          hips: { r: [-4 * k, 0, 0], p: [0, 0.02 * k, 0] },
+          spine: [-8 * k, 0, 0],
+          chest: [-6 * k, 0, 0],
+          head: [-12 * k, 0, 0],
+          ...BM(
+            lerpV([0.45, -0.65, 0.45], [0.95, 0.15 + pump, 0.1], k),
+            lerpV([-0.15, 0.85, 0.35], [0, 1, 0.1], k),
+            lerpV([-0.05, 0.55, -0.85], [0.3, 0.9, 0.1], k)
+          ),
+          ...B_FREE(
+            lerpV([-0.4, -0.92, 0.1], [-0.95, 0.15 + pump, 0.1], k),
+            lerpV([-0.15, -0.9, 0.35], [0, 1, 0.1], k),
+            [0, 1, -0.2]
+          ),
+          ...tailWave(3, p * 4, 18 * k, 4 * k, 0.1),
+        };
+      },
+    },
+    // Interact: a big bend from the waist to look, paw on knee.
+    Interact: {
+      dur: 1.1,
+      keys: [
+        [0, {}],
+        [
+          0.35,
+          {
+            ...crouch(0.35, 0.5, 12),
+            spine: [24, 0, 0],
+            chest: [14, 0, 0],
+            neck: [10, 0, 0],
+            head: [6, 0, 0],
+            ...B_FREE([-0.3, -0.85, 0.4], [0.1, -0.8, 0.6]),
+          },
+          0.3,
+        ],
+        [
+          0.8,
+          {
+            ...crouch(0.35, 0.5, 12),
+            spine: [24, 0, 0],
+            chest: [14, 0, 0],
+            neck: [10, 6, 0],
+            head: [6, 10, 0],
+            ...B_FREE([-0.3, -0.85, 0.4], [0.1, -0.8, 0.6]),
+          },
+          0.3,
+        ],
+        [1.1, {}],
+      ],
+    },
+  };
+}
+
 // ---- Darren · Polka Scarf (timed to moves.mjs) ----
 // The scarf's free end is in his right paw; the ribbon itself is simulated in game.mjs (ScarfRibbon),
 // so these clips only have to swing the paw on clean arcs. A lash = wind back, whip the paw through
@@ -3236,7 +3843,7 @@ export const LIBRARY = {
     clips: () => ({ ...darrenLocomotion(), ...darrenPaws(), ...darrenScarf() }),
   },
   Tormund: { base: T_BASE, clips: () => ({ ...tormundLocomotion(), ...tormundSword() }) },
-  Bucky: { base: B_BASE, clips: () => ({ ...buckyLocomotion() }) },
+  Bucky: { base: B_BASE, clips: () => ({ ...buckyLocomotion(), ...buckyMallet() }) },
 };
 
 // Builds every authored clip for one rig. Specs with fn/keys and dur become AnimationClips.
