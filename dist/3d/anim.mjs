@@ -7,7 +7,9 @@
 //   - an array or { r } rotates that bone by Euler degrees (order YXZ) about character axes,
 //     on top of whatever its parent does (forward kinematics);
 //   - { aim } points the bone along a character-space direction no matter what its parents do,
-//     with tw degrees of twist around itself;
+//     with tw degrees of twist around itself; { aim, up } or { aim, face } also turns the bone about
+//     its aim so the axis that pointed up (or forward) at rest points as near as it can to that
+//     direction: how a held sword blade or a shield face is steered;
 //   - hips.p moves the hips in metres (root motion stays in the simulation, this is body bob).
 // Rotations in a key are added to the clip's base pose; aims replace it.
 import * as THREE from 'three';
@@ -18,7 +20,15 @@ const DEG = Math.PI / 180,
   Q1 = new THREE.Quaternion(),
   Q2 = new THREE.Quaternion(),
   Q3 = new THREE.Quaternion(),
-  E = new THREE.Euler(0, 0, 0, 'YXZ');
+  E = new THREE.Euler(0, 0, 0, 'YXZ'),
+  REF_UP = new THREE.Vector3(0, 1, 0),
+  REF_FWD = new THREE.Vector3(0, 0, 1),
+  RL = new THREE.Vector3(),
+  AL = new THREE.Vector3(),
+  ZL = new THREE.Vector3(),
+  ZT = new THREE.Vector3(),
+  ML = new THREE.Matrix4(),
+  MT = new THREE.Matrix4();
 
 // Role names used by poses, mapped to each rig's bone names.
 export const RIG_ROLES = {
@@ -156,12 +166,17 @@ export function mix(a = {}, b = {}) {
     if (v && !Array.isArray(v)) {
       if (v.aim) n.aim = v.aim.slice();
       else if (o && !Array.isArray(o) && o.aim) n.aim = o.aim.slice();
+      for (const f of ['up', 'face'])
+        if (v[f]) n[f] = v[f].slice();
+        else if (o && !Array.isArray(o) && o[f]) n[f] = o[f].slice();
       if (v.tw !== undefined) n.tw = (o?.tw || 0) * (v.aim ? 0 : 1) + v.tw;
       else if (o && o.tw !== undefined) n.tw = o.tw;
       if (v.p) n.p = o?.p ? [o.p[0] + v.p[0], o.p[1] + v.p[1], o.p[2] + v.p[2]] : v.p.slice();
       else if (o?.p) n.p = o.p.slice();
     } else if (o && !Array.isArray(o)) {
       if (o.aim) n.aim = o.aim.slice();
+      if (o.up) n.up = o.up.slice();
+      if (o.face) n.face = o.face.slice();
       if (o.tw !== undefined) n.tw = o.tw;
       if (o.p) n.p = o.p.slice();
     }
@@ -179,6 +194,8 @@ export function mirror(pose) {
     if (r) n.r = [r[0], -r[1], -r[2]];
     if (!Array.isArray(v) && v) {
       if (v.aim) n.aim = [-v.aim[0], v.aim[1], v.aim[2]];
+      if (v.up) n.up = [-v.up[0], v.up[1], v.up[2]];
+      if (v.face) n.face = [-v.face[0], v.face[1], v.face[2]];
       if (v.tw !== undefined) n.tw = -v.tw;
       if (v.p) n.p = [-v.p[0], v.p[1], v.p[2]];
     }
@@ -197,6 +214,8 @@ function channels(pose) {
         const n = Math.hypot(...v.aim) || 1;
         [c[k + '.ax'], c[k + '.ay'], c[k + '.az']] = v.aim.map((x) => x / n);
       }
+      if (v.up) [c[k + '.ux'], c[k + '.uy'], c[k + '.uz']] = v.up;
+      if (v.face) [c[k + '.fx'], c[k + '.fy'], c[k + '.fz']] = v.face;
       if (v.tw !== undefined) c[k + '.tw'] = v.tw;
       if (v.p) [c[k + '.px'], c[k + '.py'], c[k + '.pz']] = v.p;
     }
@@ -210,6 +229,8 @@ function unchannels(c) {
     const b = (pose[k] ??= {});
     if (ch[0] === 'r') (b.r ??= [0, 0, 0])['xyz'.indexOf(ch[1])] = val;
     else if (ch[0] === 'a') (b.aim ??= [0, 0, 0])['xyz'.indexOf(ch[1])] = val;
+    else if (ch[0] === 'u') (b.up ??= [0, 0, 0])['xyz'.indexOf(ch[1])] = val;
+    else if (ch[0] === 'f') (b.face ??= [0, 0, 0])['xyz'.indexOf(ch[1])] = val;
     else if (ch === 'tw') b.tw = val;
     else if (ch[0] === 'p') (b.p ??= [0, 0, 0])['xyz'.indexOf(ch[1])] = val;
   }
@@ -239,7 +260,25 @@ export function applyPose(rig, pose) {
         Q2.copy(inf.parentWorldInv).multiply(Q1).multiply(inf.parentWorld);
         bone.quaternion.copy(Q2).multiply(inf.restQ);
       }
-      if (v.aim) {
+      if (v.aim && (v.up || v.face)) {
+        // Full orientation: bone axis onto the aim, and its rest up/forward axis toward up/face.
+        X.set(v.aim[0], v.aim[1], v.aim[2]).normalize();
+        Y.set(...(v.up || v.face)).normalize();
+        const restRef = v.up ? REF_UP : REF_FWD;
+        Q3.copy(inf.world).invert();
+        RL.copy(restRef).applyQuaternion(Q3); // the reference axis in bone space
+        AL.set(0, 1, 0);
+        RL.addScaledVector(AL, -RL.dot(AL)).normalize();
+        Y.addScaledVector(X, -Y.dot(X));
+        if (Y.lengthSq() < 1e-6) Y.set(X.y, -X.x, 0.3);
+        Y.addScaledVector(X, -Y.dot(X)).normalize();
+        ML.makeBasis(AL, RL, ZL.crossVectors(AL, RL));
+        MT.makeBasis(X, Y, ZT.crossVectors(X, Y));
+        MT.multiply(ML.transpose());
+        Q3.setFromRotationMatrix(MT);
+        if (v.tw) Q3.premultiply(Q2.setFromAxisAngle(X, v.tw * DEG));
+        bone.quaternion.copy(pW).invert().multiply(Q3);
+      } else if (v.aim) {
         // Current world rotation if it simply followed its parent, then swing its axis onto the aim.
         Q3.copy(pW).multiply(bone.quaternion);
         Y.set(0, 1, 0).applyQuaternion(Q3);

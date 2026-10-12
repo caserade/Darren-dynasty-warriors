@@ -1334,6 +1334,431 @@ function darrenPaws() {
     },
   };
 }
+// ======================= TORMUND & BUCKY: full biped rigs =======================
+// Both have thigh/shin/foot legs and upper/fore/hand arms, so legs bend at the knee and the feet are
+// kept flat by giving each foot the opposite of the thigh and shin pitch. Rotations are additive down
+// the chain: thigh -X swings the leg forward, shin +X bends the knee.
+const leg = (side, thigh, knee, toe = 0, spread = 0) => ({
+  ['leg' + side]: [-thigh, 0, side === 'L' ? spread : -spread],
+  ['shin' + side]: [knee, 0, 0],
+  ['foot' + side]: [thigh - knee - toe, 0, 0],
+});
+const legs = (l, r) => ({ ...leg('L', ...l), ...leg('R', ...r) });
+// A crouch of depth k (0..1) for a leg of length len: knees forward, hips drop.
+const crouch = (k, len, spread = 4) => ({
+  hips: { p: [0, -len * (1 - cos(k * 0.9)) * 0.9, 0] },
+  ...legs([40 * k, 80 * k, 0, spread], [40 * k, 80 * k, 0, spread]),
+});
+// cfg: { base, h (hip height), len (leg length), walk/run: { dur, thigh, knee, bob, yaw, lean },
+//        arms(kind, s, c) -> arm pose for 'idle'|'walk'|'run'|'air'|'land'|'roll'|'hurt', tail }
+function bipedLocomotion(cfg) {
+  const { len, h } = cfg,
+    tail = (p, yaw, pitch = 0, lag = 0.12, base = 0) => tailWave(3, p, yaw, pitch, lag, base);
+  // One stride: left thigh forward while s > 0; a leg's knee bends while it swings through.
+  const stride = (p, g) => {
+    const s = S(p),
+      c = C(p),
+      kL = g.knee * Math.max(0, c) ** 1.4 + g.knee * 0.12,
+      kR = g.knee * Math.max(0, -c) ** 1.4 + g.knee * 0.12,
+      toeL = g.toe * Math.max(0, -S(p + 0.15)),
+      toeR = g.toe * Math.max(0, S(p + 0.15));
+    return {
+      hips: {
+        r: [g.lean, g.yaw * s, g.roll * c],
+        p: [0, g.bob * C(p, 2) - g.drop, 0],
+      },
+      spine: [g.lean * 0.3, -g.yaw * 0.7 * s, 0],
+      chest: [g.lean * 0.2, -g.yaw * 0.6 * s, -g.roll * 0.5 * c],
+      neck: [-g.lean * 0.4, g.yaw * 0.3 * s, 0],
+      head: [-g.lean * 0.6, g.yaw * 0.3 * s, 0],
+      ...legs([g.thigh * s, kL, toeL, 3], [-g.thigh * s, kR, toeR, 3]),
+    };
+  };
+  const roll = (u0) => {
+    const u = smooth(u0),
+      th = TAU * u,
+      tuck = sin(PI * clamp01(u0 / 0.9)) ** 0.6,
+      cy = lerp(h + cfg.rollPivot[0], cfg.rollH, tuck) + 0.1 * sin(PI * u),
+      oy = cfg.rollPivot[0],
+      oz = cfg.rollPivot[1];
+    return {
+      hips: {
+        r: [360 * u, 0, 0],
+        p: [0, cy - (oy * cos(th) - oz * sin(th)) - h, oz - (oy * sin(th) + oz * cos(th))],
+      },
+      spine: [35 * tuck, 0, 0],
+      chest: [25 * tuck, 0, 0],
+      neck: [20 * tuck, 0, 0],
+      head: [20 * tuck, 0, 0],
+      ...legs([110 * tuck, 130 * tuck, 0, 6], [100 * tuck, 125 * tuck, 0, 6]),
+      ...cfg.arms('roll', tuck, 0),
+    };
+  };
+  return {
+    Idle: {
+      dur: 3,
+      loop: true,
+      fn: (p) =>
+        seq(
+          {
+            hips: { p: [0, -0.01 + 0.01 * S(p), 0], r: [0, 0, 1.2 * S(p * 0.5)] },
+            spine: [1 * S(p), 0, 0],
+            chest: [1.5 * S(p - 0.1), 0, 0],
+            neck: [0, 4 * S(p * 0.5 + 0.2), 0],
+            head: [-1.5 * S(p - 0.15), 5 * S(p * 0.5 + 0.1), 2 * S(p * 0.5)],
+            ...legs([0, 4 + 2 * S(p), 0, 4], [0, 4 + 2 * S(p), 0, 4]),
+          },
+          cfg.arms('idle', S(p), C(p)),
+          tail(p, 8, 3, 0.1)
+        ),
+    },
+    Walk: {
+      dur: cfg.walk.dur,
+      loop: true,
+      fn: (p) => seq(stride(p, cfg.walk), cfg.arms('walk', S(p), C(p)), tail(p, 10, 3, 0.12)),
+    },
+    Run: {
+      dur: cfg.run.dur,
+      loop: true,
+      fn: (p) => seq(stride(p, cfg.run), cfg.arms('run', S(p), C(p)), tail(p, 14, 6, 0.12, 6)),
+    },
+    JumpUp: {
+      dur: 0.35,
+      keys: [
+        [
+          0,
+          seq(crouch(0.45, len), { spine: [14, 0, 0], chest: [6, 0, 0] }, cfg.arms('air', -1, 0)),
+        ],
+        [
+          0.12,
+          seq(
+            { hips: { p: [0, 0.04, 0] }, spine: [-6, 0, 0], head: [-10, 0, 0] },
+            legs([-6, 10, -25], [-14, 20, -25]),
+            cfg.arms('air', 1, 0)
+          ),
+          0.8,
+        ],
+        [0.35, seq({ spine: [-2, 0, 0] }, legs([35, 70, 0], [15, 40, 0]), cfg.arms('air', 0.6, 0))],
+      ],
+    },
+    Fall: {
+      dur: 0.6,
+      loop: true,
+      fn: (p) =>
+        seq(
+          { spine: [-3, 0, 0], head: [6, 0, 0] },
+          legs([20 + 6 * S(p), 30, 0, 5], [8 - 6 * S(p), 25, 0, 5]),
+          cfg.arms('air', 0.4 + 0.15 * S(p), 0),
+          tail(p, 6, 8, 0.1, -10)
+        ),
+    },
+    Land: {
+      dur: 0.42,
+      keys: [
+        [0, seq(legs([20, 30, 0], [10, 25, 0]), cfg.arms('air', 0.4, 0))],
+        [
+          0.07,
+          seq(
+            crouch(0.55 * cfg.weight, len, 8),
+            { spine: [16, 0, 0], chest: [6, 0, 0], head: [-12, 0, 0] },
+            cfg.arms('land', 1, 0),
+            { tail1: [10, 0, 0] }
+          ),
+          0.3,
+        ],
+        [0.42, {}],
+      ],
+    },
+    Dodge: cfg.dodge || { dur: 0.55, fn: (p) => roll(clamp01(p / 0.85)) },
+    HurtF: {
+      dur: 0.42,
+      keys: [
+        [0, {}],
+        [
+          0.07,
+          seq(
+            {
+              hips: { r: [-8, 0, 0], p: [0, -0.04, -0.06] },
+              spine: [-14, 6, 0],
+              chest: [-8, 4, 0],
+              neck: [-8, 0, 0],
+              head: [-14, -10, 6],
+            },
+            legs([-6, 14, 0, 6], [10, 20, 0, 6]),
+            cfg.arms('hurt', 1, 0)
+          ),
+          0.2,
+        ],
+        [0.42, {}],
+      ],
+    },
+    HurtB: {
+      dur: 0.42,
+      keys: [
+        [0, {}],
+        [
+          0.07,
+          seq(
+            {
+              hips: { r: [10, 0, 0], p: [0, -0.04, 0.06] },
+              spine: [14, -6, 0],
+              chest: [8, 0, 0],
+              head: [14, 8, -4],
+            },
+            legs([12, 22, 0, 6], [-4, 12, 0, 6]),
+            cfg.arms('hurt', -1, 0),
+            { tail1: [20, 0, 0] }
+          ),
+          0.2,
+        ],
+        [0.42, {}],
+      ],
+    },
+    // Thrown onto his back: hips swing round to lie flat, a bounce, then still.
+    Knockdown: {
+      dur: 0.8,
+      keys: [
+        [0, {}],
+        [
+          0.12,
+          seq(
+            { hips: { r: [-30, 0, 0], p: [0, -0.1, -0.2] }, spine: [-12, 0, 0], head: [-10, 0, 0] },
+            legs([30, 40, 0, 8], [20, 30, 0, 8]),
+            cfg.arms('hurt', 1, 0)
+          ),
+          0.5,
+        ],
+        [
+          0.34,
+          seq(
+            {
+              hips: { r: [-82, 0, 0], p: [0, cfg.lieH - h, -0.35] },
+              spine: [-6, 0, 0],
+              neck: [12, 0, 0],
+              head: [10, 0, 0],
+            },
+            legs([30, 30, 0, 10], [20, 20, 0, 10]),
+            cfg.arms('down', 1, 0),
+            { tail1: [70, 0, 0] }
+          ),
+          0.2,
+        ],
+        [
+          0.48,
+          seq(
+            {
+              hips: { r: [-86, 0, 0], p: [0, cfg.lieH - h + 0.06, -0.38] },
+              neck: [16, 0, 0],
+              head: [14, 0, 0],
+            },
+            legs([36, 26, 0, 12], [24, 18, 0, 12]),
+            cfg.arms('down', 1, 0),
+            { tail1: [70, 0, 0] }
+          ),
+          0.4,
+        ],
+        [
+          0.8,
+          seq(
+            {
+              hips: { r: [-88, 0, 0], p: [0, cfg.lieH - h, -0.38] },
+              neck: [8, 0, 0],
+              head: [6, 0, 0],
+            },
+            legs([24, 20, 0, 14], [12, 16, 0, 14]),
+            cfg.arms('down', 1, 0),
+            { tail1: [70, 0, 0] }
+          ),
+        ],
+      ],
+    },
+    Down: {
+      dur: 2,
+      loop: true,
+      fn: (p) =>
+        seq(
+          {
+            hips: { r: [-88, 0, 0], p: [0, cfg.lieH - h + 0.01 * S(p), -0.38] },
+            chest: [1.5 * S(p), 0, 0],
+            neck: [8, 0, 0],
+            head: [6, 0, 0],
+          },
+          legs([24, 20, 0, 14], [12, 16, 0, 14]),
+          cfg.arms('down', 1, 0),
+          { tail1: [70, 0, 0] }
+        ),
+    },
+    // Rolls up to sitting, plants a foot and pushes up.
+    GetUp: {
+      dur: 0.7,
+      keys: [
+        [
+          0,
+          seq(
+            {
+              hips: { r: [-88, 0, 0], p: [0, cfg.lieH - h, -0.38] },
+              neck: [8, 0, 0],
+              head: [6, 0, 0],
+            },
+            legs([24, 20, 0, 14], [12, 16, 0, 14]),
+            cfg.arms('down', 1, 0),
+            { tail1: [70, 0, 0] }
+          ),
+        ],
+        [
+          0.25,
+          seq(
+            {
+              hips: { r: [-20, 0, 0], p: [0, cfg.sitH - h, -0.2] },
+              spine: [30, 0, 0],
+              chest: [20, 0, 0],
+              head: [-20, 0, 0],
+            },
+            legs([95, 130, 0, 10], [80, 40, 0, 10]),
+            cfg.arms('land', 1, 0),
+            { tail1: [30, 0, 0] }
+          ),
+          0.5,
+        ],
+        [
+          0.48,
+          seq(
+            crouch(0.7, len, 6),
+            { spine: [30, 0, 0], chest: [10, 0, 0], head: [-20, 0, 0] },
+            cfg.arms('land', 1, 0)
+          ),
+          0.5,
+        ],
+        [0.7, {}],
+      ],
+    },
+  };
+}
+
+// ---- Tormund: sword in his LEFT paw, shield on his RIGHT ----
+// Knightly stance: shield side turned a little forward, sword held up and ready.
+// A held weapon sits across the fist, so the paw points along the forearm with the blade (or shield
+// face) square to it: the paw's aim is the forearm direction with the blade direction taken out.
+function across(fore, blade) {
+  const n = Math.hypot(...blade) || 1,
+    b = blade.map((x) => x / n),
+    d = fore[0] * b[0] + fore[1] * b[1] + fore[2] * b[2],
+    a = fore.map((x, i) => x - d * b[i]);
+  return Math.hypot(...a) < 1e-3 ? [b[1], -b[0], b[2]] : a;
+}
+const T_SWORD = (arm, fore, blade) => ({
+  armL: { aim: arm },
+  foreL: { aim: fore },
+  handL: { aim: across(fore, blade), up: blade },
+});
+const T_SHIELD = (arm, fore, face) => ({
+  armR: { aim: arm },
+  foreR: { aim: fore },
+  handR: { aim: across(fore, face), face },
+});
+const T_BASE = {
+  hips: { r: [0, 12, 0], p: [0, -0.03, 0] },
+  spine: [3, 0, 0],
+  chest: [2, 2, 0],
+  neck: [0, -6, 0],
+  head: [-3, -6, 0],
+  ...T_SWORD([0.25, -0.95, 0.15], [-0.1, -0.35, 0.95], [0.05, 0.6, 0.8]),
+  ...T_SHIELD([-0.2, -0.9, 0.35], [0.75, -0.1, 0.65], [0.25, 0, 1]),
+  legL: [-8, 0, 4],
+  shinL: [12, 0, 0],
+  footL: [-4, 0, 0],
+  legR: [8, 0, -4],
+  shinR: [10, 0, 0],
+  footR: [-18, 0, 0],
+};
+function tormundArms(kind, s, c) {
+  switch (kind) {
+    case 'idle':
+      return T_SWORD(
+        [0.25, -0.95, 0.15 + 0.02 * s],
+        [-0.1, -0.35, 0.95],
+        [0.05 + 0.03 * c, 0.6, 0.8]
+      );
+    case 'walk':
+      return {
+        ...T_SWORD([0.25, -0.95, 0.1 - 0.3 * s], [-0.05, -0.45, 0.9 - 0.2 * s], [0.05, 0.65, 0.75]),
+        ...T_SHIELD([-0.2, -0.92, 0.3 + 0.12 * s], [0.75, -0.15, 0.65], [0.25, 0, 1]),
+      };
+    case 'run':
+      // Shield carried up in front, sword trailing low and back, pumping with the stride.
+      return {
+        ...T_SWORD([0.3, -0.85, -0.2 - 0.45 * s], [0.15, -0.8, 0.4 - 0.5 * s], [0.1, -0.25, -1]),
+        ...T_SHIELD([-0.2, -0.75, 0.6 + 0.15 * s], [0.8, 0.05, 0.6], [0.3, 0.1, 1]),
+      };
+    case 'air':
+      return {
+        ...T_SWORD([0.7, -0.2 + 0.5 * s, -0.2], [0.6, 0.3 * s, 0.6], [0.2, 0.9, 0.3]),
+        ...T_SHIELD([-0.7, -0.3 + 0.4 * s, 0.2], [0.3, 0, 1], [0, 0.2, 1]),
+      };
+    case 'land':
+      return {
+        ...T_SWORD([0.55, -0.7, 0.3], [0.2, -0.6, 0.75], [0.4, 0.4, 0.8]),
+        ...T_SHIELD([-0.4, -0.7, 0.5], [0.7, -0.3, 0.6], [0.2, 0, 1]),
+      };
+    case 'roll':
+      // Tucked: sword pointed back along the body so it never digs in, shield on the forearm.
+      return {
+        ...T_SWORD([0.35, -0.6 + 0.2 * s, 0.6 * s], [0.2, 0.3 * s - 0.4, 0.9], [0.1, -0.3, -1]),
+        ...T_SHIELD([-0.3, -0.6, 0.7 * s], [0.6, 0.3 * s, 0.7], [0.2, 0.3, 1]),
+      };
+    case 'hurt':
+      return s > 0
+        ? {
+            ...T_SWORD([0.75, -0.5, -0.1], [0.6, -0.4, 0.5], [0.4, 0.7, 0.2]),
+            ...T_SHIELD([-0.4, -0.6, 0.6], [0.6, 0.3, 0.7], [0, 0.3, 1]),
+          }
+        : {
+            ...T_SWORD([0.6, -0.6, -0.5], [0.4, -0.5, 0.4], [0.2, 0.6, 0.6]),
+            ...T_SHIELD([-0.6, -0.6, -0.4], [-0.2, -0.4, 0.8], [0, 0, 1]),
+          };
+    case 'down':
+      return {
+        ...T_SWORD([0.85, 0.1, 0.4], [0.85, 0.4, 0.2], [0.3, -0.2, 1]),
+        ...T_SHIELD([-0.8, 0.1, 0.4], [-0.6, 0.4, 0.6], [0, 1, 0.1]),
+      };
+  }
+  return {};
+}
+function tormundLocomotion() {
+  return bipedLocomotion({
+    h: 0.85,
+    len: 0.75,
+    weight: 1,
+    rollH: 0.5,
+    rollPivot: [0.32, 0.12],
+    lieH: 0.28,
+    sitH: 0.32,
+    arms: tormundArms,
+    walk: {
+      dur: 0.95,
+      thigh: 24,
+      knee: 42,
+      toe: 14,
+      bob: 0.025,
+      drop: 0.02,
+      yaw: 7,
+      roll: 2,
+      lean: 3,
+    },
+    run: {
+      dur: 0.62,
+      thigh: 42,
+      knee: 85,
+      toe: 25,
+      bob: 0.06,
+      drop: 0.07,
+      yaw: 9,
+      roll: 3,
+      lean: 14,
+    },
+  });
+}
+
 // ---- Darren · Polka Scarf (timed to moves.mjs) ----
 // The scarf's free end is in his right paw; the ribbon itself is simulated in game.mjs (ScarfRibbon),
 // so these clips only have to swing the paw on clean arcs. A lash = wind back, whip the paw through
@@ -1936,6 +2361,7 @@ export const LIBRARY = {
     base: D_STANCE,
     clips: () => ({ ...darrenLocomotion(), ...darrenPaws(), ...darrenScarf() }),
   },
+  Tormund: { base: T_BASE, clips: () => ({ ...tormundLocomotion() }) },
 };
 
 // Builds every authored clip for one rig. Specs with fn/keys and dur become AnimationClips.
