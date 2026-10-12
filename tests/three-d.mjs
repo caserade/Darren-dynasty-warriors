@@ -152,6 +152,94 @@ test('A pause between presses restarts the string at the first hit', () => {
   assert(g.attack());
   assert.equal(g.player.action.name, 'PawN1');
 });
+test('Darren swaps to the Polka Scarf: its own six-hit string, longer reach, and the choice is saved', () => {
+  const g = fresh();
+  place(g, 40, 52);
+  for (const a of g.actors) if (a !== g.player) Object.assign(a, { x: 10, z: 10 });
+  g.switchTo(1);
+  assert(!g.switchStyle('scarf'));
+  g.switchTo(0);
+  assert(g.attack());
+  assert(!g.switchStyle('scarf'), 'not mid-move');
+  tick(g, 1.2);
+  assert(g.switchStyle('scarf') && g.style === 'scarf');
+  assert(!g.switchStyle('tormund'));
+  assert.equal(new Game(world, JSON.parse(JSON.stringify(g.save()))).style, 'scarf');
+  assert.equal(new Game(world, { ...g.save(), style: 'bogus' }).style, 'paws');
+  const names = [];
+  for (let i = 0; i < 6; i++) {
+    assert(g.attack());
+    const q = g.player.action;
+    names.push(q.name);
+    while (g.player.action === q) tick(g, 1 / 60);
+  }
+  assert.deepEqual(names, ['ScarfN1', 'ScarfN2', 'ScarfN3', 'ScarfN4', 'ScarfN5', 'ScarfN6']);
+  // A gopher 2.9 m away: the scarf's first lash reaches it, the paws' jab does not.
+  const reach = (style) => {
+    const h = fresh();
+    place(h, 40, 52);
+    for (const a of h.actors) if (a !== h.player) Object.assign(a, { x: 10, z: 10 });
+    h.switchStyle(style);
+    const e = foe(h, 'gopher', 40, 54.9);
+    e.hp = e.max = 500;
+    e.speed = 0;
+    h.startMove(h.player, h.moveset().normal[0], 'normal', 0);
+    tick(h, 0.2);
+    return e.hp < 500;
+  };
+  assert(reach('scarf') && !reach('paws'));
+});
+test('Scarf finishers and the hold-charge Polka Snare drag foes in; Polka Cyclone pulls a crowd', () => {
+  const g = fresh();
+  place(g, 40, 52);
+  for (const a of g.actors) if (a !== g.player) Object.assign(a, { x: 10, z: 10 });
+  g.switchStyle('scarf');
+  for (let n = 1; n <= 5; n++) {
+    const h = fresh();
+    h.switchStyle('scarf');
+    for (let i = 0; i < n; i++) {
+      assert(h.attack());
+      while (!(h.player.action?.type === 'normal' && h.player.action.index === i)) tick(h, 1 / 60);
+    }
+    assert(h.chargeStart());
+    const q = h.player.action;
+    while (h.player.action === q) tick(h, 1 / 60);
+    assert.equal(h.player.action.name, 'ScarfC' + (n + 1));
+  }
+  const e = foe(g, 'gopher', 40, 57);
+  e.hp = e.max = 500;
+  e.speed = 0;
+  assert(g.chargeStart());
+  tick(g, 1.3);
+  assert(g.chargeRelease());
+  assert.equal(g.player.action.name, 'ScarfSnare');
+  tick(g, 0.9);
+  const d = Math.hypot(e.x - g.player.x, e.z - g.player.z);
+  assert(
+    e.hp < 500 && d < 3.2 && d > e.r,
+    'snared foe ends up in front of Darren: ' + d.toFixed(2)
+  );
+  tick(g, 1);
+  const ring = [];
+  for (let k = 0; k < 6; k++) {
+    const o = foe(g, 'gopher', 40 + Math.sin(k) * 5, 52 + Math.cos(k) * 5);
+    o.hp = o.max = 500;
+    o.speed = 0;
+    ring.push(o);
+  }
+  const before = ring.map((o) => Math.hypot(o.x - g.player.x, o.z - g.player.z));
+  g.player.mus = 100;
+  assert(g.special());
+  assert.equal(g.player.action.name, 'ScarfSpecial');
+  tick(g, 1.5);
+  const pulled = ring.filter(
+    (o, k) => Math.hypot(o.x - g.player.x, o.z - g.player.z) < before[k] - 1
+  ).length;
+  assert(pulled >= 4, 'cyclone pulled ' + pulled);
+  tick(g, 1.5);
+  // Every foe on his level (this spot is a slope) took the cyclone's hits.
+  assert(ring.filter((o) => Math.abs(o.y - g.player.y) < 1.6).every((o) => o.hp < 500));
+});
 for (let i = 0; i < 3; i++)
   test(CAST[i] + ' charged attack reaches a practice post once', () => {
     const g = fresh();

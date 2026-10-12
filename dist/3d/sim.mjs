@@ -408,8 +408,7 @@ export class Game {
       );
       this.bosses[3] = this.quest.rescued || (Array.isArray(s.bosses) && s.bosses[3] === true);
       this.mode = s.mode === 'cozy' ? 'cozy' : 'adventure';
-      this.style =
-        MOVESETS[s.style] && s.style !== 'tormund' && s.style !== 'bucky' ? s.style : 'paws';
+      this.style = s.style === 'scarf' ? 'scarf' : 'paws';
       this.ko = clamp(Math.floor(Number(s.ko) || 0), 0, 1e7);
       this.nextKo = (Math.floor(this.ko / 100) + 1) * 100;
       this.bestCombo = clamp(Math.floor(Number(s.bestCombo) || 0), 0, 1e7);
@@ -790,7 +789,7 @@ export class Game {
     const a = this.player;
     if (this.selected !== 0 || this.paused || a.action || a.charging) return false;
     const next = style || (this.style === 'paws' ? 'scarf' : 'paws');
-    if (!MOVESETS[next] || next === this.style) return false;
+    if ((next !== 'paws' && next !== 'scarf') || next === this.style) return false;
     this.style = next;
     a.combo = 0;
     a.comboWindow = 0;
@@ -806,7 +805,17 @@ export class Game {
     a.charge = 0;
     if (this.paused) return false;
     a.energy = Math.max(0, a.energy - (15 + q * 20));
-    this.startAction('ChargeAttack', 1.05, 0.42, q);
+    const hold = this.moveset().charge[0];
+    if (hold) {
+      // A hold move from moves.mjs, stretched by how long it was charged (Polka Snare).
+      const h = hold.hits[0];
+      this.startMove(
+        a,
+        { ...hold, hits: [{ ...h, r: h.r + q * 2.5, dmg: Math.round(h.dmg + q * 30) }] },
+        'hold'
+      );
+      a.action.charge = q;
+    } else this.startAction('ChargeAttack', 1.05, 0.42, q);
     this.stats.charged++;
     return true;
   }
@@ -893,11 +902,26 @@ export class Game {
       if (
         d <= h.r + e.r * 0.85 &&
         Math.abs(e.y - a.y) < (e.boss ? 2.6 : h.launch ? 2.4 : 1.8) &&
-        (h.arc >= TAU - 0.01 ||
-          Math.abs(angleDiff(angle, a.yaw)) < h.arc / 2 + (d < e.r + 0.6 ? 0.8 : 0)) &&
+        (h.line
+          ? this.inLine(a, e, h.r)
+          : h.arc >= TAU - 0.01 ||
+            Math.abs(angleDiff(angle, a.yaw)) < h.arc / 2 + (d < e.r + 0.6 ? 0.8 : 0)) &&
         this.world.visible(c, e)
       ) {
-        this.damageFoe(e, dmg, h.pull ? angle + Math.PI : angle, h.pull ? h.pull : h.kb, heavy, h);
+        let kb = h.kb;
+        if (h.pull) {
+          // Drag the foe in to just in front of the hero (knockback travels kb*2.4/8 m), never past.
+          const reach = Math.hypot(e.x - a.x, e.z - a.z) - e.r - 1.2;
+          kb = Math.min(h.pull, Math.max(0, (reach * 8) / 2.4 / (e.boss ? 0.22 : 1)));
+        }
+        this.damageFoe(
+          e,
+          dmg,
+          h.pull ? Math.atan2(e.x - a.x, e.z - a.z) + Math.PI : angle,
+          kb,
+          heavy,
+          h
+        );
         count++;
       }
     }
@@ -913,6 +937,14 @@ export class Game {
     });
     if (count) this.emit('hitstop', { t: h.down || h.launch ? 0.075 : heavy ? 0.06 : 0.035 });
     return count;
+  }
+  // A straight crack along the hero's facing: ahead of him and within about a metre of the line.
+  inLine(a, e, r) {
+    const dx = e.x - a.x,
+      dz = e.z - a.z,
+      along = dx * Math.sin(a.yaw) + dz * Math.cos(a.yaw),
+      side = Math.abs(dx * Math.cos(a.yaw) - dz * Math.sin(a.yaw));
+    return along > -0.5 && along <= r + e.r && side < 1 + e.r;
   }
   throwBall(a, angle, speed, dmg, r, power = 0) {
     this.shots.push({
@@ -947,7 +979,7 @@ export class Game {
     if (m.dive !== undefined && q.time > 0.1 && a.air > 0) a.vy = Math.min(a.vy, m.dive);
     const p = m.pulse;
     while (p && q.pulse !== null && q.pulse <= p.to && q.time >= q.pulse) {
-      this.strike(a, { r: p.r, arc: TAU, dmg: p.dmg, kb: p.kb }, q);
+      this.strike(a, { r: p.r, arc: TAU, dmg: p.dmg, kb: p.kb, pull: p.pull }, q);
       for (let k = 0; k < (p.shots || 0); k++)
         this.throwBall(a, (k / p.shots) * TAU + q.time * 1.7, 12, 10, 0.2, 0.2);
       q.pulse += p.every;

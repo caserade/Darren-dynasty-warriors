@@ -646,10 +646,21 @@ const D_GUARD = {
   tail1: [4, 10, 0],
 };
 const G = (p = {}) => mix(D_GUARD, p);
+// Turns a whole pose about the vertical by deg: the hips yaw, and every aimed limb swings round with
+// them (aims are in character space, so without this the arms would stay put while the body spun).
+function spinPose(pose, deg) {
+  const a = deg * (PI / 180),
+    c = cos(a),
+    s = sin(a),
+    out = mix(pose, { hips: { r: [0, deg, 0] } });
+  for (const v of Object.values(out))
+    if (v?.aim) v.aim = [v.aim[0] * c + v.aim[2] * s, v.aim[1], -v.aim[0] * s + v.aim[2] * c];
+  return out;
+}
 function spinKeys(t0, t1, turns, pose, ease = smooth) {
   return (p, t) => {
     const u = ease(clamp01((t - t0) / (t1 - t0)));
-    return mix(pose(u, t), { hips: { r: [0, -360 * turns * u, 0] } });
+    return spinPose(pose(u, t), -360 * turns * u);
   };
 }
 function darrenPaws() {
@@ -1291,37 +1302,640 @@ function darrenPaws() {
           after = smooth(clamp01((t - 2.15) / 0.25)),
           spinA = 360 * (1.2 * t + 0.45 * t * t);
         const air = up * (1 - end) * (0.18 + 0.03 * sin(t * 20));
+        return spinPose(
+          {
+            hips: { p: [0, air - 0.12 * end * (1 - after), 0] },
+            spine: [-6 * up + 30 * end * (1 - after), 0, 0],
+            head: [-12 * up, 0, 0],
+            legL: [-20 * up, 0, 10 * up],
+            legR: [-10 * up, 0, -10 * up],
+            armL: {
+              aim: [
+                lerp(0.45, 1, up * (1 - end)) + 0.2 * end,
+                lerp(-1, 0.2, up) * (1 - end) - 0.7 * end + 1.2 * end * (1 - after),
+                lerp(0.18, -0.2, up) + 0.9 * end,
+              ],
+            },
+            armR: {
+              aim: [
+                lerp(-0.45, -1, up * (1 - end)) - 0.2 * end,
+                lerp(-1, 0.2, up) * (1 - end) - 0.7 * end + 1.2 * end * (1 - after),
+                lerp(0.18, -0.2, up) + 0.9 * end,
+              ],
+            },
+            wingL: { aim: [0.95, 0.6 + 0.3 * sin(t * 25), 0] },
+            wingR: { aim: [-0.95, 0.6 + 0.3 * sin(t * 25), 0] },
+            tail1: [10 * up, 0, 0],
+            tail2: [10 * up, 0, 0],
+          },
+          -spinA * (1 - end)
+        );
+      },
+    },
+  };
+}
+// ---- Darren · Polka Scarf (timed to moves.mjs) ----
+// The scarf's free end is in his right paw; the ribbon itself is simulated in game.mjs (ScarfRibbon),
+// so these clips only have to swing the paw on clean arcs. A lash = wind back, whip the paw through
+// fast, then let the arm follow on so the ribbon cracks out past it.
+const SG = {
+  hips: { r: [3, 14, 0], p: [0, -0.04, 0] },
+  spine: [6, -6, 0],
+  head: [-6, -8, 0],
+  legL: [-16, 0, 6],
+  legR: [12, 0, -6],
+  footL: [10, 0, 0],
+  armL: { aim: [0.45, -0.45, 0.75] },
+  handL: { aim: [0.2, 0.1, 1] },
+  armR: { aim: [-0.85, -0.45, -0.1] },
+  handR: { aim: [-0.6, -0.7, 0.35] },
+  wingL: { aim: [0.7, 0.6, -0.5] },
+  wingR: { aim: [-0.7, 0.6, -0.5] },
+  tail1: [4, -8, 0],
+};
+const SGp = (p = {}) => mix(SG, p);
+const R = (arm, hand) => ({ armR: { aim: arm }, handR: { aim: hand || arm } });
+// The right paw circling on a ring of radius rad at height y; a turns from start angle a0 (0 = right).
+const ringAim = (ang, y = 0.2, fwd = 0) => [-cos(ang), y, sin(ang) + fwd];
+function darrenScarf() {
+  const M = MOVESETS.scarf,
+    N = M.normal,
+    Cc = M.charge;
+  return {
+    // Charging the Polka Snare: the scarf twirls overhead like a lasso.
+    ScarfCharge: {
+      dur: 0.5,
+      loop: true,
+      fn: (p) =>
+        SGp({
+          hips: { r: [0, 0, 0], p: [0, -0.06, 0] },
+          spine: [-4, 0, 0],
+          head: [-10, 0, 0],
+          ...R([-0.35 + 0.35 * C(p), 1, 0.35 * S(p)], [-0.6 * C(p), 0.5, -0.6 * S(p)]),
+          tail1: [4, 10 * S(p), 0],
+        }),
+    },
+    // N1 lash: forehand, the paw whips from behind his right hip across to his left.
+    ScarfN1: {
+      dur: N[0].dur,
+      keys: [
+        [0, SGp()],
+        [
+          0.07,
+          SGp({
+            hips: { r: [0, -16, 0] },
+            spine: [0, -14, 0],
+            ...R([-0.75, 0.15, -0.6], [-0.4, 0.3, -0.9]),
+          }),
+          0.8,
+        ],
+        [
+          0.15,
+          SGp({
+            hips: { r: [6, 4, 0], p: [0, -0.04, 0.06] },
+            spine: [8, 22, 0],
+            head: [-6, -14, 0],
+            legL: [-28, 0, 6],
+            legR: [22, 0, -6],
+            ...R([-0.1, 0.1, 1], [0.35, 0.05, 1]),
+            tail1: [4, -24, 0],
+          }),
+          0.8,
+        ],
+        [
+          0.26,
+          SGp({
+            hips: { r: [4, 20, 0], p: [0, -0.05, 0.05] },
+            spine: [6, 30, 0],
+            legL: [-24, 0, 6],
+            legR: [20, 0, -6],
+            ...R([0.65, -0.3, 0.6], [0.8, -0.4, 0.3]),
+          }),
+          0.4,
+        ],
+        [N[0].dur, SGp({ ...R([0.4, -0.6, 0.6], [0.2, -0.8, 0.5]) })],
+      ],
+    },
+    // N2 backhand: back across the body from his left to far right.
+    ScarfN2: {
+      dur: N[1].dur,
+      keys: [
+        [0, SGp({ ...R([0.4, -0.6, 0.6], [0.2, -0.8, 0.5]) })],
+        [
+          0.07,
+          SGp({
+            hips: { r: [0, 26, 0] },
+            spine: [4, 22, 0],
+            head: [0, -10, 0],
+            ...R([0.75, 0.2, 0.35], [0.7, 0.35, -0.3]),
+          }),
+          0.8,
+        ],
+        [
+          0.15,
+          SGp({
+            hips: { r: [6, -10, 0], p: [0, -0.04, 0.06] },
+            spine: [8, -26, 0],
+            head: [-6, 12, 0],
+            legL: [-24, 0, 6],
+            legR: [26, 0, -6],
+            ...R([-0.35, 0.15, 1], [-0.75, 0.1, 0.7]),
+            tail1: [4, 26, 0],
+          }),
+          0.8,
+        ],
+        [
+          0.26,
+          SGp({
+            hips: { r: [4, -22, 0] },
+            spine: [6, -24, 0],
+            ...R([-0.95, 0.05, -0.1], [-0.8, 0, -0.6]),
+          }),
+          0.4,
+        ],
+        [N[1].dur, SGp()],
+      ],
+    },
+    // N3 overhead crack: paw up and back, then straight down the middle; the crack lands out in front.
+    ScarfN3: {
+      dur: N[2].dur,
+      keys: [
+        [0, SGp()],
+        [
+          0.12,
+          SGp({
+            hips: { r: [-8, 0, 0], p: [0, 0.02, -0.03] },
+            spine: [-14, 0, 0],
+            head: [-12, 0, 0],
+            legL: [-8, 0, 6],
+            legR: [6, 0, -6],
+            ...R([-0.25, 1, -0.45], [-0.1, 0.4, -1]),
+            armL: { aim: [0.6, 0.1, 0.5] },
+            tail1: [-12, 0, 0],
+          }),
+          0.7,
+        ],
+        [
+          0.25,
+          SGp({
+            hips: { r: [18, 0, 0], p: [0, -0.1, 0.08] },
+            spine: [22, 0, 0],
+            head: [-22, 0, 0],
+            legL: [-34, 0, 6],
+            legR: [26, 0, -6],
+            footR: [-15, 0, 0],
+            ...R([-0.12, -0.15, 1], [-0.05, -0.4, 1]),
+            armL: { aim: [0.6, -0.5, 0.2] },
+            tail1: [20, 0, 0],
+            tail2: [10, 0, 0],
+          }),
+          0.3,
+        ],
+        [
+          0.38,
+          SGp({
+            hips: { r: [12, 0, 0], p: [0, -0.08, 0.07] },
+            spine: [16, 0, 0],
+            legL: [-28, 0, 6],
+            legR: [22, 0, -6],
+            ...R([-0.2, -0.6, 0.8], [-0.1, -0.9, 0.4]),
+          }),
+          0.4,
+        ],
+        [N[2].dur, SGp()],
+      ],
+    },
+    // N4 twirl: a full turn and a half with the ribbon held straight out, three hits around him.
+    ScarfN4: {
+      dur: N[3].dur,
+      fn: spinKeys(0.1, 0.52, 1, (u, t) => {
+        const e = sin(PI * clamp01((t - 0.02) / 0.62));
+        return SGp({
+          hips: { r: [0, 0, 0], p: [0, -0.06 * e, 0] },
+          spine: [6 * e, 0, 10 * e],
+          head: [0, 10 * e, 0],
+          legL: [-6, 0, 14 * e],
+          legR: [6, 0, -14 * e],
+          ...R([-1, 0.15 * e - 0.3 * (1 - e), 0.15], [-1, 0.1, -0.2]),
+          armL: { aim: [0.85, 0.1, 0.4] },
+          wingL: { aim: [0.9, 0.6, -0.2] },
+          wingR: { aim: [-0.9, 0.6, -0.2] },
+          tail1: [10 * e, -24 * e, 0],
+          tail2: [0, -10 * e, 0],
+        });
+      }),
+    },
+    // N5 figure-eight: the paw draws a sideways eight in front of him, a lash on each loop.
+    ScarfN5: {
+      dur: N[4].dur,
+      fn: (p, t) => {
+        const u = clamp01((t - 0.03) / 0.52),
+          e = sin(PI * clamp01(t / 0.66)),
+          x = -sin(TAU * u),
+          y = 0.35 * sin(2 * TAU * u);
+        return SGp({
+          hips: { r: [6 * e, -22 * x * e, 0], p: [0, -0.05 * e, 0.04 * e] },
+          spine: [8 * e, -18 * x * e, 6 * x * e],
+          head: [-8 * e, 14 * x * e, 0],
+          legL: [-24 * e, 0, 6],
+          legR: [20 * e, 0, -6],
+          ...R(
+            [lerp(-0.85, 0.85 * x - 0.15, e), lerp(-0.45, 0.25 + y, e), lerp(-0.1, 0.75, e)],
+            [lerp(-0.6, 1.1 * x - 0.1, e), lerp(-0.7, y * 1.4, e), lerp(0.35, 0.6, e)]
+          ),
+          tail1: [4, 22 * x * e, 0],
+        });
+      },
+    },
+    // N6 helicopter rise: a hop into a climbing spin with the scarf whirling overhead, launching foes.
+    ScarfN6: {
+      dur: N[5].dur,
+      fn: spinKeys(0.14, 0.74, 2, (u, t) => {
+        const e = sin(PI * clamp01((t - 0.05) / 0.85)),
+          crouch = smooth(clamp01(1 - t / 0.13)) * smooth(clamp01(t / 0.06)),
+          rise = smooth(clamp01((t - 0.56) / 0.16));
+        return SGp({
+          hips: { r: [-6 * e, 0, 0], p: [0, -0.12 * crouch, 0] },
+          spine: [-8 * e, 0, 0],
+          head: [-14 * e, 0, 0],
+          legL: [-30 * e, 0, 10 * e],
+          legR: [-40 * e, 0, -10 * e],
+          footL: [30 * e, 0, 0],
+          footR: [30 * e, 0, 0],
+          ...R([-0.5 + 0.35 * rise, 1, 0.1], [-1, 0.2 + 0.6 * rise, 0]),
+          armL: { aim: [0.8, 0.1 + 0.5 * rise, 0.3] },
+          wingL: { aim: [0.95, 0.5 + 0.3 * e, -0.1] },
+          wingR: { aim: [-0.95, 0.5 + 0.3 * e, -0.1] },
+          tail1: [20 * e, 0, 0],
+          tail2: [10 * e, 0, 0],
+        });
+      }),
+    },
+    // C1 hold, Polka Snare: a lasso circle overhead, the long lash straight out, then a hard yank back.
+    ScarfSnare: {
+      dur: Cc[0].dur,
+      fn: (p, t) => {
+        const wind = clamp01(t / 0.28),
+          ang = TAU * 1.25 * smooth(wind),
+          throwT = smooth(clamp01((t - 0.26) / 0.12)),
+          yank = smooth(clamp01((t - 0.5) / 0.18)),
+          rest = smooth(clamp01((t - 0.75) / 0.2));
+        const over = [-0.3 + 0.3 * cos(ang), 1, 0.3 * sin(ang)];
+        const out = [-0.08, 0.12, 1],
+          back = [-0.55, -0.15, -0.7];
+        const arm = [0, 1, 2].map((k) =>
+          lerp(lerp(lerp(over[k], out[k], throwT), back[k], yank), SG.armR.aim[k], rest)
+        );
+        return SGp({
+          hips: {
+            r: [
+              lerp(lerp(-4, 14, throwT), -10, yank) * (1 - rest),
+              lerp(0, -12, yank) * (1 - rest),
+              0,
+            ],
+            p: [0, -0.04 - 0.05 * throwT, lerp(lerp(0, 0.08, throwT), -0.06, yank) * (1 - rest)],
+          },
+          spine: [
+            lerp(lerp(-10, 16, throwT), -14, yank) * (1 - rest),
+            lerp(0, -18, yank) * (1 - rest),
+            0,
+          ],
+          head: [lerp(-10, -16, throwT) * (1 - rest), 0, 0],
+          legL: [lerp(-16, -32, throwT) * (1 - rest) - 16 * rest, 0, 6],
+          legR: [lerp(12, 24, throwT) * (1 - rest) + 12 * rest, 0, -6],
+          armR: { aim: arm },
+          handR: { aim: [arm[0] * 0.7, arm[1] * 0.8 - 0.1, arm[2] + 0.2] },
+          armL: { aim: [0.55, lerp(-0.2, -0.5, throwT), 0.6] },
+          tail1: [lerp(0, 18, throwT) * (1 - yank), 0, 0],
+        });
+      },
+    },
+    // C2 launcher: a low-to-high lash that pops foes up, body stretching tall.
+    ScarfC2: {
+      dur: Cc[1].dur,
+      keys: [
+        [0, SGp()],
+        [
+          0.1,
+          SGp({
+            hips: { r: [14, 6, 0], p: [0, -0.13, 0] },
+            spine: [16, 6, 0],
+            legL: [-30, 0, 8],
+            legR: [-10, 0, -8],
+            footL: [20, 0, 0],
+            ...R([-0.45, -0.9, 0.3], [-0.2, -1, 0.5]),
+          }),
+          0.7,
+        ],
+        [
+          0.22,
+          SGp({
+            hips: { r: [-10, -6, 0], p: [0, 0.06, 0.05] },
+            spine: [-14, -8, 0],
+            head: [-18, 0, 0],
+            legL: [-12, 0, 6],
+            legR: [18, 0, -6],
+            footR: [-30, 0, 0],
+            ...R([-0.15, 1, 0.45], [0, 1, -0.2]),
+            armL: { aim: [0.7, -0.2, 0.3] },
+            wingL: { aim: [0.9, 0.8, -0.2] },
+            wingR: { aim: [-0.9, 0.8, -0.2] },
+            tail1: [-18, 0, 0],
+          }),
+          0.4,
+        ],
+        [
+          0.4,
+          SGp({
+            hips: { r: [-4, 0, 0], p: [0, 0.02, 0.03] },
+            spine: [-6, 0, 0],
+            ...R([-0.4, 0.8, 0.2], [-0.4, 0.2, -0.6]),
+          }),
+          0.4,
+        ],
+        [Cc[1].dur, SGp()],
+      ],
+    },
+    // C3 spinning top: a low crouching spin with the ribbon flat out, steerable.
+    ScarfC3: {
+      dur: Cc[2].dur,
+      fn: spinKeys(0.06, 0.88, 4, (u, t) => {
+        const e = smooth(clamp01(t / 0.1)) * smooth(clamp01((0.98 - t) / 0.14));
+        return SGp({
+          hips: { r: [8 * e, 0, 0], p: [0, -0.13 * e, 0] },
+          spine: [10 * e, 0, 14 * e],
+          head: [-12 * e, 0, -10 * e],
+          legL: [-30 * e, 0, 20 * e],
+          legR: [-30 * e, 0, -20 * e],
+          footL: [30 * e, 0, 0],
+          footR: [30 * e, 0, 0],
+          ...R([-1, lerp(-0.45, -0.05, e), 0.2 * (1 - e)], [-1, -0.05, -0.3]),
+          armL: { aim: [0.9, lerp(-0.45, 0.25, e), 0.2] },
+          wingL: { aim: [0.95, 0.35, -0.3] },
+          wingR: { aim: [-0.95, 0.35, -0.3] },
+          tail1: [12 * e, -30 * e, 0],
+          tail2: [6 * e, -15 * e, 0],
+        });
+      }),
+    },
+    // C4 lasso yank and kick: throw the loop, haul the foe in, then a flying kick with the left foot.
+    ScarfC4: {
+      dur: Cc[3].dur,
+      keys: [
+        [0, SGp()],
+        [
+          0.1,
+          SGp({
+            hips: { r: [-6, -10, 0] },
+            spine: [-10, -10, 0],
+            ...R([-0.35, 1, -0.2], [-0.2, 0.6, -0.8]),
+          }),
+          0.8,
+        ],
+        [
+          0.22,
+          SGp({
+            hips: { r: [12, 6, 0], p: [0, -0.06, 0.08] },
+            spine: [16, 10, 0],
+            legL: [-30, 0, 6],
+            legR: [24, 0, -6],
+            ...R([-0.08, 0.1, 1], [0, 0.05, 1]),
+          }),
+          0.5,
+        ],
+        [
+          0.38,
+          SGp({
+            hips: { r: [-14, -20, 0], p: [0, -0.04, -0.06] },
+            spine: [-16, -20, 0],
+            head: [-6, 18, 0],
+            legL: [-6, 0, 6],
+            legR: [24, 0, -6],
+            ...R([-0.6, -0.1, -0.7], [-0.4, -0.3, -0.9]),
+            armL: { aim: [0.6, 0, 0.6] },
+          }),
+          0.6,
+        ],
+        [
+          0.56,
+          SGp({
+            hips: { r: [-26, 10, 0], p: [0, 0.12, 0.08] },
+            spine: [-16, 6, 0],
+            head: [12, 0, 0],
+            legL: [-100, 0, 4],
+            footL: [-35, 0, 0],
+            legR: [20, 0, -4],
+            footR: [20, 0, 0],
+            ...R([-0.9, 0.3, -0.3], [-0.6, 0.2, -0.8]),
+            armL: { aim: [0.95, 0.3, -0.2] },
+            wingL: { aim: [0.95, 0.6, -0.1] },
+            wingR: { aim: [-0.95, 0.6, -0.1] },
+            tail1: [-25, 0, 0],
+          }),
+          0.3,
+        ],
+        [
+          0.7,
+          SGp({
+            hips: { r: [-6, 0, 0], p: [0, -0.06, 0.05] },
+            legL: [-30, 0, 6],
+            ...R([-0.85, -0.3, 0], [-0.6, -0.6, 0.4]),
+          }),
+          0.5,
+        ],
+        [Cc[3].dur, SGp()],
+      ],
+    },
+    // C5 ribbon dance: two pirouettes with little hops, the paw sweeping high and low, then a big flourish.
+    ScarfC5: {
+      dur: Cc[4].dur,
+      fn: spinKeys(0.04, 0.76, 2, (u, t) => {
+        const e = sin(PI * clamp01(t / 0.95)),
+          hop = Math.abs(sin(PI * clamp01(t / 0.75) * 3)) * e,
+          wave = sin(TAU * 1.5 * u);
+        return SGp({
+          hips: { r: [-4 * e, 0, 8 * wave * e], p: [0, 0.08 * hop - 0.04, 0] },
+          spine: [-6 * e, 0, -10 * wave * e],
+          head: [-12 * e, 0, 0],
+          legL: [-10 - 30 * hop, 0, 8],
+          legR: [10 + 20 * hop, 0, -8],
+          footL: [20 * hop, 0, 0],
+          ...R([-0.95, 0.5 * wave + 0.2, 0.25], [-0.9, 0.6 * wave, -0.3]),
+          armL: { aim: [0.8, 0.5 - 0.3 * wave, 0.4] },
+          wingL: { aim: [0.9, 0.7, -0.2 + 0.2 * wave] },
+          wingR: { aim: [-0.9, 0.7, -0.2 - 0.2 * wave] },
+          tail1: [6 * e, -20 * e, 0],
+          tail2: [0, -10 * e, 0],
+        });
+      }),
+    },
+    // C6 shockwave crack: rear back with the scarf high behind, then crack it down the line in front.
+    ScarfC6: {
+      dur: Cc[5].dur,
+      keys: [
+        [0, SGp()],
+        [
+          0.42,
+          SGp({
+            hips: { r: [-14, 0, 0], p: [0, 0.02, -0.08] },
+            spine: [-26, 0, 0],
+            head: [-16, 0, 0],
+            legL: [-24, 0, 8],
+            legR: [18, 0, -8],
+            ...R([-0.2, 0.95, -0.7], [-0.1, 0.3, -1]),
+            armL: { aim: [0.75, 0.5, 0.3] },
+            wingL: { aim: [0.85, 0.9, -0.3] },
+            wingR: { aim: [-0.85, 0.9, -0.3] },
+            tail1: [-25, 0, 0],
+            tail2: [-10, 0, 0],
+          }),
+          0.2,
+        ],
+        [
+          0.56,
+          SGp({
+            hips: { r: [28, 0, 0], p: [0, -0.14, 0.12] },
+            spine: [30, 0, 0],
+            head: [-34, 0, 0],
+            legL: [-46, 0, 8],
+            legR: [34, 0, -8],
+            footR: [-20, 0, 0],
+            ...R([-0.08, -0.3, 1], [0, -0.55, 1]),
+            armL: { aim: [0.75, -0.4, -0.2] },
+            wingL: { aim: [0.95, 0.3, 0.3] },
+            wingR: { aim: [-0.95, 0.3, 0.3] },
+            tail1: [30, 0, 0],
+            tail2: [10, 0, 0],
+          }),
+          0.1,
+        ],
+        [
+          0.78,
+          SGp({
+            hips: { r: [22, 0, 0], p: [0, -0.12, 0.1] },
+            spine: [24, 0, 0],
+            head: [-26, 0, 0],
+            legL: [-40, 0, 8],
+            legR: [30, 0, -8],
+            ...R([-0.15, -0.6, 0.8], [0, -0.9, 0.4]),
+          }),
+          0.4,
+        ],
+        [Cc[5].dur, SGp()],
+      ],
+    },
+    // Jump attack, spiral drop: tipped forward and spinning down with the ribbon spiralling out.
+    ScarfJump: {
+      dur: M.jump.dur,
+      fn: spinKeys(0.02, 0.46, 2, (u, t) => {
+        const e = sin(PI * clamp01(t / 0.56)) ** 0.5;
         return {
-          hips: { r: [0, -spinA * (1 - end), 0], p: [0, air - 0.12 * end * (1 - after), 0] },
-          spine: [-6 * up + 30 * end * (1 - after), 0, 0],
-          head: [-12 * up, 0, 0],
-          legL: [-20 * up, 0, 10 * up],
-          legR: [-10 * up, 0, -10 * up],
-          armL: {
-            aim: [
-              lerp(0.45, 1, up * (1 - end)) + 0.2 * end,
-              lerp(-1, 0.2, up) * (1 - end) - 0.7 * end + 1.2 * end * (1 - after),
-              lerp(0.18, -0.2, up) + 0.9 * end,
-            ],
-          },
-          armR: {
-            aim: [
-              lerp(-0.45, -1, up * (1 - end)) - 0.2 * end,
-              lerp(-1, 0.2, up) * (1 - end) - 0.7 * end + 1.2 * end * (1 - after),
-              lerp(0.18, -0.2, up) + 0.9 * end,
-            ],
-          },
-          wingL: { aim: [0.95, 0.6 + 0.3 * sin(t * 25), 0] },
-          wingR: { aim: [-0.95, 0.6 + 0.3 * sin(t * 25), 0] },
-          tail1: [10 * up, 0, 0],
-          tail2: [10 * up, 0, 0],
+          hips: { r: [16 * e, 0, 0] },
+          spine: [18 * e, 0, 0],
+          head: [-14 * e, 0, 0],
+          legL: [-50 * e, 0, 8],
+          legR: [-35 * e, 0, -8],
+          footL: [30 * e, 0, 0],
+          ...R([-1, -0.35 * e, 0.1], [-0.9, -0.3, -0.3]),
+          armL: { aim: [0.8, 0.2, 0.5] },
+          wingL: { aim: [0.95, 0.5, -0.2] },
+          wingR: { aim: [-0.95, 0.5, -0.2] },
+          tail1: [20 * e, -20 * e, 0],
         };
+      }),
+    },
+    // Dash attack, ribbon slide: a low skid on one leg with a sweeping lash.
+    ScarfDash: {
+      dur: M.dash.dur,
+      keys: [
+        [0, SGp({ hips: { r: [10, 0, 0] }, spine: [12, 0, 0] })],
+        [
+          0.08,
+          SGp({
+            hips: { r: [-18, 0, 0], p: [0, -0.22, 0] },
+            spine: [6, 0, 0],
+            head: [-6, 0, 0],
+            legL: [-75, 0, 6],
+            footL: [-20, 0, 0],
+            legR: [40, 0, -8],
+            footR: [-30, 0, 0],
+            ...R([-0.95, 0, -0.4], [-0.6, 0.1, -0.8]),
+            armL: { aim: [0.9, -0.5, 0] },
+          }),
+          0.6,
+        ],
+        [
+          0.22,
+          SGp({
+            hips: { r: [-18, 10, 0], p: [0, -0.22, 0] },
+            spine: [8, 28, 0],
+            head: [-8, -20, 0],
+            legL: [-75, 0, 6],
+            footL: [-20, 0, 0],
+            legR: [40, 0, -8],
+            footR: [-30, 0, 0],
+            ...R([0.2, 0.05, 1], [0.6, 0, 0.8]),
+            armL: { aim: [0.9, -0.5, 0] },
+            tail1: [-10, -20, 0],
+          }),
+          0.5,
+        ],
+        [
+          0.4,
+          SGp({
+            hips: { r: [-8, 10, 0], p: [0, -0.15, 0] },
+            spine: [6, 18, 0],
+            legL: [-45, 0, 6],
+            legR: [25, 0, -8],
+            ...R([0.6, -0.3, 0.6], [0.6, -0.6, 0.4]),
+          }),
+          0.5,
+        ],
+        [M.dash.dur, SGp()],
+      ],
+    },
+    // Polka Cyclone: an accelerating whirl that drags everything in, rising off the ground, then a slam.
+    ScarfSpecial: {
+      dur: M.special.dur,
+      fn: (p, t) => {
+        const up = smooth(clamp01(t / 0.25)),
+          end = smooth(clamp01((t - 2.25) / 0.15)),
+          after = smooth(clamp01((t - 2.4) / 0.2)),
+          spinA = 360 * (1.1 * t + 0.5 * t * t),
+          air = up * (1 - end) * (0.14 + 0.04 * sin(t * 18)),
+          w = up * (1 - end);
+        return spinPose(
+          SGp({
+            hips: { r: [0, 0, 0], p: [0, air - 0.14 * end * (1 - after), 0] },
+            spine: [-6 * w + 26 * end * (1 - after), 0, 8 * w],
+            head: [-14 * w, 0, 0],
+            legL: [-24 * w, 0, 12 * w],
+            legR: [-14 * w, 0, -12 * w],
+            ...R(
+              [
+                lerp(-0.85, -0.6, w) + 0.6 * end,
+                lerp(-0.45, 0.75, w) - 1 * end * (1 - after),
+                lerp(-0.1, 0.1, w) + 0.9 * end,
+              ],
+              [lerp(-0.6, -1, w), lerp(-0.7, 0.3, w) - 0.9 * end, lerp(0.35, -0.2, w) + 0.6 * end]
+            ),
+            armL: { aim: [0.9, lerp(-0.45, 0.4, w) - 0.6 * end, 0.3 + 0.6 * end] },
+            wingL: { aim: [0.95, 0.6 + 0.3 * sin(t * 25), 0] },
+            wingR: { aim: [-0.95, 0.6 + 0.3 * sin(t * 25), 0] },
+            tail1: [10 * w, -20 * w, 0],
+            tail2: [6 * w, -10 * w, 0],
+          }),
+          -spinA * (1 - end)
+        );
       },
     },
   };
 }
 export const LIBRARY = {
-  Darren: { base: D_STANCE, clips: () => ({ ...darrenLocomotion(), ...darrenPaws() }) },
+  Darren: {
+    base: D_STANCE,
+    clips: () => ({ ...darrenLocomotion(), ...darrenPaws(), ...darrenScarf() }),
+  },
 };
 
 // Builds every authored clip for one rig. Specs with fn/keys and dur become AnimationClips.

@@ -130,6 +130,128 @@ const PAWS = {
   },
 };
 
+// ---- Darren · Polka Scarf: his yellow scarf with pink dots as a long whip; reach and flow ----
+const SCARF = {
+  name: 'Polka Scarf',
+  scarf: true,
+  normal: [
+    {
+      anim: 'ScarfN1',
+      dur: 0.44,
+      chain: 0.26,
+      lunge: [[0, 0.12, 2.4]],
+      hits: [{ t: 0.15, r: 3, arc: 2.2, dmg: 12, kb: 4 }],
+    },
+    {
+      anim: 'ScarfN2',
+      dur: 0.44,
+      chain: 0.26,
+      lunge: [[0, 0.12, 2.4]],
+      hits: [{ t: 0.15, r: 3, arc: 2.2, dmg: 12, kb: 4 }],
+    },
+    {
+      anim: 'ScarfN3',
+      dur: 0.56,
+      chain: 0.34,
+      lunge: [[0.05, 0.2, 2.4]],
+      hits: [{ t: 0.25, r: 3.4, arc: 1, dmg: 18, kb: 7, ring: 1.2, off: 1.6 }],
+    },
+    {
+      anim: 'ScarfN4',
+      dur: 0.7,
+      chain: 0.48,
+      hits: [
+        { t: 0.2, r: 2.8, arc: TAU, dmg: 8, kb: 3 },
+        { t: 0.32, r: 2.8, arc: TAU, dmg: 8, kb: 3 },
+        { t: 0.44, r: 2.8, arc: TAU, dmg: 9, kb: 5 },
+      ],
+    },
+    {
+      anim: 'ScarfN5',
+      dur: 0.7,
+      chain: 0.5,
+      lunge: [[0.1, 0.4, 2]],
+      hits: [
+        { t: 0.18, r: 3.2, arc: 2.4, dmg: 12, kb: 4 },
+        { t: 0.42, r: 3.2, arc: 2.4, dmg: 14, kb: 6 },
+      ],
+    },
+    {
+      anim: 'ScarfN6',
+      dur: 0.96,
+      chain: 0.82,
+      hop: { t: 0.14, vy: 5 },
+      hits: [
+        { t: 0.24, r: 3, arc: TAU, dmg: 9, kb: 3 },
+        { t: 0.38, r: 3, arc: TAU, dmg: 9, kb: 3 },
+        { t: 0.52, r: 3, arc: TAU, dmg: 9, kb: 3 },
+        { t: 0.7, r: 3.2, arc: TAU, dmg: 22, kb: 6, launch: 8, ring: 3.2 },
+      ],
+    },
+  ],
+  charge: [
+    // C1: hold to charge the Polka Snare, a long lash that drags foes in (built from this when released).
+    {
+      anim: 'ScarfSnare',
+      dur: 0.95,
+      hits: [{ t: 0.38, r: 4, arc: 0.7, dmg: 20, kb: 0, pull: 10 }],
+    },
+    { anim: 'ScarfC2', dur: 0.64, hits: [{ t: 0.22, r: 3, arc: 1.4, dmg: 18, kb: 2, launch: 9 }] },
+    {
+      anim: 'ScarfC3',
+      dur: 1,
+      steer: 3.5,
+      pulse: { from: 0.15, to: 0.8, every: 0.13, r: 2.7, dmg: 6, kb: 3 },
+    },
+    {
+      anim: 'ScarfC4',
+      dur: 0.86,
+      hits: [
+        { t: 0.22, r: 4.6, arc: 0.9, dmg: 10, kb: 0, pull: 9 },
+        { t: 0.56, r: 2, arc: 1.6, dmg: 24, kb: 10, down: true },
+      ],
+    },
+    {
+      anim: 'ScarfC5',
+      dur: 1,
+      hits: [
+        { t: 0.2, r: 3.2, arc: TAU, dmg: 14, kb: 6 },
+        { t: 0.45, r: 3.2, arc: TAU, dmg: 14, kb: 6 },
+        { t: 0.7, r: 3.4, arc: TAU, dmg: 16, kb: 9, ring: 3.4 },
+      ],
+    },
+    {
+      anim: 'ScarfC6',
+      dur: 1.06,
+      hits: [{ t: 0.56, r: 6.5, arc: 0.55, dmg: 38, kb: 14, down: true, line: true }],
+    },
+  ],
+  jump: {
+    anim: 'ScarfJump',
+    dur: 0.56,
+    dive: -6,
+    hits: [
+      { t: 0.15, r: 2.8, arc: TAU, dmg: 11, kb: 4 },
+      { t: 0.32, r: 2.8, arc: TAU, dmg: 11, kb: 6 },
+    ],
+  },
+  dash: {
+    anim: 'ScarfDash',
+    dur: 0.62,
+    lunge: [[0, 0.35, 7.5]],
+    hits: [{ t: 0.22, r: 3, arc: 1.8, dmg: 16, kb: 8 }],
+  },
+  special: {
+    anim: 'ScarfSpecial',
+    name: 'POLKA CYCLONE',
+    dur: 2.6,
+    inv: [0, 2.6],
+    steer: 2,
+    pulse: { from: 0.25, to: 2.25, every: 0.15, r: 6, dmg: 6, kb: 0, pull: 4 },
+    hits: [{ t: 2.4, r: 5, arc: TAU, dmg: 34, kb: 14, down: true, ring: 5 }],
+  },
+};
+
 // Tormund and Bucky keep their first three-hit strings until their own passes.
 const legacy = (dmg, clipPrefix = 'Attack') => ({
   name: 'Standard',
@@ -158,6 +280,7 @@ const legacy = (dmg, clipPrefix = 'Attack') => ({
 
 export const MOVESETS = {
   paws: PAWS,
+  scarf: SCARF,
   tormund: legacy([18, 20, 30]),
   bucky: legacy([20, 22, 34]),
 };

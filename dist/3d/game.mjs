@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { World, Game, CAST, KITS, BELLY, MOVE_WIND, clamp } from './sim.mjs';
 import { buildRig, Animator } from './anim.mjs';
 import { buildClips } from './clips.mjs';
+import { ScarfRibbon } from './ribbon.mjs';
 
 const $ = (id) => document.getElementById(id),
   canvas = $('view'),
@@ -1320,8 +1321,11 @@ function heroPose(a, i, h) {
       noLook: act.name === 'Dodge',
     };
   }
-  if (a.charging)
-    return { ...d, key: 'charge', clip: 'Charge', loop: true, blend: 0.12, still: true };
+  if (a.charging) {
+    const clip =
+      i === 0 && game.style === 'scarf' && an.has('ScarfCharge') ? 'ScarfCharge' : 'Charge';
+    return { ...d, key: 'charge', clip, loop: true, blend: 0.12, still: true };
+  }
   if (a.air > 0.02) {
     if (an.has('Fall')) {
       const up = a.vy > 1.2;
@@ -1338,6 +1342,20 @@ function heroPose(a, i, h) {
   if (an.landT < 0.3 && an.has('Land') && a.speed < 2.5)
     return { ...d, key: 'land', clip: 'Land', time: an.landT, blend: 0.05 };
   return { ...d, key: 'loco', clip: 'Idle', blend: an.current === 'land' ? 0.2 : 0.18 };
+}
+// How hard Darren's scarf is drawn out straight: peaks on each lash's hit frame, steady in spins.
+function scarfPull(a) {
+  if (a.charging) return 0.25;
+  const q = a.action,
+    m = q?.move;
+  if (!m) return 0;
+  let k = 0;
+  for (const h of m.hits || []) {
+    const u = (q.time - h.t + 0.04) / (h.arc >= 6 ? 0.16 : 0.09);
+    k = Math.max(k, Math.exp(-u * u) * (h.arc >= 6 ? 0.6 : 1));
+  }
+  if (m.pulse && q.time > m.pulse.from - 0.1 && q.time < m.pulse.to + 0.1) k = Math.max(k, 0.55);
+  return k;
 }
 // The heroes glance at the boss they're fighting, or the nearest enemy, or the quest marker when close.
 function lookTarget(a) {
@@ -1376,6 +1394,12 @@ function updateScene(dt) {
       h.base.y * sq,
       (h.base.z * (1 + 0.07 * belly)) / Math.sqrt(sq)
     );
+    if (h.ribbon) {
+      h.ribbon.setActive(game.style === 'scarf');
+      h.ribbon.floor = world.height(a.x, a.z) + 0.03;
+      h.root.updateMatrixWorld(true);
+      h.ribbon.update(game.paused ? 0 : dt, scarfPull(a), camera, h.base.y);
+    }
   }
   updateFoes(dt);
   updateFloaters(dt);
@@ -1639,7 +1663,12 @@ async function boot() {
       ])
         if (!all.some((c) => c.name === name)) throw Error(`${CAST[i]} is missing ${name}.`);
       const animator = new Animator(root, rig, all, HERO_MOTION[i]);
+      // Darren's Polka Scarf weapon replaces the short scarf end (and its dots) while in use.
+      const hide = [];
+      if (i === 0)
+        root.traverse((o) => o.isMesh && /^Scarf_(tail|polka)/.test(o.name) && hide.push(o));
       heroes.push({
+        ribbon: i === 0 ? new ScarfRibbon(scene, rig, hide) : null,
         root,
         animator,
         actions: animator.actions,
