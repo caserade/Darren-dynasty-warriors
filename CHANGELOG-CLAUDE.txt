@@ -379,3 +379,41 @@ TESTS
 - tests/browser-qa.cjs: 4 checks updated for the new moves (PawN1 opener, finisher on K
   inside the combo window, LT/RT pad defaults, friends joining fights). 63 of 63 pass.
 - Windows app zip rebuilt from the PR #1 branch with this dist/.
+
+CLAUDE UPDATE 7 · FULL QUALITY CHECK, NO UPDATER, FRESH-CLONE READY · 2026-10-12
+At Michael's request the self-updater is gone entirely and this branch starts clean from
+main: it carries update 5 (the Windows app, PR #1) and update 6 (animation and combos,
+PR #2) merged together, plus the standalone 1.2.0 app and packaging safeguards from PR #5
+(which came by way of PR #4). The updater code, its GitHub workflow, update tests and key
+handling were never added here. Earlier notes for the updater (old update 7, PR #3) and
+the credential fix live only on those PR branches.
+
+WHAT THE CHECK FOUND AND FIXED
+3D game (dist/3d/):
+- anim.mjs: on a slow PC (about 12 frames a second or fewer) the squash and flinch springs
+  blew up to NaN after a jump landing or a hit and Darren vanished until reload. Springs
+  now step in small fixed sub-steps and reset if they ever go non-finite.
+- anim.mjs: the Idle breathing used the wall clock, so it kept moving while paused.
+- sim.mjs: a hero knocked out mid-air after a jump attack could never jump-attack again
+  (also after defeat and Try again). jump() now clears the flag. New check in three-d.mjs.
+- game.mjs: controller layouts saved before Paws/Scarf (LT) and Special (RT) existed could
+  leave one button doing two things (e.g. Dodge moved to LT also swapped styles). A newer
+  action that clashes now gets a free button.
+- trail.mjs: weapon trails took one sample per screen frame, so on a 144 Hz monitor they
+  were a short stub. They now sample at most 60 times a second.
+Desktop app (desktop-app/):
+- main.cjs: a file with a space or accent in its name returned "not found" (the path was
+  re-encoded). snowday://game/3d without the trailing slash now redirects to /3d/ so the
+  page's files load from the right folder.
+- home/index.html: the start screen ignored the first controller press.
+- build-windows.cjs: when the temp folder is on another drive than the project (D: or
+  OneDrive vs C:) the build failed after deleting the previous build; it now copies.
+Fresh clone from GitHub:
+- tools/verify-scene.cjs rewrote previews/Darren-Storybook-Weight-Levels.png on every
+  npm test, leaving a changed file; it now only does so with --update-previews.
+- tests/firewood.cjs failed about 1 run in 15 because its robot stood at a wood pile while
+  one guard stayed out of the friends' reach; it now walks to that guard like a player.
+  The pixel game itself is unchanged (no dist/ file outside dist/3d/ differs from main).
+- README/START-HERE say the Windows zip is not stored in GitHub and how to build it.
+- package-lock.json added for the root test dependency.
+Windows zip rebuilt from this branch (1.2.0, no updater) and replaced in the project files.
