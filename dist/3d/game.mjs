@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { World, Game, CAST, KITS, BELLY, MOVE_WIND, clamp } from './sim.mjs';
+import { buildRig, Animator } from './anim.mjs';
+import { buildClips } from './clips.mjs';
 
 const $ = (id) => document.getElementById(id),
   canvas = $('view'),
@@ -655,6 +657,7 @@ function events() {
     if (e.type === 'hit' && e.damage)
       floater(e.x, e.y + 0.3, e.z, String(e.damage), e.power > 1 ? 'heavy' : '');
     if (e.type === 'hurt') {
+      if (heroes[e.actor]) heroes[e.actor].hurt = e.angle ?? null;
       tone(140, 0.22, 0.06);
       hurtFlash();
       shake = 0.3;
@@ -1228,31 +1231,117 @@ function resize() {
   camera.updateProjectionMatrix();
 }
 addEventListener('resize', resize);
+// How each hero moves (Claude update 6): natural walk/run speeds of the authored cycles, springy
+// tail bones, and Darren's wings.
+const HERO_MOTION = [
+  {
+    loco: { walk: 1.7, run: 5.8 },
+    chains: [['tail1', 'tail2', 'tail3', 'tail4', 'tail5']],
+    wings: ['wingL', 'wingR'],
+  },
+  { loco: { walk: 1.6, run: 5.5 }, chains: [['tail1', 'tail2', 'tail3']] },
+  { loco: { walk: 1.4, run: 5.1 }, chains: [['tail1', 'tail2', 'tail3']] },
+];
+let actionSerial = 0;
+const actionKeys = new WeakMap();
+// Picks the clip a hero should be showing from what the simulation says they are doing.
+function heroPose(a, i, h) {
+  const an = h.animator,
+    d = {
+      speed: a.action || a.charging ? 0 : a.speed,
+      vx: a.vx ?? 0,
+      vz: a.vz ?? 0,
+      air: a.air,
+      vy: a.vy,
+      yaw: a.yaw,
+      x: a.x,
+      y: a.y,
+      z: a.z,
+      hurt: h.hurt,
+      look: lookTarget(a),
+    };
+  if (a.down)
+    return { ...d, key: 'down', clip: an.has('Down') ? 'Down' : 'Idle', loop: true, blend: 0.3 };
+  const act =
+    a.action ||
+    (a.assist
+      ? { name: a.animation, time: a.assist.time, duration: 0.65, assist: a.assist }
+      : null);
+  if (act) {
+    const id = act.assist || act;
+    if (!actionKeys.has(id)) actionKeys.set(id, 'act' + actionSerial++);
+    let clip = act.anim || act.name;
+    if (clip === 'Jump' && an.has('JumpUp')) clip = 'JumpUp';
+    if (!an.has(clip)) clip = /^(Hurt|Knock|GetUp)/.test(clip) ? 'Idle' : 'Attack1';
+    const c = an.clips[clip],
+      time = c && act.duration ? (act.time / act.duration) * c.duration : act.time;
+    return {
+      ...d,
+      key: actionKeys.get(id),
+      clip,
+      time,
+      blend: act.blend ?? 0.07,
+      snapYaw: true,
+      noLook: act.name === 'Dodge',
+    };
+  }
+  if (a.charging)
+    return { ...d, key: 'charge', clip: 'Charge', loop: true, blend: 0.12, still: true };
+  if (a.air > 0.02) {
+    if (an.has('Fall')) {
+      const up = a.vy > 1.2;
+      return {
+        ...d,
+        key: up ? 'jumpup' : 'fall',
+        clip: up ? 'JumpUp' : 'Fall',
+        loop: !up,
+        blend: up ? 0.06 : 0.22,
+      };
+    }
+    return { ...d, key: 'jump', clip: 'Jump', blend: 0.1 };
+  }
+  if (an.landT < 0.3 && an.has('Land') && a.speed < 2.5)
+    return { ...d, key: 'land', clip: 'Land', time: an.landT, blend: 0.05 };
+  return { ...d, key: 'loco', clip: 'Idle', blend: an.current === 'land' ? 0.2 : 0.18 };
+}
+// The heroes glance at the boss they're fighting, or the nearest enemy, or the quest marker when close.
+function lookTarget(a) {
+  const boss = game.engaged;
+  if (boss && !boss.dead && Math.hypot(boss.x - a.x, boss.z - a.z) < 20)
+    return { x: boss.x, y: boss.y + 1.2, z: boss.z };
+  let best = null,
+    bd = 9;
+  for (const e of game.enemies) {
+    if (e.dead) continue;
+    const d = Math.hypot(e.x - a.x, e.z - a.z);
+    if (d < bd) {
+      bd = d;
+      best = e;
+    }
+  }
+  if (best) return { x: best.x, y: best.y, z: best.z };
+  const o = game.objective();
+  if (Math.hypot(o.x - a.x, o.z - a.z) < 6)
+    return { x: o.x, y: world.height(o.x, o.z) + 0.5, z: o.z };
+  return null;
+}
 function updateScene(dt) {
   for (let i = 0; i < 3; i++) {
     const a = game.actors[i],
-      h = heroes[i];
+      h = heroes[i],
+      an = h.animator;
+    an.update(game.paused ? 0 : dt, heroPose(a, i, h));
+    h.hurt = null;
     h.root.position.set(a.x, a.y + 0.01, a.z);
-    h.root.rotation.y = a.yaw;
-    if (h.current !== a.animation) {
-      const next = h.actions[a.animation];
-      if (next) {
-        h.actions[h.current]?.fadeOut(0.12);
-        next.reset().setEffectiveWeight(1).fadeIn(0.12).play();
-        if (!['Idle', 'Run', 'Charge'].includes(a.animation)) {
-          next.setLoop(THREE.LoopOnce, 1);
-          next.clampWhenFinished = true;
-        } else next.setLoop(THREE.LoopRepeat, Infinity);
-        h.current = a.animation;
-      }
-    }
-    h.mixer.update(game.paused ? 0 : dt);
+    h.root.rotation.y = an.yaw;
+    const belly = i === 0 ? game.belly : 0,
+      sq = an.squashY;
+    h.root.scale.set(
+      (h.base.x * (1 + 0.05 * belly)) / Math.sqrt(sq),
+      h.base.y * sq,
+      (h.base.z * (1 + 0.07 * belly)) / Math.sqrt(sq)
+    );
   }
-  heroes[0].root.scale.set(
-    heroes[0].base.x * (1 + 0.05 * game.belly),
-    heroes[0].base.y,
-    heroes[0].base.z * (1 + 0.07 * game.belly)
-  );
   updateFoes(dt);
   updateFloaters(dt);
   const a = game.player,
@@ -1488,24 +1577,31 @@ async function boot() {
         }
       });
       scene.add(root);
-      const mixer = new THREE.AnimationMixer(root),
-        actions = {};
-      for (const c of g.animations) actions[c.name] = mixer.clipAction(c);
+      // Authored clips (clips.mjs) replace the supplied ones of the same name; anything not yet
+      // authored keeps the supplied clip.
+      const rig = buildRig(root, CAST[i]),
+        authored = buildClips(rig),
+        names = new Set(authored.map((c) => c.name)),
+        all = [...authored, ...g.animations.filter((c) => !names.has(c.name))];
       for (const name of [
         'Idle',
         'Run',
-        'Jump',
         'Dodge',
-        'Attack1',
-        'Attack2',
-        'Attack3',
         'Charge',
         'ChargeAttack',
         'Interact',
         'Celebrate',
       ])
-        if (!actions[name]) throw Error(`${CAST[i]} is missing ${name}.`);
-      heroes.push({ root, mixer, actions, current: '', base: root.scale.clone() });
+        if (!all.some((c) => c.name === name)) throw Error(`${CAST[i]} is missing ${name}.`);
+      const animator = new Animator(root, rig, all, HERO_MOTION[i]);
+      heroes.push({
+        root,
+        animator,
+        actions: animator.actions,
+        rig,
+        base: root.scale.clone(),
+        hurt: null,
+      });
     }
     createDetails();
     setQuality();
@@ -1532,6 +1628,17 @@ async function boot() {
         retry,
         foeViews,
         padBindings: () => ({ ...padBindings }),
+        // Deterministic stepping for screenshots: runs the simulation and the animation at a fixed
+        // frame rate (the browser's own frame loop keeps running too).
+        advance: (seconds, input = { x: 0, z: 0 }, fps = 30) => {
+          for (let t = 0; t < seconds - 1e-6; t += 1 / fps) {
+            for (let k = 0; k < 60 / fps; k++) game.update(1 / 60, input);
+            events();
+            updateScene(1 / fps);
+          }
+          hud();
+          renderer.render(scene, camera);
+        },
         setView: (yaw, pitch = 0.3, distance = 8.5) => {
           cameraYaw = yaw;
           cameraPitch = pitch;

@@ -290,6 +290,8 @@ export class Game {
         down: false,
         kx: 0,
         kz: 0,
+        vx: 0,
+        vz: 0,
         assist: null,
         assistCd: 0,
       };
@@ -440,6 +442,7 @@ export class Game {
       [p.y, q.y] = [q.y, p.y];
       q.yaw = p.yaw;
       q.assist = null;
+      [q.vx, q.vz, p.vx, p.vz] = [p.vx, p.vz, 0, 0];
     }
     this.selected = i;
     this.navAge = 99;
@@ -456,6 +459,8 @@ export class Game {
       y: this.world.height(p.x, p.z),
       animation: 'Idle',
       assist: null,
+      vx: 0,
+      vz: 0,
     });
     this.cancelCharge();
     const q = this.actors[i];
@@ -496,6 +501,8 @@ export class Game {
         inv: 1.5,
         kx: 0,
         kz: 0,
+        vx: 0,
+        vz: 0,
         assist: null,
       });
     }
@@ -610,6 +617,22 @@ export class Game {
     a.cooldown = 0.12;
     this.emit('animation', { actor: this.selected, name });
   }
+  // Hit reactions are short actions of their own so the right animation plays and the hero can't act mid-stagger.
+  react(a, name, duration, extra = {}) {
+    a.action = {
+      name,
+      time: 0,
+      duration,
+      impact: null,
+      done: true,
+      charge: 0,
+      kind: this.actors.indexOf(a),
+      react: true,
+      ...extra,
+    };
+    a.animation = name;
+    a.vx = a.vz = 0;
+  }
   attack() {
     const a = this.player;
     if (this.paused || a.action || a.charging || a.cooldown > 0) return false;
@@ -643,12 +666,15 @@ export class Game {
     this.stats.charged++;
     return true;
   }
+  // Jumping is free movement now (no locked action), so the hero can steer and attack in the air.
   jump() {
     const a = this.player;
     if (this.paused || a.air > 0 || a.action || a.charging) return false;
     a.air = 0.01;
-    a.vy = 7;
-    this.startAction('Jump', 0.75);
+    a.vy = 7.2;
+    a.animation = 'Jump';
+    a.cooldown = 0.12;
+    this.emit('jump', { actor: this.selected });
     return true;
   }
   dodge() {
@@ -857,13 +883,22 @@ export class Game {
     a.kx += Math.sin(angle) * 6;
     a.kz += Math.cos(angle) * 6;
     this.combo = 0;
-    if (damage >= 12 && a.action && a.air <= 0) {
-      a.action = null;
-      a.animation = 'Idle';
+    // Big blows knock the hero down (then up again, untouchable meanwhile); medium ones stagger;
+    // small ones only make the body flinch. Armoured moves (Bucky's heavy swings) shrug them off.
+    const front = Math.abs(angleDiff(angle, a.yaw + Math.PI)) < Math.PI / 2,
+      armored = a.action?.armor && damage < 20;
+    if (!armored && a.air <= 0 && damage >= 14) {
+      this.react(a, 'Knockdown', 0.8, { next: { name: 'GetUp', duration: 0.62 } });
+      a.inv = 1.6;
+      a.kx += Math.sin(angle) * 4;
+      a.kz += Math.cos(angle) * 4;
+    } else if (!armored && a.air <= 0 && damage >= 7)
+      this.react(a, front ? 'HurtF' : 'HurtB', 0.36);
+    if (!armored) {
+      a.charging = false;
+      a.charge = 0;
     }
-    a.charging = false;
-    a.charge = 0;
-    this.emit('hurt', { damage, actor: this.selected, x: a.x, z: a.z, y: a.y + 1.6 });
+    this.emit('hurt', { damage, actor: this.selected, x: a.x, z: a.z, y: a.y + 1.6, angle });
     if (a.hp <= 0) {
       a.hp = 0;
       a.down = true;
@@ -1060,17 +1095,37 @@ export class Game {
       dz /= n;
       n = 1;
     }
-    if (n > 0.05 && !a.action && !a.charging) a.yaw = Math.atan2(dx, dz);
-    let speed = kit.speed * (a.charging ? 0.2 : a.action ? 0.12 : 1);
-    if (a.action?.name === 'Dodge') {
-      dx = Math.sin(a.yaw);
-      dz = Math.cos(a.yaw);
-      speed = 10;
-      n = 1;
+    // Smooth movement (Claude update 6): the hero accelerates and turns instead of snapping.
+    const steer = !a.action && !a.charging;
+    if (n > 0.05 && steer) {
+      const want = Math.atan2(dx, dz),
+        diff = angleDiff(want, a.yaw),
+        rate = a.speed < 0.5 || Math.abs(diff) > 2.6 ? 26 : 15;
+      a.yaw += clamp(diff, -rate * dt, rate * dt);
+      a.yaw = Math.atan2(Math.sin(a.yaw), Math.cos(a.yaw));
     }
+    let speed = kit.speed * (a.charging ? 0.2 : a.action ? 0.12 : 1),
+      tx = dx * speed,
+      tz = dz * speed,
+      accel = n > 0.05 ? (a.air > 0 ? 6 : 13) : a.air > 0 ? 2 : 16;
+    if (a.action?.name === 'Dodge') {
+      const t = a.action.time,
+        v = 10.5 * (1 - clamp((t - 0.3) / 0.25, 0, 1) ** 2);
+      tx = Math.sin(a.yaw) * v;
+      tz = Math.cos(a.yaw) * v;
+      accel = 40;
+    }
+    a.vx += (tx - a.vx) * (1 - Math.exp(-accel * dt));
+    a.vz += (tz - a.vz) * (1 - Math.exp(-accel * dt));
+    if (Math.hypot(a.vx, a.vz) < 0.03 && n < 0.05) a.vx = a.vz = 0;
     const ox = a.x,
       oz = a.z;
-    this.world.move(a, dx * speed * dt + a.kx * dt, dz * speed * dt + a.kz * dt);
+    this.world.move(a, a.vx * dt + a.kx * dt, a.vz * dt + a.kz * dt);
+    // Bumping into a wall stops the push into it, so the hero doesn't keep "running" on the spot.
+    const mx = (a.x - ox) / Math.max(dt, 1e-4) - a.kx,
+      mz = (a.z - oz) / Math.max(dt, 1e-4) - a.kz;
+    if (Math.abs(mx) < Math.abs(a.vx) * 0.5) a.vx = mx;
+    if (Math.abs(mz) < Math.abs(a.vz) * 0.5) a.vz = mz;
     a.kx *= Math.exp(-8 * dt);
     a.kz *= Math.exp(-8 * dt);
     a.speed = Math.hypot(a.x - ox, a.z - oz) / Math.max(dt, 0.0001);
@@ -1096,7 +1151,8 @@ export class Game {
       }
       if (q.time >= q.duration) {
         a.action = null;
-        a.animation = a.moving ? 'Run' : 'Idle';
+        a.animation = a.air > 0 ? 'Jump' : a.moving ? 'Run' : 'Idle';
+        if (q.next) this.react(a, q.next.name, q.next.duration);
       }
     } else if (!a.charging) a.animation = a.air > 0 ? 'Jump' : a.moving ? 'Run' : 'Idle';
     this.navAge += dt;
