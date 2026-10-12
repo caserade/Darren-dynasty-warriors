@@ -1,3 +1,39 @@
+TEST RESULTS · CLAUDE UPDATE 7 (THE WINDOWS APP UPDATES ITSELF) · 2026-10-12
+Environment: Linux cloud container, Node 22.22, Electron 44.4.5 under Xvfb, driven by
+Playwright 1.56, software WebGL (SwiftShader). A local web server stood in for GitHub.
+This isn't a Windows PC, and no update was fetched from the real GitHub repo.
+
+UPDATER (tests/desktop-update.cjs, now in npm test) — 28 of 28 pass
+  First start uses the bundled game with no news; "nothing published yet" is reported
+  plainly; a newer game downloads only its changed and new files (2 of 5 here); nothing
+  switches before apply; the new game has new + unchanged files; the bundled folder is
+  never changed; the news shows once; a restart keeps the downloaded game; the same game
+  again downloads nothing; an older game never replaces a newer one; a file failing its
+  checksum stops the update and leaves no half-written folder; a file name outside the
+  game folder is refused; a game needing a newer app is not installed; offline keeps the
+  current game; a damaged download falls back to the bundled game; a newer app copy wins
+  and clears old downloads; "go back to the bundled game" works; no source = off;
+  private-repo (API + key) and public-repo download addresses are right; the real dist/
+  makes a valid manifest (50 files).
+
+DESKTOP APP (tests/desktop-app.cjs) — 17 of 17 pass, from the checkout and as a packaged
+Linux build (same layout as the Windows zip)
+  The 12 earlier checks, plus: the start screen says the game was updated; only the 2
+  changed files were downloaded out of 51; the updated game is what plays; saves are kept
+  across the update; offline after an update it still plays the updated game and does not
+  repeat the news. Screenshot: qa-screenshots/desktop-04-updated-*.png.
+
+EXISTING SUITE
+  node tests/gameplay.cjs, firewood.cjs, phone.cjs, tools/verify-scene.cjs: pass.
+  npm test: passed 3 of 4 runs. The one failure was an assertion in a pixel firewood
+  check (enemy/quest timing); it passed alone 3 times and in the next 3 full runs.
+  dist/ is not changed by this update, so this is an existing intermittent check.
+
+NOT TESTED
+  A real Windows PC; the GitHub workflow running on GitHub (it runs after merge to main);
+  downloads from the real private repo with the real read-only key; slow or flaky real
+  internet beyond the timeouts and failure cases simulated above.
+
 TEST RESULTS · CLAUDE UPDATE 6 (FLUID ANIMATION, COMBOS, POLKA SCARF, SMARTER AI · 3D ONLY) · 2026-10-12
 Environment: Linux cloud container, Node 22.22, headless Chromium (Playwright 1.56),
 software WebGL (SwiftShader). This isn't a real GPU, Windows PC, phone or physical

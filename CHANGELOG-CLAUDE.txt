@@ -379,3 +379,48 @@ TESTS
 - tests/browser-qa.cjs: 4 checks updated for the new moves (PawN1 opener, finisher on K
   inside the combo window, LT/RT pad defaults, friends joining fights). 63 of 63 pass.
 - Windows app zip rebuilt from the PR #1 branch with this dist/.
+
+CLAUDE UPDATE 7 · THE WINDOWS APP UPDATES ITSELF · 2026-10-12
+michael asked whether every update means downloading the whole app again. No longer: the
+app (version 1.1.0) now fetches new versions of the game on its own.
+
+WHAT'S NEW
+- Every time the app starts it asks GitHub whether a newer game exists. If so it downloads
+  only the game files that changed (often well under 1 MB; at most the 34 MB game, never
+  the 180 MB app), checks each file's SHA-256, and switches to it as soon as the start
+  screen is showing. If you are mid-game it waits until you go back to the start screen
+  (Ctrl+H) or open the app next time.
+- The start screen shows a yellow note once: "The game was updated! Game from <date>. New:
+  <title of the newest update in this changelog>". Otherwise it shows the game's date and
+  "The game is up to date" or "Offline, so the game was not checked for updates".
+- Game > "Check for game updates" checks again without restarting.
+- Test > "Go back to the game that came with the app" drops downloaded updates.
+- Saves, sound and controller settings are untouched by updates.
+- Safety: a download that fails its checksum, stops halfway, or lists a file outside the
+  game folder is thrown away and the current game keeps playing. A newer game never gets
+  replaced by an older one. A game that needs a newer app says so instead of installing.
+  If downloaded files go missing, the app falls back to the game it came with.
+
+HOW UPDATES ARE PUBLISHED
+- .github/workflows/publish-game-update.yml: on every push to main that changes dist/ (or
+  the changelog), GitHub runs tools/publish-game-update.cjs and replaces the game-updates
+  branch with latest.json + game/. Future threads only need to get their change merged
+  into main; no zip rebuild and no upload.
+- The repo is private, so the app carries a read-only GitHub key (michael's choice on
+  2026-10-12). It is put into the build from desktop-app/update-token.txt or
+  SNOWDAY_UPDATE_TOKEN and is never committed. Without a key the app can only read a
+  public repo.
+- A new app zip is needed only when desktop-app/ itself changes (raise package.json version
+  and MIN_APP in tools/publish-game-update.cjs).
+
+FILES
+- desktop-app/updater.cjs (new), desktop-app/game-manifest.cjs (new),
+  desktop-app/update-config.json (new: repo and branch, no key), main.cjs (serves the
+  newest game, update status for the start screen, menu items), home/index.html (update
+  note), build-windows.cjs (writes the bundled game's manifest and update settings into
+  resources/), package.json 1.0.0 -> 1.1.0, README.md.
+- tools/publish-game-update.cjs (new), .github/workflows/publish-game-update.yml (new).
+- tests/desktop-update.cjs (new, 28 checks, added to npm test); tests/desktop-app.cjs
+  gains 5 update checks. dist/ is unchanged.
+- This branch also carries update 5 (PR #1, the app) and update 6 (PR #2, animation) merged
+  together, so merging it alone brings everything to main.
