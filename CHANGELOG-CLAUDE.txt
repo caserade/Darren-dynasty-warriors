@@ -406,8 +406,8 @@ HOW UPDATES ARE PUBLISHED
   the changelog), GitHub runs tools/publish-game-update.cjs and replaces the game-updates
   branch with latest.json + game/. Future threads only need to get their change merged
   into main; no zip rebuild and no upload.
-- The repo is private, so the app carries a read-only GitHub key (michael's choice on
-  2026-10-12). It is put into the build from desktop-app/update-token.txt or
+- The repo is private, so the app carries a read-only GitHub key (the recommended option; michael
+  is choosing on 2026-10-12). It is put into the build from desktop-app/update-token.txt or
   SNOWDAY_UPDATE_TOKEN and is never committed. Without a key the app can only read a
   public repo.
 - A new app zip is needed only when desktop-app/ itself changes (raise package.json version
