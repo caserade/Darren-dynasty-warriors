@@ -5,3 +5,4 @@
 *.glb binary
 *.bin binary
 *.zip binary
+*.command text eol=lf

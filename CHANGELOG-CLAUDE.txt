@@ -216,3 +216,45 @@ LEFT FOR LATER
   dist/3d/sim.mjs in metres). Merging them would mean loading one game's code into the
   other and re-checking all the balance, so it was left as is.
 - For update 4: the 3D models are still 17 MB, and there are still only Windows launchers.
+
+CLAUDE UPDATE 4 · SMALLER 3D MODELS, MAC LAUNCHERS · 2026-10-12
+
+SMALLER 3D MODELS (dist/3d/assets, 17.0 MB -> 6.3 MB)
+- tormund.glb 7.60 -> 2.63 MB, bucky.glb 5.65 -> 1.72 MB, terrain.glb 2.21 -> 1.29 MB,
+  darren.glb 0.93 -> 0.65 MB.
+- Most of the size was Tormund's and Bucky's bumpiness (normal) and shininess
+  (metal/roughness) maps, stored as 2048x2048 PNGs. They are now
+  2048x2048 JPEGs at quality 90 with no colour subsampling, the same format the colour
+  textures already used. Texture size, colour textures, animations, bone names and
+  materials are unchanged.
+- Vertex positions, normals, texture coordinates and bone weights are stored in smaller
+  number types (the standard KHR_mesh_quantization option, which Three.js reads with no
+  extra decoder file). Positions move by less than 0.1 mm on the characters and about
+  2 mm on the 144 m terrain.
+- Duplicate data (one repeated skin per character, unused accessors) was removed.
+- Checked by rendering every model before and after from several angles, close up and
+  mid-attack: the pictures differ only on a few edge pixels (0.01-0.5% of pixels), and a
+  Tormund close-up side by side shows no visible change. Triangle counts and bounding
+  boxes match.
+- tools/shrink-models.mjs is the script that did it (gltf-transform + sharp, installed
+  outside the folder with --no-save; see the comment at its top). The original models are
+  in the first git commit and in the original download.
+- Not used on purpose: WebP/KTX2 textures and Draco/meshopt compression. They would shrink
+  the models further but need newer browsers or extra decoder files shipped with the
+  game; JPEG and quantization work everywhere the game already ran.
+
+MAC LAUNCHERS
+- New PLAY-3D.command and PLAY-PIXEL.command: double-click in Finder. Like the Windows
+  .cmd launchers they use Node.js if installed, otherwise Python 3, and say what to install
+  if neither is there. They also look in /opt/homebrew/bin and /usr/local/bin, where the
+  Node.js and Homebrew installers put node.
+- desktop-server.cjs now opens the browser on a Mac too (it only did on Windows);
+  desktop-server.py already did. Opening the second launcher while the first runs reuses
+  the same address, so saves stay shared, as in update 3.
+- .gitattributes keeps the .command files with Unix line endings, and git marks them
+  executable.
+- First run on a Mac: macOS may refuse a launcher downloaded from the internet. Right-click
+  it, choose Open, then Open again; after that a double-click works. If it says you lack
+  "access privileges" (the zip lost the executable mark), open Terminal and run
+  `chmod +x ` followed by dragging the launcher into the window, then press Return.
+- README.md and START-HERE.txt describe both.

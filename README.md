@@ -11,6 +11,8 @@ Both games share sound, difficulty, a few controller buttons and story progress 
 ## Play
 
 - Windows: double-click `PLAY-3D.cmd` or `PLAY-PIXEL.cmd`.
+- Mac: double-click `PLAY-3D.command` or `PLAY-PIXEL.command` (the first time, right-click and
+  choose Open).
 - Anywhere with Node.js: `npm start` (3D) or `npm run pixel`, then open the address it prints.
 
 Read `START-HERE.txt` for controls, phone play and the full history of the project.

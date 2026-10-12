@@ -1,3 +1,33 @@
+TEST RESULTS · CLAUDE UPDATE 4 (SMALLER 3D MODELS, MAC LAUNCHERS) · 2026-10-12
+Environment: Linux cloud container, Node 22.22, headless Chromium (Playwright 1.56),
+software WebGL (SwiftShader). This isn't a real GPU or a real Mac.
+
+MODELS (17.0 MB -> 6.3 MB)
+  Each model rendered before and after in Three.js from 4 views (front, back, close-up,
+  mid-Attack2) and the terrain from 2 views. Pixel difference: 38-55 dB PSNR, with only
+  0.01-0.5% of pixels changed by more than 24/255, all on polygon edges. Same triangle
+  counts; bounding boxes within 0.1 mm (characters) and 2 mm (terrain). All 11 animation
+  clips are still in each character. Side-by-side Tormund close-up:
+  qa-screenshots/3d-40-tormund-before-after-shrink.png.
+
+EXISTING SUITE (npm test) — all pass with the new models
+  (it also rewrites previews/Darren-Storybook-Weight-Levels.png; restored afterwards)
+
+REAL-BROWSER PASS (tests/browser-qa.cjs) — 63 of 63 pass with the new models
+  Console: no errors. Only the known harmless "net::ERR_ABORTED" lines for .glb models
+  when a test leaves the page while they load.
+
+MAC LAUNCHERS
+  Run with bash on Linux, with node told it is on macOS and a stand-in "open" command:
+  PLAY-3D.command started the game on port 8000 and opened /3d/; PLAY-PIXEL.command then
+  found it running, opened / on the same port and exited. With node hidden from PATH, the
+  same two steps worked through Python 3. With neither available, the launcher printed
+  the install message and waited for Return.
+
+NOT TESTED
+  A real Mac: Finder double-click, the macOS "unidentified developer" prompt, and Safari.
+  Performance on a real GPU (smaller files load faster; drawing cost is unchanged).
+
 TEST RESULTS · CLAUDE UPDATE 3 (TIDY CODE, SHARED SAVES, GIT) · 2026-10-12
 Environment: Linux cloud container, Node 22.22, headless Chromium (Playwright 1.56),
 software WebGL (SwiftShader). This isn't a real GPU, phone or physical controller.

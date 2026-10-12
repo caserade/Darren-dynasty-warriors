@@ -16,13 +16,21 @@ Double-click PLAY-3D.cmd for the 3D exploration game, or PLAY-PIXEL.cmd for the
 pixel game. The launchers use Node.js if installed, otherwise Python 3. If
 neither is installed, install one and run the launcher again. A local server
 window opens; keep it open while playing. Ctrl+C stops it. A browser tab opens
-on Windows. Avoid double-clicking index.html: 3D models/modules need HTTP.
+on Windows and Mac. Avoid double-clicking index.html: 3D models/modules need HTTP.
 These launchers need no npm packages to play. Browser saves from the hosted
 site do not automatically transfer to localhost or another computer.
 The two games share sound, Adventure/Cozy choice, the Attack/Dodge/Pause
 controller buttons and story progress (see CHANGELOG-CLAUDE.txt, update 3).
 Opening the second launcher while the first is running reuses the same game
 address, so the shared saves keep working.
+
+PLAY ON A MAC
+Double-click PLAY-3D.command or PLAY-PIXEL.command. They work like the Windows
+launchers (Node.js if installed, otherwise Python 3) and open the game in your
+browser; a Terminal window stays open while you play, and closing it stops the game.
+The first time, macOS may refuse a launcher from the internet: right-click it,
+choose Open, then Open again. If it says you lack access privileges, open Terminal,
+type chmod +x and a space, drag the launcher into the window and press Return.
 
 CONTENTS
 - dist/: full playable pixel game and both chapters.

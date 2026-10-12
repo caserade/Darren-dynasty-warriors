@@ -56,6 +56,8 @@ function openGame(url) {
   console.log('Darren game: ' + url + '\nKeep this window open. Ctrl+C stops the game server.');
   if (process.platform === 'win32')
     spawn('explorer.exe', [url], { stdio: 'ignore' }).on('error', () => {});
+  else if (process.platform === 'darwin')
+    spawn('open', [url], { stdio: 'ignore' }).on('error', () => {});
 }
 // Both games keep their saves in the browser storage of one address. If this game is already
 // running (for example the other launcher was opened first), open that address instead of
