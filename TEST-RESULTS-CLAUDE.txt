@@ -1,3 +1,54 @@
+TEST RESULTS · CLAUDE UPDATE 6 (FLUID ANIMATION, COMBOS, POLKA SCARF, SMARTER AI · 3D ONLY) · 2026-10-12
+Environment: Linux cloud container, Node 22.22, headless Chromium (Playwright 1.56),
+software WebGL (SwiftShader). This isn't a real GPU, Windows PC, phone or physical
+controller. Nothing below was checked on any of those.
+
+EXISTING SUITE (npm test) — all pass
+  tests/three-d.mjs       42 checks (28 before; the old 3-hit combo check replaced)
+  tests/shared-save.cjs   8 checks
+  tests/gameplay.cjs, firewood.cjs, phone.cjs, controllers.cjs, screen-fit.cjs  pass
+  tools/verify-scene.cjs  pass (it rewrites previews/Darren-Storybook-Weight-Levels.png;
+  restored afterwards). The pixel game was not changed.
+
+NEW SIMULATION CHECKS (tests/three-d.mjs, game logic without drawing)
+  Darren: Polka Scarf swap and save; scarf string reach; scarf finishers, Snare pull and
+  Polka Cyclone special. Tormund: 5-hit string and finishers; jump plunge and shield ram;
+  parry and counter. Bucky: string, super armor, finishers and the line crack. AI: grunts
+  ring and back off, step out of danger zones; crow and bale dashes; boss move choice and
+  fury below half health; friends walk over and join a fight.
+  The whole-adventure robot run still clears every camp and boss.
+
+REAL-BROWSER PASS (tests/browser-qa.cjs) — 63 of 63 pass after 4 test updates
+  First run: 59 of 63. All four were the test expecting update-5 behaviour, not game
+  faults, and each was looked at in the running game before the test was changed:
+  - "J starts combo animation": the first paw hit is now PawN1, not Attack1.
+  - "hold K charges": K straight after a combo hit now fires a finisher (as designed), so
+    the test waits for the combo window to close before holding K.
+  - "Restore standard buttons": the default pad layout gained style (LT) and special (RT).
+  - "grunts hurt the hero": the friends now join fights and knocked out every grunt first.
+    The test moves the friends away and puts two fresh grunts next to Darren.
+  Second run: 63 of 63. Console: no errors. Only the known harmless "net::ERR_ABORTED"
+  lines for .glb models when a test leaves the page while they load.
+
+ANIMATION REVIEW
+  Every new clip was rendered as contact sheets (Three.js, SwiftShader) from several
+  angles and read frame by frame, plus in-game strips captured right after each game
+  step. Problems found and fixed this way included spins ending backwards, the scarf
+  ribbon flying upward, a sword that couldn't point forward, a roll that floated and arms
+  that stayed out after spins. Sample sheets: /mnt/project-files/animation-pass/.
+  This is a still-frame review: how smooth it feels at full frame rate on a real GPU was
+  not seen.
+
+WINDOWS APP
+  Rebuilt from the PR #1 branch with this branch's dist/ and replaced the download.
+  A Linux build of the same app passed all 12 tests/desktop-app.cjs checks (xvfb).
+  The Windows .exe itself was not run.
+
+NOT TESTED
+  Real GPU frame rate, a real controller (new default: right trigger = Special, left
+  trigger = style swap), phones, Windows, and difficulty/feel with a human player.
+  Combat balance was only checked by the robot run.
+
 TEST RESULTS · CLAUDE UPDATE 4 (SMALLER 3D MODELS, MAC LAUNCHERS) · 2026-10-12
 Environment: Linux cloud container, Node 22.22, headless Chromium (Playwright 1.56),
 software WebGL (SwiftShader). This isn't a real GPU or a real Mac.

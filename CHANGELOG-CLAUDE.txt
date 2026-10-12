@@ -258,3 +258,98 @@ MAC LAUNCHERS
   "access privileges" (the zip lost the executable mark), open Terminal and run
   `chmod +x ` followed by dragging the launcher into the window, then press Return.
 - README.md and START-HERE.txt describe both.
+
+
+CLAUDE UPDATE 6 · FLUID ANIMATION, CHARACTER COMBOS, POLKA SCARF, SMARTER AI · 2026-10-12
+3D game only (dist/3d/). The pixel game is untouched, at michael's request. (Update 5,
+the Windows app, lives on its own branch / PR #1.) Scope and before-pictures:
+/mnt/project-files/animation-pass/scope.md in the project files.
+
+HOW THE NEW ANIMATION WORKS
+- The supplied models, skins, textures and Darren's look are unchanged. New motion is
+  authored in code as key poses on the existing skeletons (dist/3d/clips.mjs) and turned
+  into Three.js animation clips when the game loads (dist/3d/anim.mjs). Authored clips
+  replace the supplied ones of the same name; nothing went back through Blender.
+- New animator (anim.mjs Animator) instead of the flat 0.12 s cross-fades: per-transition
+  blend times, walk/run blended and speed-matched to real ground speed (feet don't
+  slide), turn-rate-limited facing with lean and banking, head look-at toward the fight,
+  spring tails and wings, landing squash, hit flinches, and hit-stop on heavy hits.
+- Movement has momentum (smoothed acceleration and turning). Jumping is free movement,
+  so heroes can steer and attack in the air. New reactions: hurt front/back, knockdown
+  and get-up (untouchable while getting up).
+- Move data lives in dist/3d/moves.mjs, shared by the simulation and the clips, so the
+  hit frames and the animation always line up.
+
+CONTROLS (Dynasty Warriors style)
+- J builds each hero's normal string; pressing during a move queues the next hit.
+- K right after hit N gives that hero's finisher; holding K from standing still charges
+  the old power move (packed snowball, Crescent cleave, Timber quake).
+- J in the air is a jump attack; J after sprinting is a dash attack.
+- L (controller default: right trigger, touch: Special button) spends a full gold Special
+  meter that fills as you land hits. The hero is untouchable during it.
+- Q (controller default: left trigger, touch: Paws / Scarf button) swaps Darren's weapon.
+- Shift as Tormund while standing still raises the shield (parry, see below).
+
+DARREN (3 passes)
+1. Movement: idle with breathing and tail sway, walk, bounding run, jump/fall/land,
+   tucked dodge roll, hurts, knockdown/get-up, charge, interact and celebrate.
+2. Bare Paws: 6-hit string (jab, cross, hop kick, tail-whip spin, wing buffet, somersault
+   tail slam). Finishers: wing uppercut launcher, tail-sweep trip, snowball volley, wing
+   gust, belly flop (stronger with each belly stage). Corkscrew jump attack, rolling
+   tackle dash, Scarf-Star Blizzard special.
+3. Polka Scarf (new weapon): his yellow scarf with pink dots becomes a long ribbon
+   (dist/3d/ribbon.mjs, a physics chain from his collar into his right paw that cracks
+   straight on each hit). The short scarf end is hidden while it is out. 6-hit lash
+   string (lash, backhand, overhead crack, twirl, figure-eight, helicopter rise),
+   finishers (launcher, spinning top, lasso yank and kick, ribbon dance, shockwave
+   crack), the hold move becomes the Polka Snare that drags foes to him, spiral-drop
+   jump attack, ribbon-slide dash, Polka Cyclone special that pulls a crowd in. Longer
+   reach, lower damage per hit than the paws. The choice is saved.
+
+TORMUND (3 passes)
+1. Knight stance (shield turned forward, sword ready), knee-bending walk, shield-forward
+   run, roll, hurts, knockdown/get-up.
+2. 5-hit string (rising slash, backhand, shield bash, thrust, spinning cleave).
+   Finishers: shield charge, launcher cut, guard-break overhead, sweeping arc, leaping
+   cleave. Plunge jump attack, shield-ram dash, Golden Crescent special, new Crescent
+   cleave animation.
+3. Shield parry: dodge from a standstill raises the shield; a frontal hit in the first
+   0.32 s is blocked, staggers nearby grunts and answers with a counter-cut. Dodge with
+   the stick held still rolls. Sword trails, victory flourish, kneeling interact.
+
+BUCKY (3 passes)
+1. Mallet on his shoulder, rolling waddle and heavy run, big landing thump, belly-first
+   hip-bump dodge hop, hurts, knockdown/get-up.
+2. 4-hit armored string (side swing, backswing, overhead smash, double spin): small
+   hits don't interrupt it. Finishers: belly bump, uppercut launcher, hammer-throw
+   whirl, log splitter (a straight ground crack). Ground-pound jump attack, rolling
+   ball dash, Timber Avalanche special, new Timber quake animation.
+3. Mallet trails, camera thump on his heavy hits, victory flex, interact.
+
+SMARTER AI (dist/3d/sim.mjs)
+- Grunts: the nearest four press the attack (still at most three winding up at once);
+  the rest circle in a loose ring waiting their turn. They back off from a charging hero,
+  badly hurt gophers and crows run for a moment (camp guards don't), crows dive-bomb and
+  hay bales roll-charge after a glowing telegraph, and all of them step out of their
+  boss's marked attack. A hero's special leaves them dazed.
+- Bosses: moves are weighted by distance and by how you fight (standing your ground or
+  charging near them invites a slam or a volley; far away invites a charge), and the same
+  move rarely comes twice. Below half health they become furious (banner): wind-ups 20%
+  quicker but still always marked, less rest, and often two attacks back to back.
+- Friends: walk over to foes near the hero, fight with their own string and a finisher
+  every fourth swing, step out of boss warnings, and come back when you move on.
+
+SAVES
+- 3D save stays snowday-3d-v1 version 1 with one new optional field, style ('paws' or
+  'scarf'); anything else loads as paws. Controller layout keeps its key and gains
+  special and style defaults. Pixel saves untouched.
+
+TESTS
+- tests/three-d.mjs: 42 checks (the old 3-hit combo check was replaced), new ones for
+  every hero's string and finishers, jump/dash attacks, the Special meter, launch/knockdown, the scarf's reach,
+  snare and cyclone, Tormund's parry, Bucky's armor and line crack, the grunt ring,
+  dives and rolls, boss move choice and fury, and friends joining fights.
+- The whole-adventure test bot now goes looking for the boss it was sent to fight.
+- tests/browser-qa.cjs: 4 checks updated for the new moves (PawN1 opener, finisher on K
+  inside the combo window, LT/RT pad defaults, friends joining fights). 63 of 63 pass.
+- Windows app zip rebuilt from the PR #1 branch with this dist/.
