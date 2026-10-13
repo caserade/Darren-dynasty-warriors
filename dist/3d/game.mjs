@@ -674,9 +674,11 @@ function ring(e) {
 }
 // Darren's hit effects (studio pass 5): a bright impact star and a burst of snow where his blow
 // lands, flung the way he struck, and a short camera kick the same way on heavy blows.
+// Tormund's sword gets the same, plus a spray of steel sparks (Tormund studio pass 5).
 const impacts = [];
 let starMap = null,
   snowGeo = null,
+  sparkGeo = null,
   kick = 0,
   kickX = 0,
   kickZ = 0;
@@ -742,16 +744,71 @@ function impactBurst(e) {
     scene.add(m);
     impacts.push({ m, life: 0.45 + Math.random() * 0.2, max: 0.6 });
   }
-  while (impacts.length > 90) {
-    const f = impacts.shift();
-    scene.remove(f.m);
-    f.m.material.dispose();
-  }
+  if (e.actor === 1) steelSparks(e.x, e.y - 0.3, e.z, dx, dz, (heavy ? 14 : 9) >> (low ? 1 : 0));
+  trimImpacts();
   if (heavy) {
     kick = 1;
     kickX = dx * 0.12;
     kickZ = dz * 0.12;
   }
+}
+function trimImpacts() {
+  while (impacts.length > 90) {
+    const f = impacts.shift();
+    scene.remove(f.m);
+    f.m.material.dispose();
+  }
+}
+// Short bright streaks thrown mostly the way the blade travelled, falling as they fade.
+function steelSparks(x, y, z, dx, dz, n, spread = 1.4) {
+  sparkGeo ??= new THREE.BoxGeometry(0.014, 0.014, 0.17);
+  for (let i = 0; i < n; i++) {
+    const m = new THREE.Mesh(
+      sparkGeo,
+      new THREE.MeshBasicMaterial({
+        color: i % 3 ? 0xffe2a0 : 0xffffff,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      })
+    );
+    m.position.set(x, y, z);
+    const a = (Math.random() - 0.5) * spread,
+      sp = 5 + Math.random() * 4;
+    m.userData.v = new THREE.Vector3(
+      (dx * Math.cos(a) + dz * Math.sin(a)) * sp,
+      1 + Math.random() * 3.5,
+      (dz * Math.cos(a) - dx * Math.sin(a)) * sp
+    );
+    scene.add(m);
+    impacts.push({ m, life: 0.18 + Math.random() * 0.14, max: 0.32, spark: true });
+  }
+}
+// Tormund's parry (studio pass 5): a flash and sparks on the shield itself, and a ringing clang.
+function shieldFlash(e) {
+  const h = heroes[e.actor],
+    mark = h?.root.getObjectByName('shield_centre'),
+    p = new THREE.Vector3(e.x, e.y, e.z),
+    a = game.actors[e.actor];
+  if (mark) mark.getWorldPosition(p);
+  starMap ??= starTexture();
+  const star = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: starMap,
+      color: 0xe8f3ff,
+      transparent: true,
+      depthWrite: false,
+      depthTest: false,
+    })
+  );
+  star.renderOrder = 5;
+  star.position.copy(p);
+  scene.add(star);
+  impacts.push({ m: star, life: 0.28, max: 0.28, size: 2.4, star: true });
+  const dx = Math.sin(a?.yaw || 0),
+    dz = Math.cos(a?.yaw || 0);
+  steelSparks(p.x, p.y, p.z, dx, dz, $('quality').value !== 'high' ? 8 : 16, 2.6);
+  trimImpacts();
 }
 function updateImpacts(dt) {
   for (let i = impacts.length - 1; i >= 0; i--) {
@@ -766,6 +823,8 @@ function updateImpacts(dt) {
       v.y -= 14 * dt;
       f.m.position.addScaledVector(v, dt);
       f.m.material.opacity = Math.min(1, k * 2);
+      // Sparks point along their flight, so they read as streaks.
+      if (f.spark) f.m.lookAt(f.m.position.x + v.x, f.m.position.y + v.y, f.m.position.z + v.z);
     }
     if (f.life <= 0) {
       scene.remove(f.m);
@@ -784,7 +843,7 @@ function events() {
     if (e.type === 'hit') {
       ring(e);
       tone(660, 0.08);
-      if (e.actor === 0 && e.angle !== undefined) impactBurst(e);
+      if ((e.actor === 0 || e.actor === 1) && e.angle !== undefined) impactBurst(e);
     }
     if (e.type === 'snowburst') ring(e);
     if (e.type === 'throw') tone(380, 0.2);
@@ -797,6 +856,10 @@ function events() {
       ring({ x: e.x, z: e.z, y: e.y - 1.2, r: 1.6, strong: true, color: 0xfff1b0 });
       floater(e.x, e.y + 0.3, e.z, 'PARRY!', 'heal');
       tone(1180, 0.12, 0.05);
+      if (e.actor === 1) {
+        shieldFlash(e);
+        tone(1570, 0.18, 0.035);
+      }
     }
     if (e.type === 'special') {
       banner(e.name, 'SPECIAL');
@@ -1374,7 +1437,7 @@ function updateCamera(dt) {
     cameraInitialized = true;
   } else camera.position.lerp(desired, 1 - Math.exp(-dt * 12));
   camera.lookAt(aim);
-  // Kick from Darren's heavy blows: a quick push the way he struck that eases straight back.
+  // Kick from Darren's and Tormund's heavy blows: a quick push the way he struck that eases straight back.
   if (kick > 0 && !game.paused) {
     kick = Math.max(0, kick - dt * 7);
     const k = Math.sin(kick * Math.PI) * kick;
