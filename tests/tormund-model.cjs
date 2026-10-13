@@ -10,9 +10,9 @@ const names = json.nodes.map((n) => n.name),
   node = (n) => json.nodes[names.indexOf(n)];
 const triangles = (n) =>
   json.meshes[node(n).mesh].primitives.reduce((s, p) => s + json.accessors[p.indices].count / 3, 0);
-// Which paw holds which (the model's own sides: hand_L is his left).
-const SWORD_HAND = 'hand_L',
-  SHIELD_HAND = 'hand_R';
+// Sword in his right paw, shield on his left arm, as in the design (hand_R is his right).
+const SWORD_HAND = 'hand_R',
+  SHIELD_HAND = 'hand_L';
 const jointOf = (n) => {
   const p = json.meshes[node(n).mesh].primitives[0],
     acc = json.accessors[p.attributes.JOINTS_0],
@@ -65,11 +65,19 @@ const checks = [
     },
   ],
   [
+    'parry flash marker rides on the shield arm',
+    () => assert(node(SHIELD_HAND).children.includes(names.indexOf('shield_centre'))),
+  ],
+  [
     'baked soft shadowing on the body',
     () => {
       const mesh = json.meshes.find((m) => /^tripo_mesh/.test(m.name));
       assert('COLOR_0' in mesh.primitives[0].attributes);
     },
+  ],
+  [
+    'no supplied animations left (every clip comes from clips.mjs)',
+    () => assert(!json.animations?.length),
   ],
   ['the file stays small', () => assert(glb.length < 3.5 * 1048576, glb.length + ' bytes')],
 ];

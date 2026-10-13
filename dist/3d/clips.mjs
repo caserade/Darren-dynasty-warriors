@@ -1667,7 +1667,11 @@ function bipedLocomotion(cfg) {
   };
 }
 
-// ---- Tormund: sword in his LEFT paw, shield on his RIGHT ----
+// ---- Tormund: sword and shield ----
+// His moves are written below with the sword in his LEFT paw and the shield on his RIGHT, as the
+// supplied model had them. The design has it the other way round, so since studio pass 4 his
+// model holds the sword in the right paw and every Tormund pose is mirrored when the library is
+// built (LIBRARY.Tormund at the end of this file). Read 'left' below as his shield side's mirror.
 // Knightly stance: shield side turned a little forward, sword held up and ready.
 // A held weapon sits across the fist, so the paw points along the forearm with the blade (or shield
 // face) square to it: the paw's aim is the forearm direction with the blade direction taken out.
@@ -3871,12 +3875,25 @@ function darrenScarf() {
     },
   };
 }
+// Left/right mirror of whole clips: every key pose (or pose function) swaps sides.
+function mirrorClips(specs) {
+  const out = {};
+  for (const [name, sp] of Object.entries(specs))
+    out[name] = sp.fn
+      ? { ...sp, fn: (p, t) => mirror(sp.fn(p, t)) }
+      : { ...sp, keys: sp.keys.map(([t, pose, f]) => [t, mirror(pose || {}), f]) };
+  return out;
+}
 export const LIBRARY = {
   Darren: {
     base: D_STANCE,
     clips: () => withKnees({ ...darrenLocomotion(), ...darrenPaws(), ...darrenScarf() }),
   },
-  Tormund: { base: T_BASE, clips: () => ({ ...tormundLocomotion(), ...tormundSword() }) },
+  // Mirrored: sword in his right paw, shield on his left, as in the design (studio pass 4).
+  Tormund: {
+    base: mirror(T_BASE),
+    clips: () => mirrorClips({ ...tormundLocomotion(), ...tormundSword() }),
+  },
   Bucky: { base: B_BASE, clips: () => ({ ...buckyLocomotion(), ...buckyMallet() }) },
 };
 

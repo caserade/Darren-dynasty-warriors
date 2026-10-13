@@ -6,7 +6,7 @@
 //
 // Rig and skin (studio pass 2):
 //   - the neck and head bones stop moving the top of the breastplate and the scarf's lower edge;
-//   - softer blends between bones (see reskinBody for what was tried and dropped);
+//   (see reskinBody for what was tried, measured and dropped);
 //   - fists: the supplied paws are flat and open; the fingers are curled into fists around a
 //     grip line that runs front to back through each paw.
 //
@@ -131,35 +131,16 @@ function topology(prim) {
   }
   return { P, weld, nb, n };
 }
-// Averages each welded vertex's weights with its neighbours' (keeps bends soft, never spreads far).
-function smoothWeights(top, maps, rounds, keep = 0.5) {
-  for (let r = 0; r < rounds; r++) {
-    const acc = new Map();
-    maps.forEach((m, i) => {
-      const w = top.weld[i];
-      if (!acc.has(w)) acc.set(w, m);
-    });
-    const next = new Map();
-    for (const [w, m] of acc) {
-      const out = {};
-      for (const [j, v] of Object.entries(m)) out[j] = v * keep;
-      const share = (1 - keep) / top.nb[w].size;
-      for (const o of top.nb[w])
-        for (const [j, v] of Object.entries(acc.get(o))) out[j] = (out[j] || 0) + v * share;
-      next.set(w, out);
-    }
-    maps.forEach((m, i) => (maps[i] = { ...next.get(top.weld[i]) }));
-  }
-}
 
 // ---------- skin weights (studio pass 2) ----------
-// Tried and dropped: making the breastplate and shoulder plates rigid, and hanging the tabard
-// from the hips. The body is one fused surface (plates, sleeves, tabard and trousers are not
-// separate pieces), so a rigid plate only moves the stretching to its edge: the stretch check
-// (tools/review/stretch.cjs) got worse by about a third and the chainmail sleeves visibly
-// squeezed into the shoulder plates. That needs the armour cut into separate pieces by an artist.
-// What helps on this mesh: the neck and head stop at the collar, and every blend between two
-// bones is softened a little (fewer sharply stretched edges at the knees, elbows and hips).
+// Tried and dropped, measured with the stretch check (tools/review/stretch.cjs, which counts
+// edges pulled past 1.6x or squeezed under half their length in the worst frame of every clip):
+//   - rigid breastplate and shoulder plates, and tabard flaps hung from the hips: the body is one
+//     fused surface (plates, sleeves, tabard and trousers are not separate pieces), so a rigid
+//     plate only moves the stretching to its edge; the chainmail sleeves visibly squeezed into the
+//     shoulder plates. That needs the armour cut into separate pieces by an artist;
+//   - softening every blend between bones: slightly worse (about 5% more stretched edges).
+// Kept: the neck and head stop at the collar, so looking around no longer drags the breastplate.
 function reskinBody(prim) {
   const top = topology(prim),
     maps = readWeights(prim).map(normalize);
@@ -171,16 +152,6 @@ function reskinBody(prim) {
       if (!v) continue;
       m[b] -= v;
       m[J.chest] = (m[J.chest] || 0) + v;
-    }
-  });
-  smoothWeights(top, maps, 4, 0.5);
-  // Smoothing must not carry the neck back down onto the breastplate.
-  maps.forEach((m, i) => {
-    const y = top.P[i][1];
-    if (y < 1.47) {
-      m[J.chest] = (m[J.chest] || 0) + (m[J.neck] || 0) + (m[J.head] || 0);
-      delete m[J.neck];
-      delete m[J.head];
     }
   });
   writeWeights(prim, maps);
@@ -651,6 +622,8 @@ async function buildShield(sx, hand) {
     .setImage(await shieldTexture())
     .setMimeType('image/jpeg');
   const j = J[hand];
+  // Where the parry flash goes (game.mjs): the middle of the shield's face.
+  addMarker('shield_centre', hand, new THREE.Vector3(cx, cy, zFront(0) + 0.02));
   addPart('Shield face', face, j, material('Shield paint', [1, 1, 1], 0, 0.55, { texture: tex }));
   addPart('Shield back', back, j, material('Shield wood', [0.13, 0.07, 0.03], 0, 0.8));
   addPart('Shield rim', gold, j, material('Shield gold', [0.66, 0.36, 0.06], 1, 0.32));
@@ -812,9 +785,22 @@ for (const name of ['Shield face', 'Shield rim', 'Sword blade', 'Sword grip', 'S
   node.getMesh()?.dispose();
   node.dispose();
 }
-buildSword(1, 'hand_L');
-await buildShield(-1, 'hand_R');
+// Sword in the right paw, shield on the left arm, as in the design (studio pass 4; the supplied
+// model had them the other way round, and clips.mjs mirrors his moves to match).
+buildSword(-1, 'hand_R');
+await buildShield(1, 'hand_L');
 bakeAO([main]);
+// The supplied clips are dropped (studio pass 4): the game builds every Tormund clip from clips.mjs,
+// and with no Attack1 its fallback for a missing move is Idle, not the stiff supplied swing.
+for (const a of root.listAnimations()) {
+  for (const sm of a.listSamplers()) {
+    sm.getInput()?.dispose();
+    sm.getOutput()?.dispose();
+    sm.dispose();
+  }
+  for (const c of a.listChannels()) c.dispose();
+  a.dispose();
+}
 await jpegTextures();
 
 // keepLeaves: the empty trail markers on the sword hand are leaves and must stay.

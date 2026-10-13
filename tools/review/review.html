@@ -131,8 +131,8 @@
           for (let k = 0; k < 3; k++) {
             const p = idx.getX(t + k),
               q = idx.getX(t + ((k + 1) % 3));
-            a.fromBufferAttribute(pos, p);
-            b.fromBufferAttribute(pos, q);
+            a.fromArray(m.userData.rest, p * 3);
+            b.fromArray(m.userData.rest, q * 3);
             const rest = a.distanceTo(b);
             if (rest < 1e-5) continue;
             const l = Math.log(posed[p].distanceTo(posed[q]) / rest);
@@ -213,8 +213,8 @@
               for (let k = 0; k < 3; k++) {
                 const p = idx.getX(t + k),
                   q = idx.getX(t + ((k + 1) % 3));
-                a.fromBufferAttribute(pos, p);
-                b.fromBufferAttribute(pos, q);
+                a.fromArray(m.userData.rest, p * 3);
+                b.fromArray(m.userData.rest, q * 3);
                 const rest = a.distanceTo(b);
                 if (rest < 0.006) continue; // ignore tiny edges, where any change looks huge
                 a.fromArray(posed, p * 3);
@@ -304,6 +304,16 @@
           return true;
         },
       };
+      // Rest positions as the game shows them (bind pose through the skin, so packed/quantized
+      // vertex data compares like for like), for the stretch views.
+      review.shot({ bind: true });
+      for (const m of meshes) {
+        const pos = m.geometry.attributes.position,
+          v = new THREE.Vector3();
+        m.userData.rest = new Float32Array(pos.count * 3);
+        for (let i = 0; i < pos.count; i++)
+          m.userData.rest.set(m.getVertexPosition(i, v).toArray(), i * 3);
+      }
       window.reviewReady = true;
     </script>
   </body>
