@@ -476,3 +476,74 @@ WHAT STILL NEEDS AN ARTIST
 - The colour texture is still the supplied AI-made one; hand-painted textures, real fists
   and fingers, eyelids for blinking and a full re-sculpt need an artist and 3D tools that
   are not part of this project.
+
+CLAUDE UPDATE 9 · TORMUND STUDIO PASS (3D ONLY, TORMUND ONLY) · 2026-10-13
+After Darren's pass Michael gave the go-ahead for Tormund: the same full scan, then four fix
+passes. This branch is built on Darren's branch, so it also carries update 8. Darren, Bucky
+and the pixel game are untouched. Scan report with before pictures: project files
+tormund-studio/scan.md.
+
+HOW THE MODEL IS MADE NOW
+- art-source/tormund-3d-original.glb is the supplied model as it first arrived (from git).
+- tools/tormund-model.mjs rebuilds dist/3d/assets/tormund.glb from it, every step in code
+  (needs gltf-transform + sharp via npm i --no-save, like tools/darren-model.mjs).
+- tools/review/ gains albedo, metal and stretch views, an in-game shooter (ingame.cjs) and a
+  stretch check over every clip (stretch.cjs), which counts edges pulled past 1.6x or squeezed
+  under half their length, measured against the skinned bind pose.
+
+PASS 2 · RIG AND SKIN
+- Fists: both paws are curled shut around a grip by a bend applied to the paw mesh, so the
+  sword sits in a closed fist instead of poking through flat fingers.
+- The neck and head bones now stop at the collar, so looking around no longer twists the top
+  of the breastplate and scarf.
+- Tried and dropped after measuring: rigid breastplate and shoulder plates, tabard flaps hung
+  from the hips, and softer blends at every joint. His body is one fused surface (plates,
+  sleeves, tabard and trousers are not separate pieces), so each made the stretching worse or
+  just moved it; the chainmail visibly squeezed into the shoulder plates.
+
+PASS 3 · MODEL AND LOOK
+- A real sword replaces the box: a bevelled steel blade, gold cross-guard with gold tips and
+  blue gems, a spiral-wrapped leather grip and a gem pommel.
+- A real heater shield replaces the box: domed blue face with the cream fleur-de-lis
+  (generated texture), gold rim with 16 rivets, wooden back with a strap.
+- Silver armour that reads silver: dist/3d/look.mjs gives his materials a small snowy sky
+  to reflect (reflections only, so fur, cloth and leather are lit exactly as before).
+  Before, the polished plates had nothing to reflect and went dark brown or black.
+- Soft shadowing baked into the vertex colours (under the scarf, belt and tabard, between
+  the legs, the tail root) and smooth normals across texture seams.
+- tormund.glb 2.76 MB -> 2.96 MB.
+
+PASS 4 · ANIMATION
+- Sword in his right paw and shield on his left, as in the design and the pixel game.
+  clips.mjs mirrors every Tormund pose when the library is built, so all his moves
+  (locomotion, the five-hit string, finishers, special, parry) match the new sides.
+- The off hand holds the shield face forward in his sword stance.
+- The supplied clips inside the file are gone; his fallback is Idle, not the stiff Attack1.
+
+PASS 5 · COMBAT FEEL AND EFFECTS
+- His landed blows get the impact star, snow burst and heavy-blow camera kick Darren got,
+  plus a spray of steel sparks.
+- The sword trail follows the real blade (trail.mjs between two markers in the model,
+  blade_base and blade_tip).
+- A successful parry flashes and sparks on the shield itself (shield_centre marker) with a
+  ringing clang.
+
+TESTS
+- New tests/tormund-model.cjs (in npm test): joints, real sword and shield, sword in the
+  right paw and shield on the left, blade and shield markers, baked shading, no supplied
+  clips, file size.
+- tests/three-d.mjs: new check that Tormund's hits say who struck and which way.
+
+APP
+- Desktop app version 1.4.0 (studio pass for Darren and Tormund).
+
+WHAT STILL NEEDS AN ARTIST
+- Hard armour still bends with the body and the tabard still stretches in long strides,
+  because his armour, sleeves and tabard are one fused surface; an artist needs to cut them
+  into separate pieces before they can move as rigid plates and loose cloth.
+- The shield still rides his paw bone, as the old box did (the rig has no strap bone).
+- The colour texture is still the supplied AI-made one; hand-painted textures, real
+  separate fingers (the fists are a bend, not a sculpt), sharper armour edges and a
+  re-sculpt need an artist and 3D tools that are not part of this project.
+- Mirroring the moves raised the stretch count about 10% over the original clips (the
+  supplied rig's weights are not symmetrical), as measured by the stretch check.
