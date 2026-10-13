@@ -562,7 +562,9 @@ function rec(area, check, ok, note = '') {
       };
       navigator.getGamepads = () => [window.__pad];
     });
-    await p.keyboard.press('Escape');
+    // Back twice: Options to the main menu, then the title screen.
+    await p.click('#fx-back');
+    await p.click('#fx-back');
     await enter3d(p);
     await press(9);
     await p.evaluate(() => document.querySelector('#play').focus());
