@@ -71,6 +71,17 @@ const { serve } = require('./serve.cjs');
         .map(([c, y]) => c + ' ' + y.toFixed(3))
         .join(', ') || 'none'
     );
+    console.log('  other parts below the ground by over 3 cm (deepest, m):');
+    const deep = {};
+    for (const [c, e] of Object.entries(r.under))
+      for (const [p, y] of Object.entries(e))
+        if (y < -0.03 && y < (deep[p]?.[1] ?? 0)) deep[p] = [c, y];
+    console.log(
+      '   ',
+      Object.entries(deep)
+        .map(([p, [c, y]]) => `${p} ${y.toFixed(3)} (${c})`)
+        .join(', ') || 'none'
+    );
   }
   await browser.close();
   server.close();

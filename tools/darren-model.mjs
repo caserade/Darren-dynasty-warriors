@@ -58,7 +58,7 @@ for (const side of ['L', 'R']) {
 // each pass stays only if it measured better. DARREN_WEIGHTS (comma list) builds with only some
 // passes, for measuring each one alone.
 const PASSES = new Set(
-  (process.env.DARREN_WEIGHTS ?? 'repaint,scarf,wings,clear,feet').split(',').filter(Boolean)
+  (process.env.DARREN_WEIGHTS ?? 'repaint,scarf,wings,clear,feet,ground').split(',').filter(Boolean)
 );
 const joints = skin.listJoints(),
   J = Object.fromEntries(joints.map((j, i) => [j.getName(), i]));
@@ -1090,7 +1090,7 @@ function bakeAO(prims) {
 // frames of the bones that move them (extras.probe on wing_X and hand_X). Every frame the game
 // turns a wing or arm away from the head just enough that no probe sinks into a ball.
 function clearance(prim) {
-  if (!(PASSES.has('clear') || PASSES.has('feet')) || !bodySkin) return;
+  if (!['clear', 'feet', 'ground'].some((p) => PASSES.has(p)) || !bodySkin) return;
   const { top, maps, body } = bodySkin,
     pos = prim.getAttribute('POSITION'),
     idx = prim.getIndices(),
@@ -1318,6 +1318,49 @@ function clearance(prim) {
         ),
       });
     }
+  // Ground probes (fix pass 5): points spread over the trunk, head and each tail bone's skin, in
+  // the frame of the bone that moves them, so the game can keep his body, head and tail out of
+  // the ground (anim.mjs groundBody and groundTail).
+  if (PASSES.has('ground')) {
+    const spread = (ids, count) => {
+      const chosen = [ids.reduce((a, i) => (P[i][1] < P[a][1] ? i : a), ids[0])],
+        far = new Map(ids.map((i) => [i, 9]));
+      while (chosen.length < Math.min(count, ids.length)) {
+        const c = chosen[chosen.length - 1];
+        let best = -1,
+          bd = -1;
+        for (const i of ids) {
+          const d = Math.min(
+            far.get(i),
+            Math.hypot(P[i][0] - P[c][0], P[i][1] - P[c][1], P[i][2] - P[c][2])
+          );
+          far.set(i, d);
+          if (d > bd) ((bd = d), (best = i));
+        }
+        chosen.push(best);
+      }
+      return chosen;
+    };
+    for (const [name, count] of [
+      ['hips', 24],
+      ['spine', 24],
+      ['head', 40],
+      ['tail_1', 8],
+      ['tail_2', 8],
+      ['tail_3', 8],
+      ['tail_4', 8],
+      ['tail_5', 8],
+    ]) {
+      const ids = [];
+      for (let i = 0; i < n; i++) if (top.shell[i] === body && topBone[i] === J[name]) ids.push(i);
+      if (!ids.length) continue;
+      const bone = nodeByName(name);
+      bone.setExtras({
+        ...bone.getExtras(),
+        ground: spread(ids, count).map((i) => local(name, P[i]).toArray().map(r3)),
+      });
+    }
+  }
   console.log(
     'clearance:',
     balls.length,

@@ -31,6 +31,18 @@
       import { LIBRARY } from '/clips.mjs';
       import { buildClips } from '/clips.mjs';
       import { addMetalShine } from '/look.mjs';
+      import { MOVESETS } from '/moves.mjs';
+      // Moves that hop (moves.mjs hop: { t, vy }) are in the air from the hop until they land
+      // (sim.mjs gravity 18 m/s²); the game plants feet and keeps the body out of the ground
+      // only on the ground, so the review does the same (Claude update 12).
+      const HOPS = {};
+      (function walk(o) {
+        if (!o || typeof o !== 'object') return;
+        if (o.anim && o.hop) HOPS[o.anim] = [o.hop.t, o.hop.t + (2 * o.hop.vy) / 18];
+        Object.values(o).forEach(walk);
+      })(MOVESETS);
+      const inAir = (clip, t) =>
+        /Jump|Fall/.test(clip) || (HOPS[clip] && t > HOPS[clip][0] && t < HOPS[clip][1]) ? 1 : 0;
       const q = new URLSearchParams(location.search);
       const name = q.get('hero') || 'Darren';
       const canvas = document.getElementById('c');
@@ -753,7 +765,7 @@
           const K = this.kit();
           if (!K) return null;
           const { n, parts, topBone, P } = K;
-          const res = { clips: {}, total: 0, pairs: {}, verts: {}, ground: {} };
+          const res = { clips: {}, total: 0, pairs: {}, verts: {}, ground: {}, under: {} };
           const seen = {};
           const list = this.clips.filter(
             (c) => !skip.includes(c.name) && (!clips || clips.includes(c.name))
@@ -775,10 +787,19 @@
               e.inside += f;
               res.total += f;
               if (f > e.peak) Object.assign(e, { peak: f, peakT: t });
-              // Lowest foot skin this frame (the clips keep the hero's root on the ground).
+              // Lowest foot skin this frame (the clips keep the hero's root on the ground), and
+              // the lowest point of every other part (a tail or paw dug into the snow). Frames in
+              // the air are left out: the game lifts the whole hero there.
+              if (inAir(cl.name, t)) continue;
               let fl = 9;
-              for (let i = 0; i < n; i++)
-                if (/^foot_/.test(topBone[i])) fl = Math.min(fl, P[i * 3 + 1]);
+              for (let i = 0; i < n; i++) {
+                const y = P[i * 3 + 1];
+                if (/^foot_/.test(topBone[i])) fl = Math.min(fl, y);
+                else {
+                  const gp = (res.under[cl.name] ??= {});
+                  if (y < (gp[parts[i]] ?? 0)) gp[parts[i]] = y;
+                }
+              }
               lo = Math.min(lo, fl);
             }
             res.ground[cl.name] = lo;
@@ -825,8 +846,8 @@
             x: 0,
             y: 0,
             z: 0,
-            // Jump clips play in the air in the game (no foot planting there).
-            air: /Jump|Fall/.test(o.clip || '') ? 1 : 0,
+            // In the air (jumps, hopping moves) the game plants nothing on the ground.
+            air: inAir(o.clip || '', o.t || 0),
           });
           animator.update(0.001, {
             key: animator.current,
@@ -837,8 +858,8 @@
             x: 0,
             y: 0,
             z: 0,
-            // Jump clips play in the air in the game (no foot planting there).
-            air: /Jump|Fall/.test(o.clip || '') ? 1 : 0,
+            // In the air (jumps, hopping moves) the game plants nothing on the ground.
+            air: inAir(o.clip || '', o.t || 0),
           });
           // A raw pose on top of the hero's base stance (for checking pose directions).
           if (o.pose) applyPose(rig, mix(LIBRARY[name].base, o.pose));

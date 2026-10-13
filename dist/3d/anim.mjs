@@ -184,6 +184,22 @@ export function buildRig(root, name) {
       sole: role['foot' + s]?.userData.sole?.map((p) => new THREE.Vector3(p[0], p[1], p[2])),
     }))
     .filter((f) => f.leg && f.shin && f.foot && f.sole?.length);
+  // Ground probes built into Darren's model (Claude update 12): trunk, head and tail skin points.
+  const probesOf = (b) => b?.userData.ground?.map((p) => new THREE.Vector3(p[0], p[1], p[2]));
+  const body = ['hips', 'spine', 'head']
+      .map((r) => ({ bone: role[r], pts: probesOf(role[r]) }))
+      .filter((e) => e.pts?.length),
+    tail = ['tail1', 'tail2', 'tail3', 'tail4', 'tail5']
+      .map((r) => ({ bone: role[r], pts: probesOf(role[r]) }))
+      .filter((e) => e.pts?.length);
+  // The wings rest on the ground the same way, from their head-clearance probes.
+  if (tail.length)
+    for (const r of ['wingL', 'wingR'])
+      if (role[r]?.userData.probe)
+        tail.push({
+          bone: role[r],
+          pts: role[r].userData.probe.map((p) => new THREE.Vector3(p[0], p[1], p[2])),
+        });
   return {
     name,
     root,
@@ -193,6 +209,7 @@ export function buildRig(root, name) {
     roles,
     twoHand,
     feet: feet.length ? feet : null,
+    ground: body.length ? { body, tail } : null,
     clear: clear?.length
       ? {
           head,
@@ -272,6 +289,78 @@ export function plantFeet(rig, floor = -0.01) {
       lifted += dy;
     }
   return lifted;
+}
+
+// ---------- body and tail out of the ground (Claude update 12) ----------
+// Lying down sank his back 19 cm into the snow, the flip in Paw combo 6 swung his head through
+// the ground, and the tail dragged up to half a metre under it in falls, dashes and lunges.
+// While he is on the ground: the whole body is lifted (at the hips) until no trunk or head probe
+// is below the ground, then each tail bone in turn (and each wing) is tipped up just enough to
+// rest on it.
+const GV = new THREE.Vector3(),
+  GP = new THREE.Vector3(),
+  GQ = new THREE.Quaternion(),
+  GR = new THREE.Quaternion(),
+  GM = new THREE.Matrix4();
+function frameOf(rig) {
+  rig.root.updateMatrixWorld(true);
+  GM.copy(rig.root.matrixWorld).invert();
+  const e = rig.root.matrixWorld.elements,
+    up = new THREE.Vector3(e[4], e[5], e[6]),
+    scale = up.length();
+  return { up: up.divideScalar(scale || 1), scale };
+}
+function lowest(entry, best = { y: Infinity, p: new THREE.Vector3() }) {
+  for (const p of entry.pts) {
+    GV.copy(p).applyMatrix4(entry.bone.matrixWorld);
+    const y = GP.copy(GV).applyMatrix4(GM).y;
+    if (y < best.y) {
+      best.y = y;
+      best.p.copy(GV);
+    }
+  }
+  return best;
+}
+export function groundBody(rig, floor = -0.02) {
+  const G = rig.ground;
+  if (!G) return 0;
+  const { up, scale } = frameOf(rig);
+  let low = { y: Infinity, p: new THREE.Vector3() };
+  for (const e of G.body) low = lowest(e, low);
+  const dy = floor - low.y;
+  if (dy <= 0.002) return 0;
+  const hips = rig.role.hips;
+  hips.getWorldPosition(GV).addScaledVector(up, dy * scale);
+  hips.parent.worldToLocal(GV);
+  hips.position.copy(GV);
+  hips.updateMatrixWorld(true);
+  return dy;
+}
+export function groundTail(rig, floor = -0.01) {
+  const G = rig.ground;
+  if (!G?.tail.length) return 0;
+  const { up } = frameOf(rig);
+  let turned = 0;
+  for (const e of G.tail)
+    for (let it = 0; it < 3; it++) {
+      const low = lowest(e),
+        dy = floor - low.y;
+      if (dy <= 0.002) break;
+      e.bone.getWorldPosition(GP);
+      const v = low.p.clone().sub(GP),
+        axis = new THREE.Vector3().crossVectors(v, up),
+        reach = axis.length();
+      if (reach < 1e-4) break;
+      const angle = Math.min(0.8, (dy * 1.1 * frameOf(rig).scale) / reach);
+      GQ.setFromAxisAngle(axis.normalize(), angle);
+      e.bone.parent.getWorldQuaternion(GR);
+      e.bone.quaternion.premultiply(GR.clone().invert().multiply(GQ).multiply(GR));
+      e.bone.updateMatrixWorld(true);
+      rig.root.updateMatrixWorld(true);
+      GM.copy(rig.root.matrixWorld).invert();
+      turned += angle;
+    }
+  return turned;
 }
 
 // ---------- keep clear of the head (Claude update 12) ----------
@@ -858,10 +947,14 @@ export class Animator {
     }
     // three.js only writes a bone when its blended value changes, so the procedural layer below
     // must be undone first or it would pile up frame after frame.
+    // groundBody() lifts the hips, so their position is undone the same way (Claude update 12).
+    const hips = this.rig.role.hips;
     if (this.snap) this.rig.bones.forEach((b, i) => b.quaternion.fromArray(this.snap, i * 4));
+    if (this.snapHips && hips) hips.position.copy(this.snapHips);
     this.mixer.update(0);
     this.snap ??= new Float32Array(this.rig.bones.length * 4);
     this.rig.bones.forEach((b, i) => b.quaternion.toArray(this.snap, i * 4));
+    if (hips) (this.snapHips ??= new THREE.Vector3()).copy(hips.position);
     this.procedural(dt, d, fwd, side, ax, yawVel, air);
   }
   setW(name, w, t) {
@@ -941,7 +1034,11 @@ export class Animator {
       this.turn(R[this.opt.wings[1]], 0, w * 0.4, -w * 0.5);
     }
     this.squashY = 1 + this.squash.step(0, dt) * 0.06;
-    if (!air) plantFeet(this.rig);
+    if (!air) {
+      groundBody(this.rig);
+      groundTail(this.rig);
+      plantFeet(this.rig);
+    }
     keepClear(this.rig);
   }
 }
