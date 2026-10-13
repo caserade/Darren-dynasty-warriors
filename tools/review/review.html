@@ -96,6 +96,89 @@
         setDebugColors(g, col);
         return new THREE.MeshBasicMaterial({ vertexColors: true });
       }
+      // Colours every vertex by the bones that move it, mixed by weight (one colour per bone), so
+      // the whole skin's ownership shows at once (Claude update 11).
+      const BONE_COLORS = {};
+      function boneColor(name) {
+        if (!BONE_COLORS[name]) {
+          const i = rig.bones.findIndex((b) => b.name === name);
+          BONE_COLORS[name] = new THREE.Color().setHSL((((i * 0.381966) % 1) + 1) % 1, 0.75, 0.55);
+        }
+        return BONE_COLORS[name];
+      }
+      function ownersMaterial(mesh) {
+        const g = mesh.geometry,
+          j = g.attributes.skinIndex,
+          w = g.attributes.skinWeight,
+          col = new Float32Array(g.attributes.position.count * 3),
+          c = new THREE.Color();
+        for (let i = 0; i < g.attributes.position.count; i++) {
+          c.setRGB(0, 0, 0);
+          for (let k = 0; k < 4; k++) {
+            const wt = w.getComponent(i, k);
+            if (wt > 0)
+              c.add(
+                boneColor(mesh.skeleton.bones[j.getComponent(i, k)].name).clone().multiplyScalar(wt)
+              );
+          }
+          col.set([c.r, c.g, c.b], i * 3);
+        }
+        setDebugColors(g, col);
+        return new THREE.MeshBasicMaterial({ vertexColors: true });
+      }
+      // Weight on bones far from the vertex (more than `far` beyond its nearest bone): red = all of
+      // its weight comes from a distant bone, grey = none (Claude update 11).
+      function strayMaterial(mesh, far = 0.12) {
+        const g = mesh.geometry,
+          j = g.attributes.skinIndex,
+          w = g.attributes.skinWeight,
+          col = new Float32Array(g.attributes.position.count * 3),
+          v = new THREE.Vector3();
+        const segs = BIND_SEGS;
+        for (let i = 0; i < g.attributes.position.count; i++) {
+          v.fromArray(mesh.userData.rest, i * 3).applyMatrix4(mesh.matrixWorld);
+          const d = Object.fromEntries(
+            Object.entries(segs).map(([n, s]) => [n, segDistance(v, s)])
+          );
+          const near = Math.min(...Object.values(d));
+          let stray = 0;
+          for (let k = 0; k < 4; k++) {
+            const n = mesh.skeleton.bones[j.getComponent(i, k)].name;
+            if (d[n] > near + far) stray += w.getComponent(i, k);
+          }
+          const s = Math.min(1, stray * 2);
+          col.set([0.78 + 0.22 * s, 0.78 * (1 - s), 0.78 * (1 - s)], i * 3);
+        }
+        setDebugColors(g, col);
+        return new THREE.MeshBasicMaterial({ vertexColors: true });
+      }
+      let BIND_SEGS = null;
+      // Each bone as a segment from its head to the middle of its children's heads (bind pose).
+      function boneSegments() {
+        const seg = {},
+          all = [];
+        root.traverse((o) => o.isBone && all.push(o));
+        for (const bone of all) {
+          const h = bone.getWorldPosition(new THREE.Vector3());
+          const kids = bone.children.filter((c) => c.isBone);
+          const t = kids.length
+            ? kids
+                .reduce(
+                  (s, c) => s.add(c.getWorldPosition(new THREE.Vector3())),
+                  new THREE.Vector3()
+                )
+                .divideScalar(kids.length)
+            : h.clone();
+          seg[bone.name] = [h, t];
+        }
+        return seg;
+      }
+      function segDistance(p, [h, t]) {
+        const d = t.clone().sub(h),
+          L = d.lengthSq();
+        const u = L ? Math.max(0, Math.min(1, p.clone().sub(h).dot(d) / L)) : 0;
+        return p.distanceTo(h.clone().addScaledVector(d, u));
+      }
       // Debug views paint their own vertex colours; the model's own (baked shading) come back after.
       function setDebugColors(g, col) {
         if (!('ownColor' in g.userData)) g.userData.ownColor = g.attributes.color || null;
@@ -229,7 +312,298 @@
           }
           return out;
         },
-        // opts: { clip, t, yaw (deg), pitch (deg), mode: tex|clay|wire|weights|skeleton, bone, dist, h,
+        // Skin-weight diagnosis (Claude update 11, tools/review/weights.cjs). Static checks on the
+        // bind pose, then every clip sampled `samples` times: edges stretched past 1.6x or squashed
+        // under 0.5x ("tears"), past 1.3x / under 0.77x ("strain"), per clip and per pair of bones
+        // that drive the two ends, plus how much the closed body loses or gains volume.
+        diagnose({ samples = 12, skip = [] } = {}) {
+          const v = new THREE.Vector3(),
+            a = new THREE.Vector3(),
+            b = new THREE.Vector3();
+          this.shot({ bind: true });
+          const skinned = meshes.filter((m) => m.isSkinnedMesh && m.geometry.index);
+          const boneName = (m, i) => m.skeleton.bones[i].name;
+          const seg = BIND_SEGS,
+            segDist = segDistance;
+          const family = (n1, n2) => {
+            const b1 = root.getObjectByName(n1),
+              b2 = root.getObjectByName(n2);
+            return n1 === n2 || b1?.parent === b2 || b2?.parent === b1 || b1?.parent === b2?.parent;
+          };
+          const statics = { far: {}, crossSide: {}, hardSeams: {}, influences: [0, 0, 0, 0, 0] };
+          const tops = new Map();
+          for (const m of skinned) {
+            const g = m.geometry,
+              j = g.attributes.skinIndex,
+              w = g.attributes.skinWeight,
+              n = g.attributes.position.count,
+              top = new Array(n);
+            m.updateMatrixWorld(true);
+            for (let i = 0; i < n; i++) {
+              let bi = 0,
+                count = 0;
+              for (let k = 0; k < 4; k++) {
+                if (w.getComponent(i, k) > w.getComponent(i, bi)) bi = k;
+                if (w.getComponent(i, k) > 0.01) count++;
+              }
+              statics.influences[count]++;
+              top[i] = boneName(m, j.getComponent(i, bi));
+              v.fromArray(m.userData.rest, i * 3).applyMatrix4(m.matrixWorld);
+              const near = Math.min(...Object.values(seg).map((s) => segDist(v, s)));
+              for (let k = 0; k < 4; k++) {
+                const wt = w.getComponent(i, k);
+                if (wt < 0.05) continue;
+                const nm = boneName(m, j.getComponent(i, k));
+                // An influence much farther away than the nearest bone, and not a neighbour of
+                // the vertex's main bone: likely pulled by the wrong bone.
+                if (segDist(v, seg[nm]) > near + 0.25 && !family(nm, top[i])) {
+                  const e = (statics.far[m.name + ':' + nm + ' on ' + top[i]] ??= { n: 0, w: 0 });
+                  e.n++;
+                  e.w = Math.max(e.w, wt);
+                }
+                // Left-side skin moved by a right-side bone, or the other way round.
+                const side = /_L$/.test(nm) ? 1 : /_R$/.test(nm) ? -1 : 0;
+                if (side && v.x * side < -0.06) {
+                  const e = (statics.crossSide[m.name + ':' + nm] ??= { n: 0, w: 0 });
+                  e.n++;
+                  e.w = Math.max(e.w, wt);
+                }
+              }
+            }
+            // Neighbouring vertices whose weights differ a lot: the skin creases there.
+            const idx = g.index,
+              wmap = (i) => {
+                const o = {};
+                for (let k = 0; k < 4; k++)
+                  o[j.getComponent(i, k)] = (o[j.getComponent(i, k)] || 0) + w.getComponent(i, k);
+                return o;
+              };
+            for (let t = 0; t < idx.count; t += 3)
+              for (let k = 0; k < 3; k++) {
+                const p = idx.getX(t + k),
+                  q = idx.getX(t + ((k + 1) % 3));
+                const mp = wmap(p),
+                  mq = wmap(q);
+                let jump = 0;
+                for (const key of new Set([...Object.keys(mp), ...Object.keys(mq)]))
+                  jump = Math.max(jump, Math.abs((mp[key] || 0) - (mq[key] || 0)));
+                if (jump > 0.5) {
+                  const key = m.name + ':' + [top[p], top[q]].sort().join('/');
+                  statics.hardSeams[key] = (statics.hardSeams[key] || 0) + 1;
+                }
+              }
+            tops.set(m, top);
+          }
+          for (const k of Object.keys(statics.hardSeams)) statics.hardSeams[k] /= 2; // edges are shared
+          const restVol = {};
+          const volume = (m, posed) => {
+            const idx = m.geometry.index;
+            let s = 0;
+            for (let t = 0; t < idx.count; t += 3) {
+              const p = idx.getX(t) * 3,
+                q = idx.getX(t + 1) * 3,
+                r = idx.getX(t + 2) * 3;
+              a.set(posed[q] - posed[p], posed[q + 1] - posed[p + 1], posed[q + 2] - posed[p + 2]);
+              b.set(posed[r] - posed[p], posed[r + 1] - posed[p + 1], posed[r + 2] - posed[p + 2]);
+              a.cross(b);
+              s += a.x * posed[p] + a.y * posed[p + 1] + a.z * posed[p + 2];
+            }
+            return s / 6;
+          };
+          for (const m of skinned) restVol[m.name] = volume(m, m.userData.rest);
+          const clips = {},
+            pairs = {},
+            vertWorst = new Map(
+              skinned.map((m) => [m, new Float32Array(m.geometry.attributes.position.count)])
+            ),
+            vertClip = new Map(
+              skinned.map((m) => [m, new Array(m.geometry.attributes.position.count)])
+            );
+          // Scarf pieces against the body under them: each scarf vertex's nearest body vertex at
+          // rest (below the chin); posed, the gap should stay about the same. "sunk" = gap under 40% of rest (it
+          // dips into the body), "lifted" = gap grew by over 4 cm (it floats off).
+          const body = skinned.find((m) => m.name === 'Darren_Game'),
+            cloth = skinned.filter((m) => /scarf|Scarf/.test(m.name)),
+            clothNear = new Map();
+          if (body)
+            for (const m of cloth) {
+              const n = m.geometry.attributes.position.count,
+                bn = body.geometry.attributes.position.count,
+                near = new Int32Array(n),
+                gap = new Float32Array(n);
+              for (let i = 0; i < n; i++) {
+                a.fromArray(m.userData.rest, i * 3);
+                let best = 9,
+                  bi = 0;
+                for (let k = 0; k < bn; k++) {
+                  b.fromArray(body.userData.rest, k * 3);
+                  if (b.y > 0.99) continue; // the skin it rests on, not the chin hanging over it
+                  const d = a.distanceToSquared(b);
+                  if (d < best) ((best = d), (bi = k));
+                }
+                near[i] = bi;
+                gap[i] = Math.sqrt(best);
+              }
+              clothNear.set(m, { near, gap });
+            }
+          // Drift: skin well inside one body part (much nearer that bone than any other) should
+          // move rigidly with it. How far it strays from that, on average, says how rubbery the
+          // limbs got; blending wider always lowers tears but raises drift.
+          const own = [];
+          if (body) {
+            const bones = body.skeleton.bones,
+              n = body.geometry.attributes.position.count;
+            for (let i = 0; i < n; i++) {
+              a.fromArray(body.userData.rest, i * 3).applyMatrix4(body.matrixWorld);
+              const d = bones
+                .map((bn, k) => [
+                  BIND_SEGS[bn.name] && bn.name !== 'root' ? segDist(a, BIND_SEGS[bn.name]) : 9,
+                  k,
+                ])
+                .sort((x, y) => x[0] - y[0]);
+              if (d[0][0] < 0.6 * d[1][0] && !/wing/.test(bones[d[0][1]].name))
+                own.push([i, d[0][1]]);
+            }
+          }
+          const rigidOf = (i, k) => {
+            const sk = body.skeleton;
+            return a
+              .fromBufferAttribute(body.geometry.attributes.position, i)
+              .applyMatrix4(body.bindMatrix)
+              .applyMatrix4(
+                new THREE.Matrix4().multiplyMatrices(sk.bones[k].matrixWorld, sk.boneInverses[k])
+              )
+              .applyMatrix4(body.bindMatrixInverse);
+          };
+          let drift = 0,
+            driftN = 0;
+          const driftBy = {};
+          let sunk = 0,
+            lifted = 0;
+          const clothBy = {};
+          let tears = 0,
+            strain = 0,
+            worstVol = { lo: 1, hi: 1, loClip: '', hiClip: '' };
+          for (const c of this.clips.filter((c) => !skip.includes(c.name))) {
+            const e = (clips[c.name] = { tears: 0, strain: 0, peak: 0, peakT: 0, vol: [1, 1] });
+            for (let s = 0; s < samples; s++) {
+              const t = (c.dur * s) / samples;
+              this.shot({ clip: c.name, t, mode: 'tex' });
+              let frameTears = 0;
+              for (const m of skinned) {
+                const g = m.geometry,
+                  n = g.attributes.position.count,
+                  idx = g.index,
+                  posed = new Float32Array(n * 3),
+                  top = tops.get(m),
+                  vw = vertWorst.get(m),
+                  vc = vertClip.get(m);
+                for (let i = 0; i < n; i++) posed.set(m.getVertexPosition(i, v).toArray(), i * 3);
+                for (let t3 = 0; t3 < idx.count; t3 += 3)
+                  for (let k = 0; k < 3; k++) {
+                    const p = idx.getX(t3 + k),
+                      q = idx.getX(t3 + ((k + 1) % 3));
+                    if (p > q) continue; // each shared edge once
+                    a.fromArray(m.userData.rest, p * 3);
+                    b.fromArray(m.userData.rest, q * 3);
+                    const rest = a.distanceTo(b);
+                    if (rest < 0.006) continue;
+                    a.fromArray(posed, p * 3);
+                    b.fromArray(posed, q * 3);
+                    const r = a.distanceTo(b) / rest,
+                      l = Math.abs(Math.log(r));
+                    for (const x of [p, q])
+                      if (l > vw[x]) {
+                        vw[x] = l;
+                        vc[x] = c.name;
+                      }
+                    if (r > 1.3 || r < 0.77) {
+                      e.strain++;
+                      strain++;
+                    }
+                    if (r > 1.6 || r < 0.5) {
+                      e.tears++;
+                      tears++;
+                      frameTears++;
+                      const key = m.name + ':' + [top[p], top[q]].sort().join('/');
+                      pairs[key] = (pairs[key] || 0) + 1;
+                    }
+                  }
+                if (m.name === 'Darren_Game') {
+                  const r = volume(m, posed) / restVol[m.name];
+                  e.vol = [Math.min(e.vol[0], r), Math.max(e.vol[1], r)];
+                  if (r < worstVol.lo) Object.assign(worstVol, { lo: r, loClip: c.name });
+                  if (r > worstVol.hi) Object.assign(worstVol, { hi: r, hiClip: c.name });
+                }
+              }
+              {
+                const pv = new THREE.Vector3();
+                for (const [i, k] of own) {
+                  body.getVertexPosition(i, pv);
+                  const dd = pv.distanceTo(rigidOf(i, k)),
+                    e = (driftBy[body.skeleton.bones[k].name] ??= { sum: 0, n: 0 });
+                  drift += dd;
+                  driftN++;
+                  e.sum += dd;
+                  e.n++;
+                }
+              }
+              for (const [m, { near, gap }] of clothNear) {
+                const bp = new THREE.Vector3();
+                for (let i = 0; i < near.length; i++) {
+                  m.getVertexPosition(i, a);
+                  body.getVertexPosition(near[i], bp);
+                  const g = a.distanceTo(bp);
+                  const pm = (clothBy[m.name] ??= { sunk: 0, lifted: 0 });
+                  if (g < gap[i] * 0.4) (sunk++, pm.sunk++, (e.sunk = (e.sunk || 0) + 1));
+                  else if (g > gap[i] + 0.04)
+                    (lifted++, pm.lifted++, (e.lifted = (e.lifted || 0) + 1));
+                }
+              }
+              if (frameTears > e.peak) Object.assign(e, { peak: frameTears, peakT: t });
+            }
+          }
+          // Per-vertex worst stretch, summarised by the bone that mainly drives the vertex.
+          const regions = {};
+          for (const m of skinned) {
+            const vw = vertWorst.get(m),
+              top = tops.get(m);
+            vw.forEach((l, i) => {
+              const r = (regions[m.name + ':' + top[i]] ??= {
+                verts: 0,
+                torn: 0,
+                strained: 0,
+                clips: {},
+              });
+              r.verts++;
+              if (l > Math.log(1.3)) r.strained++;
+              if (l > Math.log(1.6)) {
+                r.torn++;
+                const cn = vertClip.get(m)[i];
+                r.clips[cn] = (r.clips[cn] || 0) + 1;
+              }
+            });
+          }
+          return {
+            statics,
+            clips,
+            pairs,
+            regions,
+            tears,
+            strain,
+            volume: worstVol,
+            samples,
+            scarf: { sunk, lifted, by: clothBy },
+            drift: {
+              cm: (100 * drift) / (driftN || 1),
+              verts: own.length,
+              by: Object.fromEntries(
+                Object.entries(driftBy).map(([k, e]) => [k, (100 * e.sum) / e.n])
+              ),
+            },
+          };
+        },
+        // opts: { clip, t, yaw (deg), pitch (deg), mode: tex|clay|wire|weights|stretch|skeleton, bone, dist, h, follow,
         //         target: [x, z] to look at instead of the middle, bind: true for the unposed model }
         shot(o = {}) {
           const mode = o.mode || 'tex';
@@ -242,11 +616,15 @@
                   ? wire
                   : mode === 'weights'
                     ? weightMaterial(m, o.bone)
-                    : mode === 'stretch'
-                      ? stretchMaterial(m)
-                      : mode === 'albedo' || mode === 'metal'
-                        ? flatMaterial(m, mode)
-                        : m.userData.mat;
+                    : mode === 'owners'
+                      ? ownersMaterial(m)
+                      : mode === 'stray'
+                        ? strayMaterial(m, o.far)
+                        : mode === 'stretch'
+                          ? stretchMaterial(m)
+                          : mode === 'albedo' || mode === 'metal'
+                            ? flatMaterial(m, mode)
+                            : m.userData.mat;
           skel.visible = mode === 'skeleton';
           if (mode === 'skeleton')
             for (const m of meshes) {
@@ -293,13 +671,20 @@
             pitch = ((o.pitch ?? 12) * Math.PI) / 180;
           const d = o.dist ?? 4.2,
             h = o.h ?? 0.75;
-          const [tx, tz] = o.target || [0, 0];
+          let [tx, tz] = o.target || [0, 0];
+          // follow: aim at the hips wherever the clip has moved or rolled the body.
+          let hh = h;
+          if (o.follow) {
+            const p = rig.bones.find((b) => b.name === (o.follow === true ? 'hips' : o.follow));
+            const w = p.getWorldPosition(new THREE.Vector3());
+            [tx, tz, hh] = [w.x, w.z, w.y + (o.h ?? 0.75) - 0.48];
+          }
           camera.position.set(
             tx + Math.sin(yaw) * Math.cos(pitch) * d,
-            h + Math.sin(pitch) * d,
+            hh + Math.sin(pitch) * d,
             tz + Math.cos(yaw) * Math.cos(pitch) * d
           );
-          camera.lookAt(tx, h, tz);
+          camera.lookAt(tx, hh, tz);
           renderer.render(scene, camera);
           return true;
         },
@@ -307,6 +692,8 @@
       // Rest positions as the game shows them (bind pose through the skin, so packed/quantized
       // vertex data compares like for like), for the stretch views.
       review.shot({ bind: true });
+      root.updateMatrixWorld(true);
+      BIND_SEGS = boneSegments();
       for (const m of meshes) {
         const pos = m.geometry.attributes.position,
           v = new THREE.Vector3();
@@ -314,6 +701,10 @@
         for (let i = 0; i < pos.count; i++)
           m.userData.rest.set(m.getVertexPosition(i, v).toArray(), i * 3);
       }
+      // For one-off probes from tools (page.evaluate).
+      review.meshes = meshes;
+      review.rig = rig;
+      review.THREE = THREE;
       window.reviewReady = true;
     </script>
   </body>
