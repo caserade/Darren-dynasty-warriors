@@ -828,3 +828,12 @@ NEEDS MICHAEL
 - The repository must be public before the app can see updates (Settings > Danger Zone >
   Change visibility). Until then the Update page says no updates have been published.
 - Apps 1.8.0 and older have no updater: install 1.9.0 once by hand.
+
+CODEX MAINTENANCE - WINDOWS SETUP AND VERIFICATION - 2026-10-13
+Based on main 0a0a9c78 (Claude update 14).
+- Restored the missing platform-specific Canvas entries in package-lock.json, so a
+  fresh Windows npm ci succeeds. Canvas stays pinned to 0.1.100.
+- README links to the published Windows release and identifies its updater.
+- Desktop smoke tests keep normal Windows sandbox/GPU behavior and refuse to run
+  against any save profile other than the temporary test profile.
+- No gameplay, art, save schema, updater behavior, installation or shortcut changes.

@@ -511,3 +511,32 @@ LIMITS
   Frame rate and feel on real hardware weren't measured.
 - The controller was simulated through the browser Gamepad API. No physical pad was used.
 - Not tested: iPhone/Safari, real phones, Firefox.
+
+CODEX WINDOWS VERIFICATION - 2026-10-13
+Source: main 0a0a9c78, plus the maintenance changes described in CHANGELOG-CLAUDE.txt.
+Environment: Windows x64, Node 24.21.0, Electron 44.4.5. Playwright drove a separate
+Electron/Chromium test window on the execution host; no existing browser profile used.
+
+- Before fix: fresh npm ci failed because the root lockfile omitted the Windows
+  Canvas binary (and other optional platform entries). After fix: npm ci succeeds.
+- Full npm test passes, including 46 3D simulation, 8 story-select, 23 model, 8 shared
+  save checks, gameplay/firewood/phone/controller/screen-fit/Canvas checks, updater
+  checks, and all 12 packaging/runtime tests. Sandbox socket restrictions blocked
+  the first local updater-server run; the authorized host run passed the full suite.
+- tests/desktop-app.cjs: 27/27 from checkout; 27/27 from the staged Windows package.
+  Title/menu/story start, pixel startup, models/animations, shared storage, complete
+  model streams, path/navigation restrictions, restart persistence, update notices,
+  partial download/install and save preservation all passed. Updates used a local
+  fixture server, not a live update installed into the player's profile.
+- Windows ZIP build succeeded. All 53 resources/game files match dist byte-for-byte.
+  app.asar matches the eight-file runtime allowlist. Packaging guards passed.
+- Title and gameplay screenshots inspected. Existing installation, desktop shortcut
+  and real saves were not changed. No merge, release or Site publication performed.
+
+Repository state observed: main includes updates 8-14; no open PRs before this fix.
+GitHub release app-v1.9.0 and publish workflow run 38451545630 already succeeded.
+PR #13 reintroduced the updater; this conflicts with the earlier standalone preference.
+That product decision is left for confirmation; this maintenance patch does not change it.
+
+Limits: no full manual playthrough, physical controller/phone tests, FPS/balance
+benchmark, or fresh run of tests/browser-qa.cjs. Artist limitations in prior notes remain.

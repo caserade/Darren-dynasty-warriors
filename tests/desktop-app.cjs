@@ -37,7 +37,9 @@ function rec(check, ok, note = '') {
 }
 async function launch(env = {}) {
   env = { SNOWDAY_UPDATE_URL: 'http://127.0.0.1:' + updServer.address().port, ...env };
-  const args = ['--no-sandbox', '--user-data-dir=' + profile, '--ignore-gpu-blocklist'];
+  const args = ['--user-data-dir=' + profile];
+  // Keep normal Windows sandbox/GPU behavior; the Linux container needs these flags.
+  if (process.platform === 'linux') args.push('--no-sandbox', '--ignore-gpu-blocklist');
   const app = await electron.launch(
     packaged
       ? { executablePath: packaged, args, env: { ...process.env, ...env } }
@@ -47,6 +49,11 @@ async function launch(env = {}) {
           env: { ...process.env, ...env },
         }
   );
+  const actualProfile = await app.evaluate(({ app }) => app.getPath('userData'));
+  if (path.resolve(actualProfile) !== path.resolve(profile)) {
+    await app.close();
+    throw new Error('Refusing to test outside the isolated save profile');
+  }
   const p = await app.firstWindow();
   const log = [];
   p.on('pageerror', (e) => log.push('[pageerror] ' + e.message));
