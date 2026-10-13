@@ -11,6 +11,13 @@
 //   - closed paws: the supplied paws are flat and open; the fingers and claws are curled into a
 //     grip around a line that runs front to back under each palm.
 //
+// Look (studio pass 3):
+//   - a real log mallet made to the design in place of the supplied boxes (tree-ring ends, iron
+//     bands with rivets, a wooden handle with a knob), held in the closed left paw, with markers for
+//     the game's trail and impact effects;
+//   - soft built-in shadowing in creases, smooth shading across texture seams, and wetter, smoother
+//     eyes, teeth, claws and mouth than his matte skin.
+//
 // One-time setup outside the game folder's tests (same as tools/darren-model.mjs):
 //   npm i --no-save @gltf-transform/core@4 @gltf-transform/extensions@4 @gltf-transform/functions@4 sharp
 // Run: node tools/bucky-model.mjs
@@ -214,6 +221,385 @@ function makeFists(prim) {
 // Where the paw holds things: the grip line's centre in each paw (bind pose, model space).
 const gripCentre = (sx) => new THREE.Vector3(sx * (FIST.knuckle - 0.01), FIST.palm - FIST.R, -0.1);
 
+// ---------- geometry helpers (studio pass 3) ----------
+// A part is plain arrays: positions, normals, uvs and triangle indices.
+const part = () => ({ P: [], N: [], UV: [], I: [] });
+function addGeometry(out, g, matrix) {
+  const base = out.P.length / 3;
+  if (matrix) g.applyMatrix4(matrix);
+  if (!g.attributes.normal) g.computeVertexNormals();
+  const pos = g.attributes.position,
+    nrm = g.attributes.normal,
+    uv = g.attributes.uv;
+  for (let i = 0; i < pos.count; i++) {
+    out.P.push(pos.getX(i), pos.getY(i), pos.getZ(i));
+    out.N.push(nrm.getX(i), nrm.getY(i), nrm.getZ(i));
+    out.UV.push(uv ? uv.getX(i) : 0, uv ? uv.getY(i) : 0);
+  }
+  if (g.index) for (let i = 0; i < g.index.count; i++) out.I.push(base + g.index.getX(i));
+  else for (let i = 0; i < pos.count; i++) out.I.push(base + i);
+  return out;
+}
+// Squeezes a geometry's uvs into one rectangle of a texture atlas (u0, v0, u1, v1).
+function atlas(g, [u0, v0, u1, v1]) {
+  const uv = g.attributes.uv;
+  for (let i = 0; i < uv.count; i++)
+    uv.setXY(i, u0 + uv.getX(i) * (u1 - u0), v0 + uv.getY(i) * (v1 - v0));
+  return g;
+}
+// Colours are linear, as glTF stores them.
+function material(name, color, metal, rough, extra = {}) {
+  const m = doc
+    .createMaterial(name)
+    .setBaseColorFactor([...color, 1])
+    .setMetallicFactor(metal)
+    .setRoughnessFactor(rough);
+  if (extra.texture) m.setBaseColorTexture(extra.texture);
+  return m;
+}
+function skinnedPrimitive(pt, joint, mat) {
+  const n = pt.P.length / 3,
+    joints = new Uint8Array(n * 4),
+    weights = new Float32Array(n * 4);
+  for (let i = 0; i < n; i++) {
+    joints[i * 4] = joint;
+    weights[i * 4] = 1;
+  }
+  const acc = (type, arr) => doc.createAccessor().setType(type).setArray(arr);
+  return doc
+    .createPrimitive()
+    .setAttribute('POSITION', acc('VEC3', new Float32Array(pt.P)))
+    .setAttribute('NORMAL', acc('VEC3', new Float32Array(pt.N)))
+    .setAttribute('TEXCOORD_0', acc('VEC2', new Float32Array(pt.UV)))
+    .setAttribute('JOINTS_0', acc('VEC4', joints))
+    .setAttribute('WEIGHTS_0', acc('VEC4', weights))
+    .setIndices(acc('SCALAR', new Uint32Array(pt.I)))
+    .setMaterial(mat);
+}
+function addPart(name, pt, joint, mat) {
+  const node = doc
+    .createNode(name)
+    .setMesh(doc.createMesh(name).addPrimitive(skinnedPrimitive(pt, joint, mat)))
+    .setSkin(skin);
+  nodeByName('Bucky_Rig').addChild(node);
+}
+// An empty marker riding on a bone (the game reads its world position, e.g. for the trail).
+function addMarker(name, bone, point) {
+  const inv = new THREE.Matrix4().fromArray(nodeByName(bone).getWorldMatrix()).invert(),
+    local = point.clone().applyMatrix4(inv);
+  nodeByName(bone).addChild(doc.createNode(name).setTranslation(local.toArray()));
+}
+
+// ---------- the mallet (studio pass 3) ----------
+// Made to the design sheet: a round log-end head with tree rings on both ends and pale split wood
+// round its side, two dark iron bands with rivets, and a wooden handle with a rounded knob. The
+// handle lies along the paw's grip line (front to back in the bind pose) with the head forward;
+// the head's long axis runs along the arm, as the supplied box's did.
+const MALLET = { below: 0.13, reach: 0.62, handle: 0.033, head: 0.17, length: 0.48 };
+// One texture for the whole mallet: side grain on the left half, the log end on the top right,
+// the handle's grain on the bottom right.
+async function woodTexture() {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+    <defs>
+      <filter id="grain" x="0" y="0" width="1" height="1">
+        <feTurbulence type="fractalNoise" baseFrequency="0.09 0.004" numOctaves="4" seed="7"/>
+        <feColorMatrix values="0 0 0 0 0.36  0 0 0 0 0.2  0 0 0 0 0.08  0 0 0 -1.1 0.95"/>
+      </filter>
+      <filter id="warp" x="0" y="0" width="1" height="1">
+        <feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="2" seed="3" result="n"/>
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="26"/>
+      </filter>
+      <radialGradient id="end" cx="0.5" cy="0.5" r="0.5">
+        <stop offset="0" stop-color="#d9a35f"/><stop offset="0.82" stop-color="#c88d4c"/>
+        <stop offset="0.9" stop-color="#9a6332"/><stop offset="1" stop-color="#6b3f1d"/>
+      </radialGradient>
+    </defs>
+    <rect x="0" y="0" width="512" height="1024" fill="#c4874a"/>
+    <rect x="0" y="0" width="512" height="1024" filter="url(#grain)"/>
+    <rect x="512" y="512" width="512" height="512" fill="#a8693a"/>
+    <rect x="512" y="512" width="512" height="512" filter="url(#grain)"/>
+    <circle cx="768" cy="256" r="250" fill="url(#end)"/>
+    <g filter="url(#warp)" fill="none" stroke="#9b6230" stroke-opacity="0.55">
+      ${Array.from({ length: 11 }, (_, i) => `<circle cx="768" cy="256" r="${18 + i * 19}" stroke-width="${2 + (i % 3)}"/>`).join('')}
+    </g>
+    <g stroke="#6b3f1d" stroke-width="3" stroke-linecap="round" fill="none" stroke-opacity="0.7">
+      <path d="M768 256 L800 330 L812 392"/><path d="M768 256 L700 214"/><path d="M768 256 L790 150"/>
+    </g>
+  </svg>`;
+  const jpg = await sharp(Buffer.from(svg))
+    .jpeg({ quality: 90, chromaSubsampling: '4:4:4' })
+    .toBuffer();
+  return doc.createTexture('Mallet wood').setImage(jpg).setMimeType('image/jpeg');
+}
+async function buildMallet(sx, hand) {
+  const g0 = gripCentre(sx),
+    { below, reach, handle, head, length } = MALLET,
+    hz = g0.z + reach, // middle of the head
+    wood = part(),
+    iron = part(),
+    tex = await woodTexture();
+  // Handle: a lathe along +z from the knob to inside the head, a little thicker at the knob end.
+  {
+    const prof = [];
+    const z0 = g0.z - below,
+      z1 = hz;
+    prof.push(new THREE.Vector2(0, z0 - 0.045));
+    for (let k = 0; k <= 8; k++) {
+      const a = (k / 8) * Math.PI;
+      prof.push(
+        new THREE.Vector2(0.046 * Math.sin(a) + 0.0001, z0 - 0.045 + 0.045 * (1 - Math.cos(a)))
+      );
+    }
+    for (let k = 1; k <= 10; k++) {
+      const t = k / 10;
+      prof.push(new THREE.Vector2(handle * (1.08 - 0.16 * t), z0 + 0.02 + t * (z1 - z0 - 0.02)));
+    }
+    // Lathe turns about y; the handle runs along z, so y becomes z.
+    const g = atlas(new THREE.LatheGeometry(prof, 24), [0.5, 0.5, 1, 1]);
+    g.rotateX(Math.PI / 2);
+    g.computeVertexNormals();
+    addGeometry(wood, g, new THREE.Matrix4().makeTranslation(g0.x, g0.y, 0));
+  }
+  // Head side: a barrel with softly rounded rims, along x.
+  {
+    const prof = [],
+      L = length / 2,
+      bev = 0.03;
+    for (let k = 0; k <= 6; k++) {
+      const a = (k / 6) * (Math.PI / 2);
+      prof.push(new THREE.Vector2(head - bev + bev * Math.sin(a), -L + bev - bev * Math.cos(a)));
+    }
+    for (let k = 1; k <= 10; k++) {
+      const t = k / 10 - 0.5,
+        bulge = 0.008 * Math.cos(t * Math.PI);
+      prof.push(new THREE.Vector2(head + bulge, -L + bev + (k / 10) * 2 * (L - bev)));
+    }
+    for (let k = 1; k <= 6; k++) {
+      const a = (k / 6) * (Math.PI / 2);
+      prof.push(new THREE.Vector2(head - bev + bev * Math.cos(a), L - bev + bev * Math.sin(a)));
+    }
+    const g = atlas(new THREE.LatheGeometry(prof, 48), [0, 0, 0.5, 1]);
+    g.rotateZ(-Math.PI / 2); // lathe axis y -> x
+    g.computeVertexNormals();
+    addGeometry(wood, g, new THREE.Matrix4().makeTranslation(g0.x, g0.y, hz));
+    // Log ends: flat discs showing the rings.
+    for (const e of [-1, 1]) {
+      const r = head - 0.028,
+        disc = new THREE.CircleGeometry(r, 48);
+      const uv = disc.attributes.uv,
+        p = disc.attributes.position;
+      for (let i = 0; i < uv.count; i++)
+        uv.setXY(i, 0.75 + (p.getX(i) / r) * 0.244, 0.25 - (p.getY(i) / r) * 0.244);
+      disc.rotateY((e * Math.PI) / 2);
+      addGeometry(wood, disc, new THREE.Matrix4().makeTranslation(g0.x + e * L, g0.y, hz));
+    }
+  }
+  // Iron bands with rivets, a little in from each end.
+  for (const e of [-1, 1]) {
+    const band = new THREE.CylinderGeometry(head + 0.012, head + 0.012, 0.05, 48, 1, true);
+    band.rotateZ(Math.PI / 2);
+    const x = g0.x + e * (length / 2 - 0.07);
+    addGeometry(iron, band, new THREE.Matrix4().makeTranslation(x, g0.y, hz));
+    for (const s of [-1, 1]) {
+      const edge = new THREE.TorusGeometry(head + 0.012, 0.006, 6, 48);
+      edge.rotateY(Math.PI / 2);
+      addGeometry(iron, edge, new THREE.Matrix4().makeTranslation(x + s * 0.025, g0.y, hz));
+    }
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2 + Math.PI / 8,
+        rivet = new THREE.SphereGeometry(0.011, 8, 6);
+      addGeometry(
+        iron,
+        rivet,
+        new THREE.Matrix4().makeTranslation(
+          x,
+          g0.y + Math.cos(a) * (head + 0.012),
+          hz + Math.sin(a) * (head + 0.012)
+        )
+      );
+    }
+  }
+  // A collar where the handle enters the head.
+  {
+    const collar = new THREE.CylinderGeometry(handle * 1.25, handle * 1.45, 0.03, 20);
+    collar.rotateX(Math.PI / 2);
+    addGeometry(iron, collar, new THREE.Matrix4().makeTranslation(g0.x, g0.y, hz - head - 0.004));
+  }
+  const j = J[hand];
+  addPart('Mallet wood', wood, j, material('Mallet wood', [1, 1, 1], 0, 0.72, { texture: tex }));
+  addPart('Mallet iron', iron, j, material('Mallet iron', [0.09, 0.09, 0.1], 0.35, 0.42));
+  // Markers: the head's middle (impact effects) and the near and far sides of the head along the
+  // handle, which the swing trail runs between.
+  addMarker('mallet_head', hand, new THREE.Vector3(g0.x, g0.y, hz));
+  addMarker('mallet_neck', hand, new THREE.Vector3(g0.x, g0.y, hz - head));
+  addMarker('mallet_crown', hand, new THREE.Vector3(g0.x, g0.y, hz + head));
+}
+
+// ---------- look: soft built-in shadowing, smooth seams, finish (studio pass 3) ----------
+// Smooth vertex normals across texture seams (the supplied ones split hard in 15 places).
+function smoothNormals(prim) {
+  const top = topology(prim),
+    idx = prim.getIndices(),
+    acc = Array.from({ length: top.nb.length }, () => new THREE.Vector3()),
+    a = new THREE.Vector3(),
+    b = new THREE.Vector3(),
+    c = new THREE.Vector3();
+  for (let t = 0; t < idx.getCount(); t += 3) {
+    const v = [0, 1, 2].map((k) => idx.getScalar(t + k));
+    a.fromArray(top.P[v[0]]);
+    b.fromArray(top.P[v[1]]).sub(a);
+    c.fromArray(top.P[v[2]]).sub(a);
+    const nn = new THREE.Vector3().crossVectors(b, c); // area weighted
+    for (const i of v) acc[top.weld[i]].add(nn);
+  }
+  const nrm = prim.getAttribute('NORMAL');
+  for (let i = 0; i < top.n; i++) {
+    const nn = acc[top.weld[i]].clone().normalize();
+    if (Number.isFinite(nn.x)) nrm.setElement(i, nn.toArray());
+  }
+}
+// Ambient occlusion baked into vertex colours: the hero is voxelised and each vertex looks around
+// itself; creases (under the chin, the armpits, where belly meets thighs, under the tail) come out
+// softly darker. Same method as Darren's and Tormund's, sized for Bucky.
+function bakeAO(prims) {
+  const V = 0.02,
+    min = [-1.5, -0.05, -2.3],
+    dims = [152, 116, 154],
+    grid = new Uint8Array(dims[0] * dims[1] * dims[2]),
+    at = (x, y, z) => (x * dims[1] + y) * dims[2] + z,
+    cell = (p) => p.map((v, k) => Math.floor((v - min[k]) / V));
+  const inside = (c) => c.every((v, k) => v >= 0 && v < dims[k]);
+  const tri = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+  for (const prim of prims) {
+    const pos = prim.getAttribute('POSITION'),
+      idx = prim.getIndices();
+    for (let t = 0; t < idx.getCount(); t += 3) {
+      for (let k = 0; k < 3; k++) tri[k].fromArray(pos.getElement(idx.getScalar(t + k), []));
+      const len = Math.max(
+          tri[0].distanceTo(tri[1]),
+          tri[1].distanceTo(tri[2]),
+          tri[2].distanceTo(tri[0])
+        ),
+        steps = Math.max(1, Math.ceil(len / (V * 0.5)));
+      for (let i = 0; i <= steps; i++)
+        for (let j = 0; j <= steps - i; j++) {
+          const u = i / steps,
+            v = j / steps,
+            p = [0, 1, 2].map(
+              (k) =>
+                tri[0].getComponent(k) * (1 - u - v) +
+                tri[1].getComponent(k) * u +
+                tri[2].getComponent(k) * v
+            ),
+            c = cell(p);
+          if (inside(c)) grid[at(...c)] = 1;
+        }
+    }
+  }
+  // Everything the outside can't reach is solid.
+  const outside = new Uint8Array(grid.length),
+    stack = [at(0, 0, 0)];
+  outside[stack[0]] = 1;
+  while (stack.length) {
+    const i = stack.pop(),
+      z = i % dims[2],
+      y = Math.floor(i / dims[2]) % dims[1],
+      x = Math.floor(i / dims[2] / dims[1]);
+    for (const [dx, dy, dz] of [
+      [1, 0, 0],
+      [-1, 0, 0],
+      [0, 1, 0],
+      [0, -1, 0],
+      [0, 0, 1],
+      [0, 0, -1],
+    ]) {
+      const c = [x + dx, y + dy, z + dz];
+      if (!inside(c)) continue;
+      const j = at(...c);
+      if (!outside[j] && !grid[j]) {
+        outside[j] = 1;
+        stack.push(j);
+      }
+    }
+  }
+  const solid = (p) => {
+    const c = cell(p);
+    return inside(c) && !outside[at(...c)];
+  };
+  const dirs = [];
+  for (let i = 0; i < 64; i++) {
+    const y = 1 - (2 * (i + 0.5)) / 64,
+      r = Math.sqrt(1 - y * y),
+      th = i * 2.399963;
+    dirs.push(new THREE.Vector3(Math.cos(th) * r, y, Math.sin(th) * r));
+  }
+  for (const prim of prims) {
+    const pos = prim.getAttribute('POSITION'),
+      nrm = prim.getAttribute('NORMAL'),
+      n = pos.getCount(),
+      col = new Float32Array(n * 4),
+      p = new THREE.Vector3(),
+      nn = new THREE.Vector3(),
+      q = new THREE.Vector3();
+    for (let i = 0; i < n; i++) {
+      p.fromArray(pos.getElement(i, []));
+      nn.fromArray(nrm.getElement(i, []));
+      let seen = 0,
+        total = 0;
+      for (const d of dirs) {
+        const w = d.dot(nn);
+        if (w <= 0.05) continue;
+        total += w;
+        let hit = false;
+        for (let s = 2.5; s < 16 && !hit; s += 1) {
+          q.copy(p)
+            .addScaledVector(nn, V * 1.5)
+            .addScaledVector(d, s * V);
+          hit = solid(q.toArray());
+        }
+        if (!hit) seen += w;
+      }
+      const ao = total ? seen / total : 1,
+        k = 0.45 + 0.55 * Math.min(1, ao * 1.15);
+      col.set([k, k, k, 1], i * 4);
+    }
+    prim.setAttribute('COLOR_0', doc.createAccessor().setType('VEC4').setArray(col));
+  }
+}
+// Finish, drawn from his own painted texture (one texel at a time):
+//   - eyes, teeth, claws and the inside of his mouth are the warm colours on a blue hero; they get
+//     a smoother, wetter surface than his matte skin (green channel of the metal/roughness map);
+// Tried and dropped: scale relief drawn from the painting (its fine detail as a surface-detail
+// map). The painting's brush strokes came through as fine hatching across his skin.
+async function finishTextures(mat) {
+  const raw = async (t) => sharp(t.getImage()).raw().toBuffer({ resolveWithObject: true });
+  const col = await raw(mat.getBaseColorTexture()),
+    mr = await raw(mat.getMetallicRoughnessTexture()),
+    { width: w, height: h } = col.info,
+    cc = col.info.channels,
+    mc = mr.info.channels;
+  const rough = Buffer.from(mr.data);
+  for (let i = 0; i < w * h; i++) {
+    const r = col.data[i * cc],
+      g = col.data[i * cc + 1],
+      b = col.data[i * cc + 2],
+      warm = smoothstep(18, 60, r - b) * smoothstep(40, 90, r + g),
+      dark = smoothstep(70, 30, r + g + b) * smoothstep(-4, 12, r - b);
+    const k = Math.max(warm, dark),
+      target = dark > warm ? 40 : 95;
+    rough[i * mc + 1] = Math.round(rough[i * mc + 1] * (1 - k) + target * k);
+  }
+  mat
+    .getMetallicRoughnessTexture()
+    .setImage(
+      await sharp(rough, { raw: { width: w, height: h, channels: mc } })
+        .removeAlpha()
+        .jpeg({ quality: 90, chromaSubsampling: '4:4:4', mozjpeg: true })
+        .toBuffer()
+    )
+    .setMimeType('image/jpeg');
+}
+
 // PNG maps become high-quality JPEGs, as tools/shrink-models.mjs did for the old file.
 async function jpegTextures() {
   for (const texture of root.listTextures()) {
@@ -237,6 +623,16 @@ if (STEPS.has('joints')) {
 }
 if (STEPS.has('soft')) softenHips(main);
 if (STEPS.has('fists')) makeFists(main);
+smoothNormals(main);
+// The supplied boxes are replaced by the mallet made above.
+for (const name of ['Mallet band', 'Mallet band.001', 'Mallet handle', 'Mallet head']) {
+  const node = nodeByName(name);
+  node.getMesh()?.dispose();
+  node.dispose();
+}
+await buildMallet(1, 'hand_L');
+bakeAO([main]);
+await finishTextures(main.getMaterial());
 // The supplied clips are dropped (studio pass 4): the game builds every Bucky clip from clips.mjs,
 // and with no Attack1 its fallback for a missing move is Idle, not the stiff supplied swing.
 for (const a of root.listAnimations()) {
@@ -254,4 +650,4 @@ await jpegTextures();
 await doc.transform(dedup(), prune({ keepLeaves: true }), quantize(), prune({ keepLeaves: true }));
 await io.write(OUT, doc);
 console.log('bucky.glb', (fs.statSync(OUT).size / 1048576).toFixed(2), 'MB');
-void gripCentre;
+void worldPos;
