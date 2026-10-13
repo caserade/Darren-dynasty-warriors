@@ -3,6 +3,7 @@
 // (1.00 = never changes length), and in which clip. Big numbers mean tearing or pinching.
 // 'badly stretched edges' counts edges over 1.6x or under 0.5x their rest length in that bone's
 // worst frame: roughly how much of the surface visibly tears or pinches.
+// STRETCH_SKIP=ClipA,ClipB leaves clips out (to measure the rest without one dominating move).
 const { chromium } = require('playwright');
 const { serve } = require('./serve.cjs');
 (async () => {
@@ -15,9 +16,10 @@ const { serve } = require('./serve.cjs');
   const page = await browser.newPage({ viewport: { width: 64, height: 64 } });
   await page.goto(`http://127.0.0.1:${server.address().port}/review.html?hero=${hero}`);
   await page.waitForFunction(() => window.reviewReady, null, { timeout: 120000 });
-  const worst = await page.evaluate(() => {
+  const skip = (process.env.STRETCH_SKIP || '').split(',');
+  const worst = await page.evaluate((skip) => {
     const w = {};
-    for (const c of review.clips)
+    for (const c of review.clips.filter((c) => !skip.includes(c.name)))
       for (let k = 0; k < 8; k++) {
         const s = review.stretch({ clip: c.name, t: (c.dur * k) / 8 });
         for (const [bone, v] of Object.entries(s)) {
@@ -28,7 +30,7 @@ const { serve } = require('./serve.cjs');
         }
       }
     return w;
-  });
+  }, skip);
   const rows = Object.entries(worst).sort((a, b) => b[1].bad - a[1].bad);
   for (const [bone, e] of rows)
     console.log(
