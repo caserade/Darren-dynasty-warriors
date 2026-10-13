@@ -153,7 +153,185 @@ export function buildRig(root, name) {
     mark('mallet_grip') && mark('mallet_neck') && mark('paw_grip_R')
       ? { grip: mark('mallet_grip'), neck: mark('mallet_neck'), paw: mark('paw_grip_R') }
       : null;
-  return { name, root, bones, info, role, roles, twoHand };
+  // Head clearance built into Darren's model (tools/darren-model.mjs, Claude update 12): balls
+  // filling his head in the head bone's frame, and probe points on each wing and forearm.
+  const head = role.head,
+    clear =
+      head?.userData.clear &&
+      ['L', 'R'].flatMap((s) =>
+        [
+          [role['wing' + s], role['wingtip' + s]],
+          [role['hand' + s], null],
+        ]
+          .filter(([b]) => b?.userData.probe?.length)
+          .map(([bone, tip]) => ({
+            bone,
+            tip,
+            probes: bone.userData.probe.map((p) => ({
+              a: new THREE.Vector3(p[0], p[1], p[2]),
+              b: new THREE.Vector3(p[3], p[4], p[5]),
+              t: p[6],
+              floor: p[7],
+            })),
+          }))
+      );
+  // Soles built into Darren's model (Claude update 12): points under each foot, for plantFeet.
+  const feet = ['L', 'R']
+    .map((s) => ({
+      leg: role['leg' + s],
+      shin: role['shin' + s],
+      foot: role['foot' + s],
+      sole: role['foot' + s]?.userData.sole?.map((p) => new THREE.Vector3(p[0], p[1], p[2])),
+    }))
+    .filter((f) => f.leg && f.shin && f.foot && f.sole?.length);
+  return {
+    name,
+    root,
+    bones,
+    info,
+    role,
+    roles,
+    twoHand,
+    feet: feet.length ? feet : null,
+    clear: clear?.length
+      ? {
+          head,
+          balls: head.userData.clear.map((b) => ({
+            c: new THREE.Vector3(b[0], b[1], b[2]),
+            r: b[3],
+            w: new THREE.Vector3(),
+          })),
+          parts: clear,
+        }
+      : null,
+  };
+}
+
+// ---------- feet on the ground (Claude update 12) ----------
+// Lunges and low stances lower Darren's hips while a straight leg reaches back or forward, which
+// pushed a foot up to 25 cm into the ground. While he stands on the ground, any foot whose sole
+// dips below it is lifted back up by bending that leg at the hip and knee (two-bone IK in the
+// leg's own bending plane); the foot keeps the angle the clip gave it.
+const FH = new THREE.Vector3(),
+  FK = new THREE.Vector3(),
+  FA = new THREE.Vector3(),
+  FT = new THREE.Vector3(),
+  FU = new THREE.Vector3(),
+  FN = new THREE.Vector3(),
+  FV = new THREE.Vector3(),
+  FQ = new THREE.Quaternion(),
+  FP = new THREE.Quaternion(),
+  FW = new THREE.Quaternion(),
+  FM = new THREE.Matrix4();
+function turnTo(bone, from, to) {
+  FQ.setFromUnitVectors(from, to);
+  bone.parent.getWorldQuaternion(FP);
+  bone.quaternion.premultiply(FP.clone().invert().multiply(FQ).multiply(FP));
+  bone.updateMatrixWorld(true);
+}
+export function plantFeet(rig, floor = -0.01) {
+  const F = rig.feet;
+  if (!F) return 0;
+  rig.root.updateMatrixWorld(true);
+  FM.copy(rig.root.matrixWorld).invert();
+  const e = rig.root.matrixWorld.elements,
+    up = new THREE.Vector3(e[4], e[5], e[6]),
+    side = new THREE.Vector3(e[0], e[1], e[2]).normalize(),
+    scale = up.length();
+  up.divideScalar(scale || 1);
+  let lifted = 0;
+  for (const f of F)
+    for (let it = 0; it < 3; it++) {
+      let low = Infinity;
+      for (const p of f.sole)
+        low = Math.min(low, FV.copy(p).applyMatrix4(f.foot.matrixWorld).applyMatrix4(FM).y);
+      const dy = floor - low;
+      if (dy < 0.002) break;
+      f.leg.getWorldPosition(FH);
+      f.shin.getWorldPosition(FK);
+      f.foot.getWorldPosition(FA);
+      f.foot.getWorldQuaternion(FW);
+      const L1 = FK.distanceTo(FH),
+        L2 = FA.distanceTo(FK);
+      FT.copy(FA).addScaledVector(up, dy * scale);
+      const d = Math.min(L1 + L2 - 1e-4, Math.max(Math.abs(L1 - L2) + 1e-4, FT.distanceTo(FH)));
+      // The plane the leg bends in; a straight leg bends its knee forward.
+      FN.crossVectors(FV.copy(FK).sub(FH), FU.copy(FA).sub(FH));
+      if (FN.lengthSq() < 1e-8 * scale ** 4) FN.copy(side);
+      FN.normalize();
+      const cosA = Math.max(-1, Math.min(1, (L1 * L1 + d * d - L2 * L2) / (2 * L1 * d)));
+      FU.copy(FT).sub(FH).normalize();
+      const knee = FU.clone().applyAxisAngle(FN, -Math.acos(cosA)).multiplyScalar(L1).add(FH);
+      turnTo(f.leg, FV.copy(FK).sub(FH).normalize(), FU.copy(knee).sub(FH).normalize());
+      f.foot.getWorldPosition(FA);
+      turnTo(f.shin, FV.copy(FA).sub(knee).normalize(), FU.copy(FT).sub(knee).normalize());
+      // The foot keeps the angle it had.
+      f.foot.parent.getWorldQuaternion(FP);
+      f.foot.quaternion.copy(FP.invert().multiply(FW));
+      f.foot.updateMatrixWorld(true);
+      lifted += dy;
+    }
+  return lifted;
+}
+
+// ---------- keep clear of the head (Claude update 12) ----------
+// Darren's wings stand right beside his big head; a wing swung forward, a twist of the body or
+// the head turning toward a foe used to push the wing arm and its claw through his cheeks and
+// eyes, and some paw swings went through his face. After everything else is posed, each wing
+// (and each forearm) is turned about its own joint just far enough that none of its probe points
+// sinks into the head's balls (plus a small gap). Runs in the game every frame, and in the
+// review tools.
+const KP = new THREE.Vector3(),
+  KA = new THREE.Vector3(),
+  KT = new THREE.Vector3(),
+  KV = new THREE.Vector3(),
+  KQ = new THREE.Quaternion(),
+  KR = new THREE.Quaternion();
+export function keepClear(rig) {
+  const K = rig.clear;
+  if (!K) return 0;
+  rig.root.updateMatrixWorld(true);
+  const H = K.head.matrixWorld.elements,
+    sc = Math.hypot(H[0], H[1], H[2]);
+  for (const b of K.balls) b.w.copy(b.c).applyMatrix4(K.head.matrixWorld);
+  let moved = 0;
+  for (const part of K.parts) {
+    for (let it = 0; it < 6; it++) {
+      let worst = 0.002 * sc,
+        wp = null,
+        wb = null;
+      for (const pr of part.probes) {
+        KP.copy(pr.a).applyMatrix4(part.bone.matrixWorld);
+        if (part.tip && pr.t > 0) KP.lerp(KV.copy(pr.b).applyMatrix4(part.tip.matrixWorld), pr.t);
+        for (const b of K.balls) {
+          const pen = (b.r + pr.floor) * sc - KP.distanceTo(b.w);
+          if (pen > worst) {
+            worst = pen;
+            wp = wp ? wp.copy(KP) : KP.clone();
+            wb = b;
+          }
+        }
+      }
+      if (!wp) break;
+      // Turn the bone about its joint so the deepest point moves straight out of the ball.
+      part.bone.getWorldPosition(KA);
+      const arm = wp.clone().sub(KA),
+        len = arm.length();
+      arm.divideScalar(len || 1);
+      KT.copy(wp).sub(wb.w).normalize();
+      KT.addScaledVector(arm, -arm.dot(KT));
+      const tl = KT.length();
+      if (tl < 0.05 || !len) break;
+      KT.divideScalar(tl);
+      const angle = Math.min(0.6, (worst * 1.15) / (len * tl));
+      KQ.setFromAxisAngle(KV.crossVectors(arm, KT).normalize(), angle);
+      part.bone.parent.getWorldQuaternion(KR);
+      part.bone.quaternion.premultiply(KR.clone().invert().multiply(KQ).multiply(KR));
+      part.bone.updateMatrixWorld(true);
+      moved += angle;
+    }
+  }
+  return moved;
 }
 
 // ---------- pose math ----------
@@ -763,5 +941,7 @@ export class Animator {
       this.turn(R[this.opt.wings[1]], 0, w * 0.4, -w * 0.5);
     }
     this.squashY = 1 + this.squash.step(0, dt) * 0.06;
+    if (!air) plantFeet(this.rig);
+    keepClear(this.rig);
   }
 }

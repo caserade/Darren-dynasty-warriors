@@ -58,7 +58,7 @@ for (const side of ['L', 'R']) {
 // each pass stays only if it measured better. DARREN_WEIGHTS (comma list) builds with only some
 // passes, for measuring each one alone.
 const PASSES = new Set(
-  (process.env.DARREN_WEIGHTS ?? 'repaint,scarf,wings').split(',').filter(Boolean)
+  (process.env.DARREN_WEIGHTS ?? 'repaint,scarf,wings,clear,feet').split(',').filter(Boolean)
 );
 const joints = skin.listJoints(),
   J = Object.fromEntries(joints.map((j, i) => [j.getName(), i]));
@@ -1055,12 +1055,261 @@ function bakeAO(prims) {
   }
 }
 
+// ---------- clearance: wings and paws keep out of the head (Claude update 12) ----------
+// The wings rise right beside his big head, so a wing swung forward (or the head turned toward a
+// foe) pushed the wing arm and its claw through his cheeks and eyes. The model now carries what
+// the game needs to stop that (anim.mjs keepClear): the head's shape as a few balls in the head
+// bone's own frame (extras.clear on the head), and probe points on each wing and forearm, in the
+// frames of the bones that move them (extras.probe on wing_X and hand_X). Every frame the game
+// turns a wing or arm away from the head just enough that no probe sinks into a ball.
+function clearance(prim) {
+  if (!(PASSES.has('clear') || PASSES.has('feet')) || !bodySkin) return;
+  const { top, maps, body } = bodySkin,
+    pos = prim.getAttribute('POSITION'),
+    idx = prim.getIndices(),
+    n = pos.getCount(),
+    P = Array.from({ length: n }, (_, i) => pos.getElement(i, []));
+  const topBone = maps.map((m) => {
+    let best = -1,
+      bw = 0;
+    for (const [j, w] of Object.entries(m)) if (w > bw) ((bw = w), (best = +j));
+    return best;
+  });
+  const isWing = (i) => top.shell[i] !== body && topBone[i] !== J.head;
+  // Voxels inside the head: the body and eyes made solid, then the cells whose nearest skin is
+  // head skin.
+  const V = 0.02,
+    min = [-0.8, 0.6, -0.6],
+    dims = [80, 75, 60],
+    at = (x, y, z) => (x * dims[1] + y) * dims[2] + z,
+    cell = (p) => p.map((v, k) => Math.floor((v - min[k]) / V)),
+    inside = (c) => c.every((v, k) => v >= 0 && v < dims[k]),
+    grid = new Uint8Array(dims[0] * dims[1] * dims[2]);
+  const tri = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+  for (let t = 0; t < idx.getCount(); t += 3) {
+    const v = [0, 1, 2].map((k) => idx.getScalar(t + k));
+    if (v.some(isWing)) continue;
+    for (let k = 0; k < 3; k++) tri[k].fromArray(P[v[k]]);
+    const len = Math.max(
+        tri[0].distanceTo(tri[1]),
+        tri[1].distanceTo(tri[2]),
+        tri[2].distanceTo(tri[0])
+      ),
+      steps = Math.max(1, Math.ceil(len / (V * 0.5)));
+    for (let a = 0; a <= steps; a++)
+      for (let b = 0; b <= steps - a; b++) {
+        const u = a / steps,
+          w = b / steps,
+          c = cell(
+            [0, 1, 2].map(
+              (k) =>
+                tri[0].getComponent(k) * (1 - u - w) +
+                tri[1].getComponent(k) * u +
+                tri[2].getComponent(k) * w
+            )
+          );
+        if (inside(c)) grid[at(...c)] = 1;
+      }
+  }
+  // Below the box is all body; flood the outside from the box's top corner.
+  const outside = new Uint8Array(grid.length),
+    stack = [at(0, dims[1] - 1, 0)];
+  outside[stack[0]] = 1;
+  while (stack.length) {
+    const i = stack.pop(),
+      z = i % dims[2],
+      y = Math.floor(i / dims[2]) % dims[1],
+      x = Math.floor(i / dims[2] / dims[1]);
+    for (const [dx, dy, dz] of [
+      [1, 0, 0],
+      [-1, 0, 0],
+      [0, 1, 0],
+      [0, -1, 0],
+      [0, 0, 1],
+      [0, 0, -1],
+    ]) {
+      const c = [x + dx, y + dy, z + dz];
+      if (!inside(c) || c[1] === 0) continue; // the open bottom of the box is not outside
+      const j = at(...c);
+      if (!outside[j] && !grid[j]) {
+        outside[j] = 1;
+        stack.push(j);
+      }
+    }
+  }
+  const skin = [];
+  for (let i = 0; i < n; i++) if (!isWing(i)) skin.push(i);
+  const headSkin = skin.filter((i) => topBone[i] === J.head);
+  const nearestIsHead = (p) => {
+    let best = 9,
+      head = false;
+    for (const i of skin) {
+      const q = P[i],
+        d = (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2 + (q[2] - p[2]) ** 2;
+      if (d < best) ((best = d), (head = topBone[i] === J.head));
+    }
+    return head;
+  };
+  const cells = [];
+  for (let x = 0; x < dims[0]; x++)
+    for (let y = 1; y < dims[1]; y++)
+      for (let z = 0; z < dims[2]; z++)
+        if (!outside[at(x, y, z)] && (x + y + z) % 2 === 0) {
+          const p = [x, y, z].map((c, k) => min[k] + (c + 0.5) * V);
+          if (nearestIsHead(p)) cells.push(p);
+        }
+  // Balls: greedily the one that fills most of what is still uncovered, each as big as fits
+  // inside the head skin.
+  const radius = (p) => {
+    let best = 9;
+    for (const i of headSkin) {
+      const q = P[i];
+      best = Math.min(best, (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2 + (q[2] - p[2]) ** 2);
+    }
+    return Math.sqrt(best);
+  };
+  // Greedily the ball that brings the most head skin to within 2.5 cm of a ball, each as big as
+  // fits inside the head skin, until nearly all of it is.
+  const cand = cells.filter((_, k) => k % 2 === 0).map((p) => [...p, radius(p)]),
+    surf = headSkin.filter((_, k) => k % 2 === 0).map((i) => P[i]),
+    left = new Set(surf.keys()),
+    balls = [],
+    M = 0.025;
+  while (balls.length < 32 && left.size > surf.length * 0.02) {
+    let best = null,
+      bestN = 0;
+    for (const c of cand) {
+      let k = 0;
+      const rr = (c[3] + M) ** 2;
+      for (const i of left) {
+        const p = surf[i];
+        if ((p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2 + (p[2] - c[2]) ** 2 < rr) k++;
+      }
+      if (k > bestN) ((bestN = k), (best = c));
+    }
+    if (!best) break;
+    balls.push(best);
+    for (const i of [...left]) {
+      const p = surf[i];
+      if (
+        (p[0] - best[0]) ** 2 + (p[1] - best[1]) ** 2 + (p[2] - best[2]) ** 2 <
+        (best[3] + M) ** 2
+      )
+        left.delete(i);
+    }
+  }
+  const local = (name, p) =>
+    new THREE.Vector3(...p).applyMatrix4(
+      new THREE.Matrix4().fromArray(nodeByName(name).getWorldMatrix()).invert()
+    );
+  const r3 = (v) => Math.round(v * 1000) / 1000;
+  const head = nodeByName('head');
+  if (PASSES.has('clear'))
+    head.setExtras({
+      ...head.getExtras(),
+      clear: balls.map((b) => [...local('head', b).toArray(), b[3]].map(r3)),
+    });
+  // Clearance of a point from the balls at rest (negative = already inside).
+  const gap = (p) =>
+    Math.min(...balls.map((b) => Math.hypot(p[0] - b[0], p[1] - b[1], p[2] - b[2]) - b[3]));
+  // Probe points: spread evenly over the part (farthest point first), skipping skin near the
+  // root that never comes near the head anyway. Each keeps the gap it has at rest as a floor,
+  // so a probe that rests close to the head is only kept from getting closer.
+  const probes = (ids, bones, rootPos, count) => {
+    const pts = ids.filter((i) => new THREE.Vector3(...P[i]).distanceTo(rootPos) > 0.15),
+      chosen = [];
+    if (!pts.length) return [];
+    let far = pts.map(() => 9);
+    let next = pts.reduce((a, i, k) => (P[i][1] > P[pts[a]][1] ? k : a), 0);
+    while (chosen.length < count) {
+      const c = pts[next];
+      chosen.push(c);
+      far = far.map((d, k) => {
+        const q = P[pts[k]];
+        return Math.min(d, Math.hypot(q[0] - P[c][0], q[1] - P[c][1], q[2] - P[c][2]));
+      });
+      next = far.reduce((a, d, k) => (d > far[a] ? k : a), 0);
+    }
+    return chosen.map((i) => {
+      const m = maps[i],
+        tot = bones.reduce((s, b) => s + (m[J[b]] || 0), 0) || 1,
+        t = bones.length > 1 ? (m[J[bones[1]]] || 0) / tot : 0;
+      return [
+        ...local(bones[0], P[i]).toArray(),
+        ...(bones[1] ? local(bones[1], P[i]).toArray() : [0, 0, 0]),
+        t,
+        Math.min(0.03, gap(P[i])),
+      ].map(r3);
+    });
+  };
+  for (const s of PASSES.has('clear') ? ['L', 'R'] : []) {
+    const wingIds = [],
+      foreIds = [];
+    for (let i = 0; i < n; i++) {
+      if (isWing(i) && (s === 'L') === P[i][0] > 0) wingIds.push(i);
+      if (top.shell[i] === body && topBone[i] === J['hand_' + s]) foreIds.push(i);
+    }
+    const wing = nodeByName('wing_' + s),
+      hand = nodeByName('hand_' + s);
+    wing.setExtras({
+      ...wing.getExtras(),
+      probe: probes(wingIds, ['wing_' + s, 'wingtip_' + s], worldPos('wing_' + s), 48),
+    });
+    hand.setExtras({
+      ...hand.getExtras(),
+      probe: probes(foreIds, ['hand_' + s], worldPos('hand_' + s), 16),
+    });
+  }
+  // Soles (fix pass 2): points spread over the bottom of each foot, in the foot bone's frame, so
+  // the game can lift a foot that a pose pushes into the ground (anim.mjs plantFeet).
+  if (PASSES.has('feet'))
+    for (const s of ['L', 'R']) {
+      const ids = [];
+      for (let i = 0; i < n; i++)
+        if (top.shell[i] === body && topBone[i] === J['foot_' + s]) ids.push(i);
+      const low = Math.min(...ids.map((i) => P[i][1])),
+        sole = ids.filter((i) => P[i][1] < low + 0.03),
+        chosen = [sole[0]];
+      while (chosen.length < 10) {
+        let best = -1,
+          bd = -1;
+        for (const i of sole) {
+          const d = Math.min(
+            ...chosen.map((c) => Math.hypot(P[i][0] - P[c][0], P[i][2] - P[c][2]))
+          );
+          if (d > bd) ((bd = d), (best = i));
+        }
+        chosen.push(best);
+      }
+      const foot = nodeByName('foot_' + s);
+      foot.setExtras({
+        ...foot.getExtras(),
+        sole: chosen.map((i) =>
+          local('foot_' + s, P[i])
+            .toArray()
+            .map(r3)
+        ),
+      });
+    }
+  console.log(
+    'clearance:',
+    balls.length,
+    'head balls',
+    'fitted to the head;',
+    headSkin.filter((i) => gap(P[i]) < 0.03).length,
+    'of',
+    headSkin.length,
+    'head skin points within 3 cm of a ball'
+  );
+}
+
 const mainMesh = root.listMeshes().find((m) => m.getName() === 'Darren_Game'),
   main = mainMesh.listPrimitives()[0];
 rebindAll();
 reskinBody(main);
 const { crown, redUV } = flattenCrest(main);
 smoothNormals(main);
+clearance(main);
 const hornMesh = doc
   .createMesh('Darren_Horn')
   .addPrimitive(hornPrimitive(crown, redUV, main.getMaterial()));

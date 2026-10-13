@@ -24,7 +24,10 @@
       // animator, and poses it at any clip time and angle for turnaround and contact sheets.
       import * as THREE from 'three';
       import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-      import { buildRig, Animator, applyPose, mix } from '/anim.mjs';
+      import * as ANIM from '/anim.mjs';
+      const { buildRig, Animator, applyPose, mix } = ANIM;
+      // Older builds have no keepClear (Claude update 12); the review still runs on them.
+      const keepClear = ANIM.keepClear || (() => 0);
       import { LIBRARY } from '/clips.mjs';
       import { buildClips } from '/clips.mjs';
       import { addMetalShine } from '/look.mjs';
@@ -603,6 +606,186 @@
             },
           };
         },
+        // Body parts pushed into other body parts (Claude update 12, tools/review/collide.cjs):
+        // every clip sampled `samples` times, optionally with extra turns (the game's head look).
+        // Each vertex of a probing part (wings, arms, legs, tail) is tested against the nearest
+        // skin of the rest of the body: on its inside means it went through. Skin that was next to
+        // it at rest (the same continuous skin) and anything already inside at rest is left out.
+        // Also how far the feet sink below or float above the ground.
+        kit() {
+          if (this._kit !== undefined) return this._kit;
+          const body = meshes.find((m) => m.name === 'Darren_Game');
+          if (!body) return (this._kit = null);
+          const g = body.geometry,
+            n = g.attributes.position.count,
+            j = g.attributes.skinIndex,
+            w = g.attributes.skinWeight,
+            idx = g.index,
+            bones = body.skeleton.bones,
+            R = body.userData.rest;
+          const topBone = new Array(n);
+          for (let i = 0; i < n; i++) {
+            let bi = 0;
+            for (let k = 1; k < 4; k++) if (w.getComponent(i, k) > w.getComponent(i, bi)) bi = k;
+            topBone[i] = bones[j.getComponent(i, bi)].name;
+          }
+          const part = (b) =>
+            /^wing/.test(b)
+              ? 'wing_' + b.slice(-1)
+              : /^(arm|hand)_/.test(b)
+                ? 'arm_' + b.slice(-1)
+                : /^(leg|shin|foot)_/.test(b)
+                  ? 'leg_' + b.slice(-1)
+                  : /^tail_[2-5]/.test(b)
+                    ? 'tail'
+                    : b === 'head'
+                      ? 'head'
+                      : 'trunk';
+          // The face (eyes, cheeks, snout, brows) is told apart from the rest of the head.
+          const parts = topBone.map((b, i) =>
+            b === 'head' && R[i * 3 + 2] > 0.12 && R[i * 3 + 1] > 1.15 ? 'face' : part(b)
+          );
+          // Connected shells (welded at texture seams): the body, each wing, the eyes and brows.
+          const shell = (() => {
+            const keys = new Map(),
+              weld = new Int32Array(n);
+            for (let i = 0; i < n; i++) {
+              const k = [0, 1, 2].map((q) => Math.round(R[i * 3 + q] * 2000)).join();
+              if (!keys.has(k)) keys.set(k, keys.size);
+              weld[i] = keys.get(k);
+            }
+            const par = [...Array(keys.size).keys()],
+              find = (x) => (par[x] === x ? x : (par[x] = find(par[x])));
+            for (let t = 0; t < idx.count; t += 3) {
+              par[find(weld[idx.getX(t)])] = find(weld[idx.getX(t + 1)]);
+              par[find(weld[idx.getX(t + 1)])] = find(weld[idx.getX(t + 2)]);
+            }
+            return Array.from(weld, (x) => find(x));
+          })();
+          const probing = (p) => p !== 'head' && p !== 'face' && p !== 'trunk';
+          const P = new Float32Array(n * 3),
+            N = new Float32Array(n * 3),
+            v = new THREE.Vector3(),
+            a = new THREE.Vector3(),
+            b = new THREE.Vector3(),
+            c = new THREE.Vector3();
+          const pose = () => {
+            for (let i = 0; i < n; i++) P.set(body.getVertexPosition(i, v).toArray(), i * 3);
+            N.fill(0);
+            for (let t = 0; t < idx.count; t += 3) {
+              const p = idx.getX(t),
+                q = idx.getX(t + 1),
+                r = idx.getX(t + 2);
+              a.fromArray(P, q * 3).sub(v.fromArray(P, p * 3));
+              b.fromArray(P, r * 3).sub(v);
+              c.crossVectors(a, b);
+              for (const x of [p, q, r])
+                for (let k = 0; k < 3; k++) N[x * 3 + k] += c.getComponent(k);
+            }
+          };
+          const CELL = 0.05,
+            NEAR = 0.12;
+          const inside = () => {
+            const grid = new Map();
+            for (let i = 0; i < n; i++) {
+              const k =
+                Math.floor(P[i * 3] / CELL) +
+                ',' +
+                Math.floor(P[i * 3 + 1] / CELL) +
+                ',' +
+                Math.floor(P[i * 3 + 2] / CELL);
+              (grid.get(k) || grid.set(k, []).get(k)).push(i);
+            }
+            const out = new Map();
+            for (let i = 0; i < n; i++) {
+              if (!probing(parts[i])) continue;
+              const x = P[i * 3],
+                y = P[i * 3 + 1],
+                z = P[i * 3 + 2];
+              let best = 0.1 ** 2,
+                bi = -1;
+              const cx = Math.floor(x / CELL),
+                cy = Math.floor(y / CELL),
+                cz = Math.floor(z / CELL);
+              for (let dx = -1; dx <= 1; dx++)
+                for (let dy = -1; dy <= 1; dy++)
+                  for (let dz = -1; dz <= 1; dz++)
+                    for (const o of grid.get(cx + dx + ',' + (cy + dy) + ',' + (cz + dz)) || []) {
+                      if (parts[o] === parts[i]) continue;
+                      // The same continuous skin at rest (a shoulder running into the chest).
+                      if (
+                        shell[o] === shell[i] &&
+                        (R[o * 3] - R[i * 3]) ** 2 +
+                          (R[o * 3 + 1] - R[i * 3 + 1]) ** 2 +
+                          (R[o * 3 + 2] - R[i * 3 + 2]) ** 2 <
+                          NEAR * NEAR
+                      )
+                        continue;
+                      const d =
+                        (P[o * 3] - x) ** 2 + (P[o * 3 + 1] - y) ** 2 + (P[o * 3 + 2] - z) ** 2;
+                      if (d < best) ((best = d), (bi = o));
+                    }
+              if (bi < 0) continue;
+              const dot =
+                (x - P[bi * 3]) * N[bi * 3] +
+                (y - P[bi * 3 + 1]) * N[bi * 3 + 1] +
+                (z - P[bi * 3 + 2]) * N[bi * 3 + 2];
+              if (dot < 0) out.set(i, bi);
+            }
+            return out;
+          };
+          const pose0 = { bind: true };
+          this.shot(pose0);
+          pose();
+          const atRest = inside();
+          return (this._kit = { body, n, parts, topBone, P, pose, inside, atRest });
+        },
+        // Vertices of the current pose that went through another body part (not at rest).
+        through() {
+          const k = this.kit();
+          if (!k) return new Map();
+          k.pose();
+          const out = k.inside();
+          for (const i of k.atRest.keys()) out.delete(i);
+          return out;
+        },
+        collide({ samples = 12, skip = [], turn = null, clips = null } = {}) {
+          const K = this.kit();
+          if (!K) return null;
+          const { n, parts, topBone, P } = K;
+          const res = { clips: {}, total: 0, pairs: {}, verts: {}, ground: {} };
+          const seen = {};
+          const list = this.clips.filter(
+            (c) => !skip.includes(c.name) && (!clips || clips.includes(c.name))
+          );
+          for (const cl of list) {
+            const e = (res.clips[cl.name] = { inside: 0, peak: 0, peakT: 0, pairs: {} });
+            let lo = 9;
+            for (let s = 0; s < samples; s++) {
+              const t = (cl.dur * s) / samples;
+              this.shot({ clip: cl.name, t, mode: 'tex', turn });
+              let f = 0;
+              for (const [i, bi] of this.through()) {
+                f++;
+                const k = parts[i] + ' > ' + parts[bi];
+                (seen[k] ??= new Set()).add(i);
+                res.pairs[k] = (res.pairs[k] || 0) + 1;
+                e.pairs[k] = (e.pairs[k] || 0) + 1;
+              }
+              e.inside += f;
+              res.total += f;
+              if (f > e.peak) Object.assign(e, { peak: f, peakT: t });
+              // Lowest foot skin this frame (the clips keep the hero's root on the ground).
+              let fl = 9;
+              for (let i = 0; i < n; i++)
+                if (/^foot_/.test(topBone[i])) fl = Math.min(fl, P[i * 3 + 1]);
+              lo = Math.min(lo, fl);
+            }
+            res.ground[cl.name] = lo;
+          }
+          for (const [k, s] of Object.entries(seen)) res.verts[k] = s.size;
+          return res;
+        },
         // opts: { clip, t, yaw (deg), pitch (deg), mode: tex|clay|wire|weights|stretch|skeleton, bone, dist, h, follow,
         //         target: [x, z] to look at instead of the middle, bind: true for the unposed model }
         shot(o = {}) {
@@ -610,7 +793,7 @@
           restoreColors();
           for (const m of meshes)
             m.material =
-              mode === 'clay'
+              mode === 'clay' || mode === 'through'
                 ? clay
                 : mode === 'wire'
                   ? wire
@@ -642,7 +825,8 @@
             x: 0,
             y: 0,
             z: 0,
-            air: 0,
+            // Jump clips play in the air in the game (no foot planting there).
+            air: /Jump|Fall/.test(o.clip || '') ? 1 : 0,
           });
           animator.update(0.001, {
             key: animator.current,
@@ -653,10 +837,19 @@
             x: 0,
             y: 0,
             z: 0,
-            air: 0,
+            // Jump clips play in the air in the game (no foot planting there).
+            air: /Jump|Fall/.test(o.clip || '') ? 1 : 0,
           });
           // A raw pose on top of the hero's base stance (for checking pose directions).
           if (o.pose) applyPose(rig, mix(LIBRARY[name].base, o.pose));
+          // Extra turns on top, the way the game's procedural layer adds them (anim.mjs turn():
+          // radians about character axes), e.g. { head: [0, 0.65, 0] } = the head looking left
+          // as far as the game ever turns it (Claude update 12).
+          if (o.turn)
+            for (const [role, [x, y, z]] of Object.entries(o.turn))
+              animator.turn(rig.role[role] || root.getObjectByName(role), x, y, z);
+          // The game keeps wings and paws out of the head after everything else (anim.mjs).
+          if ((o.turn || o.pose) && !o.noClear) keepClear(rig);
           // The model exactly as built, before any animation (bind pose).
           if (o.bind)
             for (const b of rig.bones) {
@@ -667,6 +860,18 @@
           root.updateMatrixWorld(true);
           for (const m of meshes)
             if (m.userData.needsStretch && mode === 'stretch') paintStretch(m);
+          // 'through': clay, with skin that went through another body part in red and the skin
+          // it went into in blue (Claude update 12).
+          if (mode === 'through') {
+            const k = this.kit(),
+              col = new Float32Array(k.n * 3).fill(0.78);
+            for (const [i, bi] of this.through()) {
+              col.set([0.95, 0.1, 0.1], i * 3);
+              col.set([0.15, 0.3, 0.95], bi * 3);
+            }
+            setDebugColors(k.body.geometry, col);
+            k.body.material = this._thru ??= new THREE.MeshLambertMaterial({ vertexColors: true });
+          }
           const yaw = ((o.yaw ?? 25) * Math.PI) / 180,
             pitch = ((o.pitch ?? 12) * Math.PI) / 180;
           const d = o.dist ?? 4.2,
@@ -703,6 +908,7 @@
       }
       // For one-off probes from tools (page.evaluate).
       review.meshes = meshes;
+      review.kit();
       review.rig = rig;
       review.THREE = THREE;
       window.reviewReady = true;

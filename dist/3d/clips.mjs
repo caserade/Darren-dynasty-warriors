@@ -62,12 +62,58 @@ function dKnees(pose) {
   }
   return out;
 }
+// Wings (Claude update 12). The wings stand right beside Darren's big head, and every clip aimed
+// them in world directions while the body twisted, leaned and rolled underneath them, so the head
+// turned into the wing arm and its claw, and rolls dragged the wings through his back. Now:
+//   - a wing aim is read as relative to his chest (hips and spine turn it with them), so the
+//     wings stay on his back however he moves; keys without their own wing aim keep the stance's.
+//     Lying on his back (hips tipped back past 45 degrees) is the one exception: there the
+//     clips spread the wings flat on the ground in world directions, which stays as it was;
+//   - a wing may swing forward only part of the way: the forward share of the aim is eased back
+//     behind WING_Z, so the wings frame his face instead of covering it.
+// anim.mjs keepClear() then keeps the last few centimetres clear in the game.
+const WING_Z = -0.45,
+  WING_GIVE = 0.3;
+const rotOfKey = (v) => (Array.isArray(v) ? v : v?.r || [0, 0, 0]);
+// Euler degrees, order YXZ about character axes (as anim.mjs reads poses), applied to a vector.
+function eulerApply([ex, ey, ez], [x, y, z]) {
+  const [cx, sx] = [cos(ex * (PI / 180)), sin(ex * (PI / 180))],
+    [cy, sy] = [cos(ey * (PI / 180)), sin(ey * (PI / 180))],
+    [cz, sz] = [cos(ez * (PI / 180)), sin(ez * (PI / 180))];
+  [x, y] = [x * cz - y * sz, x * sz + y * cz];
+  [y, z] = [y * cx - z * sx, y * sx + z * cx];
+  [x, z] = [x * cy + z * sy, -x * sy + z * cy];
+  return [x, y, z];
+}
+function dWings(pose) {
+  const lying = rotOfKey(pose.hips)[0] < -45,
+    hips = lying ? [0, 0, 0] : rotOfKey(pose.hips),
+    spine = lying ? [0, 0, 0] : rotOfKey(pose.spine);
+  const turned = hips.some((v) => v) || spine.some((v) => v);
+  let out = pose;
+  for (const k of ['wingL', 'wingR']) {
+    const a = pose[k]?.aim || (turned && D_STANCE[k].aim);
+    if (!a) continue;
+    const len = Math.hypot(a[0], a[1], a[2]) || 1;
+    let v = [a[0] / len, a[1] / len, a[2] / len];
+    if (v[2] > WING_Z) {
+      const z2 = WING_Z + (v[2] - WING_Z) * WING_GIVE,
+        f = Math.sqrt(1 - z2 * z2) / (Math.sqrt(1 - v[2] * v[2]) || 1);
+      v = [v[0] * f, v[1] * f, z2];
+    }
+    v = eulerApply(hips, eulerApply(spine, v));
+    if (out === pose) out = { ...pose };
+    out[k] = { ...pose[k], aim: v };
+  }
+  return out;
+}
 function withKnees(specs) {
-  const out = {};
+  const out = {},
+    fix = (pose) => dKnees(dWings(pose));
   for (const [name, sp] of Object.entries(specs))
     out[name] = sp.fn
-      ? { ...sp, fn: (p, t) => dKnees(sp.fn(p, t)) }
-      : { ...sp, keys: sp.keys.map(([t, pose, f]) => [t, dKnees(pose || {}), f]) };
+      ? { ...sp, fn: (p, t) => fix(sp.fn(p, t)) }
+      : { ...sp, keys: sp.keys.map(([t, pose, f]) => [t, fix(pose || {}), f]) };
   return out;
 }
 // A tucked forward roll; u runs 0..1 over the roll.
