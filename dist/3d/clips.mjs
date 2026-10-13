@@ -87,7 +87,8 @@ function dKnees(pose) {
 //     behind WING_Z, so the wings frame his face instead of covering it.
 // anim.mjs keepClear() then keeps the last few centimetres clear in the game.
 const WING_Z = -0.45,
-  WING_GIVE = 0.3;
+  WING_GIVE = 0.3,
+  WINGTIP_K = 0.45;
 const rotOfKey = (v) => (Array.isArray(v) ? v : v?.r || [0, 0, 0]);
 // Euler degrees, order YXZ about character axes (as anim.mjs reads poses), applied to a vector.
 function eulerApply([ex, ey, ez], [x, y, z]) {
@@ -118,6 +119,16 @@ function dWings(pose) {
     v = eulerApply(hips, eulerApply(spine, v));
     if (out === pose) out = { ...pose };
     out[k] = { ...pose[k], aim: v };
+  }
+  // The wing tip folds at most WINGTIP_K of what a pose asks: the thin membrane between the wing
+  // arm and the body cannot follow a sharper fold and tore in the wing clap (Paw combo 5).
+  for (const k of ['wingtipL', 'wingtipR']) {
+    const r = pose[k];
+    if (!r) continue;
+    if (out === pose) out = { ...pose };
+    out[k] = Array.isArray(r)
+      ? r.map((v) => v * WINGTIP_K)
+      : { ...r, r: r.r?.map((v) => v * WINGTIP_K) };
   }
   return out;
 }

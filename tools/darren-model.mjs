@@ -676,7 +676,10 @@ function finish(geo, closedEnds) {
 }
 // group (optional): vertex index -> key; vertices with the same key share one averaged weight
 // (a whole ring of a knitted tube, so the knit never shears across its own thickness).
-function partFromGeometry(g, uv, weightOf, material, group) {
+// along (optional, Claude update 12): rounds of averaging each group's weights with the groups
+// next to it (ring k with rings k-1 and k+1), so a loose scarf end bends smoothly along its
+// length instead of shearing where the belly under it folds.
+function partFromGeometry(g, uv, weightOf, material, group, along = 0) {
   const n = g.attributes.position.count,
     joints = new Uint8Array(n * 4),
     weights = new Float32Array(n * 4),
@@ -691,6 +694,20 @@ function partFromGeometry(g, uv, weightOf, material, group) {
       for (const [j, v] of w) s[j] = (s[j] || 0) + v;
       sums.set(k, s);
     });
+    for (let r = 0; r < along; r++) {
+      const next = new Map();
+      for (const [k, s] of sums) {
+        const o = {},
+          nb = [k - 1, k, k + 1].filter((x) => sums.has(x));
+        for (const x of nb) {
+          const sx = sums.get(x),
+            tot = Object.values(sx).reduce((a, v) => a + v, 0) || 1;
+          for (const [j, v] of Object.entries(sx)) o[j] = (o[j] || 0) + v / tot / nb.length;
+        }
+        next.set(k, o);
+      }
+      for (const [k, o] of next) sums.set(k, o);
+    }
     for (let i = 0; i < n; i++) {
       const top4 = Object.entries(sums.get(group(i)))
         .sort((a, b) => b[1] - a[1])
@@ -781,7 +798,7 @@ async function buildScarf(prim) {
     };
     // The collar is a stiff knitted roll: it takes only part of the shoulders' swing (the rest
     // stays with the chest), so an arm raise does not wrench it out of shape.
-    const armShare = +(process.env.DARREN_COLLAR_ARM ?? 0.5);
+    const armShare = +(process.env.DARREN_COLLAR_ARM ?? 0.25);
     neckW = (y, x, z) => {
       const out = {};
       for (const [j, w] of fromSkin(y, x, z)) {
@@ -869,7 +886,17 @@ async function buildScarf(prim) {
       b.push(0.014);
     }
     const geo = tubeGeometry(path, across, out, a, b, 12, 1, len / 0.25);
-    parts.push([name, partFromGeometry(finish(geo, 12), geo.UV, chest, mat, ringOf(12, N))]);
+    parts.push([
+      name,
+      partFromGeometry(
+        finish(geo, 12),
+        geo.UV,
+        chest,
+        mat,
+        ringOf(12, N),
+        +(process.env.DARREN_TAIL_ALONG ?? 3)
+      ),
+    ]);
   }
   for (const [name, p] of parts) {
     p.knit = true;
