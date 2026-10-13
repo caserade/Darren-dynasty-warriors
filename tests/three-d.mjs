@@ -710,6 +710,20 @@ test("Darren's hits say who struck and which way (for his impact effects)", () =
   assert(Number.isFinite(hit.angle));
   assert.equal(g.striker, -1, 'striker is cleared after the blow');
 });
+test("Tormund's sword hits say who struck and which way (for his sparks and camera kick)", () => {
+  const g = fresh();
+  near(g, 40, 52, 0);
+  g.switchTo(1);
+  assert.equal(g.selected, 1);
+  foe(g, 'gopher', g.player.x, g.player.z + 1.4);
+  g.events.length = 0;
+  assert(g.attack());
+  tick(g, 0.4);
+  const hit = g.events.find((e) => e.type === 'hit' && e.foe !== undefined);
+  assert(hit, 'no hit event');
+  assert.equal(hit.actor, 1);
+  assert(Number.isFinite(hit.angle));
+});
 test('Grunts wind up before hitting, and a dodge through the wind-up avoids the damage', () => {
   const g = fresh();
   near(g, 40, 52, 0);
