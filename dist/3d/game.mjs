@@ -675,12 +675,16 @@ function ring(e) {
 // Darren's hit effects (studio pass 5): a bright impact star and a burst of snow where his blow
 // lands, flung the way he struck, and a short camera kick the same way on heavy blows.
 // Tormund's sword gets the same, plus a spray of steel sparks (Tormund studio pass 5).
+// Bucky's mallet gets the same, plus wood chips, and his ground smashes throw a low wave of
+// snow out round the ring and kick the camera down (Bucky studio pass 5).
 const impacts = [];
 let starMap = null,
   snowGeo = null,
   sparkGeo = null,
+  chipGeo = null,
   kick = 0,
   kickX = 0,
+  kickY = 0,
   kickZ = 0;
 function starTexture() {
   const c = document.createElement('canvas');
@@ -745,10 +749,12 @@ function impactBurst(e) {
     impacts.push({ m, life: 0.45 + Math.random() * 0.2, max: 0.6 });
   }
   if (e.actor === 1) steelSparks(e.x, e.y - 0.3, e.z, dx, dz, (heavy ? 14 : 9) >> (low ? 1 : 0));
+  if (e.actor === 2) woodChips(e.x, e.y - 0.3, e.z, dx, dz, (heavy ? 10 : 6) >> (low ? 1 : 0));
   trimImpacts();
   if (heavy) {
     kick = 1;
     kickX = dx * 0.12;
+    kickY = 0;
     kickZ = dz * 0.12;
   }
 }
@@ -783,6 +789,56 @@ function steelSparks(x, y, z, dx, dz, n, spread = 1.4) {
     scene.add(m);
     impacts.push({ m, life: 0.18 + Math.random() * 0.14, max: 0.32, spark: true });
   }
+}
+// Little splinters knocked off the log mallet: tumbling, falling, not glowing.
+function woodChips(x, y, z, dx, dz, n) {
+  chipGeo ??= new THREE.BoxGeometry(0.05, 0.022, 0.09);
+  for (let i = 0; i < n; i++) {
+    const m = new THREE.Mesh(
+      chipGeo,
+      new THREE.MeshBasicMaterial({
+        color: i % 3 ? 0xc8894a : 0xe9c48a,
+        transparent: true,
+        depthWrite: false,
+      })
+    );
+    m.position.set(x, y, z);
+    m.rotation.set(Math.random() * 6, Math.random() * 6, 0);
+    const a = (Math.random() - 0.5) * 2.2,
+      sp = 2.5 + Math.random() * 2.5;
+    m.userData.v = new THREE.Vector3(
+      (dx * Math.cos(a) + dz * Math.sin(a)) * sp,
+      2.5 + Math.random() * 3,
+      (dz * Math.cos(a) - dx * Math.sin(a)) * sp
+    );
+    m.userData.spin = (Math.random() - 0.5) * 30;
+    scene.add(m);
+    impacts.push({ m, life: 0.5 + Math.random() * 0.25, max: 0.75 });
+  }
+}
+// Bucky's ground smash: a low wave of snow puffs rolling out to the edge of the shock ring.
+function snowWave(e) {
+  snowGeo ??= new THREE.IcosahedronGeometry(0.05, 0);
+  const n = $('quality').value !== 'high' ? 12 : 24;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + Math.random() * 0.2,
+      m = new THREE.Mesh(
+        snowGeo,
+        new THREE.MeshBasicMaterial({ color: 0xf6fbff, transparent: true, depthWrite: false })
+      );
+    m.position.set(e.x + Math.sin(a) * 0.4, e.y + 0.05, e.z + Math.cos(a) * 0.4);
+    // Out to the ring's radius in its life, with a low hop.
+    const sp = e.r * (1.6 + Math.random() * 0.4);
+    m.userData.v = new THREE.Vector3(Math.sin(a) * sp, 1.2 + Math.random() * 1.6, Math.cos(a) * sp);
+    m.scale.setScalar(1.4 + Math.random() * 1.4);
+    scene.add(m);
+    impacts.push({ m, life: 0.5 + Math.random() * 0.15, max: 0.65 });
+  }
+  trimImpacts();
+  kick = 1;
+  kickX = 0;
+  kickY = -0.16;
+  kickZ = 0;
 }
 // Tormund's parry (studio pass 5): a flash and sparks on the shield itself, and a ringing clang.
 function shieldFlash(e) {
@@ -825,6 +881,7 @@ function updateImpacts(dt) {
       f.m.material.opacity = Math.min(1, k * 2);
       // Sparks point along their flight, so they read as streaks.
       if (f.spark) f.m.lookAt(f.m.position.x + v.x, f.m.position.y + v.y, f.m.position.z + v.z);
+      else if (f.m.userData.spin) f.m.rotation.x += f.m.userData.spin * dt;
     }
     if (f.life <= 0) {
       scene.remove(f.m);
@@ -839,11 +896,12 @@ function events() {
     if (e.type === 'swing') {
       ring(e);
       tone(e.strong ? 100 : 220, 0.2);
+      if (e.actor === 2 && e.strong) snowWave(e);
     }
     if (e.type === 'hit') {
       ring(e);
       tone(660, 0.08);
-      if ((e.actor === 0 || e.actor === 1) && e.angle !== undefined) impactBurst(e);
+      if (e.actor >= 0 && e.actor <= 2 && e.angle !== undefined) impactBurst(e);
     }
     if (e.type === 'snowburst') ring(e);
     if (e.type === 'throw') tone(380, 0.2);
@@ -1437,11 +1495,13 @@ function updateCamera(dt) {
     cameraInitialized = true;
   } else camera.position.lerp(desired, 1 - Math.exp(-dt * 12));
   camera.lookAt(aim);
-  // Kick from Darren's and Tormund's heavy blows: a quick push the way he struck that eases straight back.
+  // Kick from the heroes' heavy blows: a quick push the way he struck (down, for Bucky's ground
+  // smashes) that eases straight back.
   if (kick > 0 && !game.paused) {
     kick = Math.max(0, kick - dt * 7);
     const k = Math.sin(kick * Math.PI) * kick;
     camera.position.x += kickX * k;
+    camera.position.y += kickY * k;
     camera.position.z += kickZ * k;
   }
   if (shake > 0 && !game.paused) {
@@ -1896,7 +1956,8 @@ async function boot() {
           ? // From the blade's base to its point (markers built into his model, studio pass 3).
             [WeaponTrail.between(scene, root, 'blade_base', 'blade_tip', 0xffd77a)]
           : i === 2
-            ? [new WeaponTrail(scene, rig, rig.role.handL, 0.3, 0.62, 0xbfe4ff)]
+            ? // Across the mallet's log head, from markers built into his model (studio pass 3).
+              [WeaponTrail.between(scene, root, 'mallet_neck', 'mallet_crown', 0xbfe4ff)]
             : [rig.role.handL, rig.role.handR].map(
                 (b) => new WeaponTrail(scene, rig, b, 0.2, 0.36, 0xff9a5c, true)
               );

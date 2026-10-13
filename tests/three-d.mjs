@@ -724,6 +724,22 @@ test("Tormund's sword hits say who struck and which way (for his sparks and came
   assert.equal(hit.actor, 1);
   assert(Number.isFinite(hit.angle));
 });
+test("Bucky's mallet hits say who struck and which way (for his wood chips and snow wave)", () => {
+  const g = fresh();
+  near(g, 40, 52, 0);
+  g.switchTo(2);
+  assert.equal(g.selected, 2);
+  foe(g, 'gopher', g.player.x, g.player.z + 1.4);
+  g.events.length = 0;
+  assert(g.attack());
+  tick(g, 0.6);
+  const hit = g.events.find((e) => e.type === 'hit' && e.foe !== undefined);
+  assert(hit, 'no hit event');
+  assert.equal(hit.actor, 2);
+  assert(Number.isFinite(hit.angle));
+  const swing = g.events.find((e) => e.type === 'swing');
+  assert(swing && swing.actor === 2 && swing.r > 0, 'swing event names Bucky and its ring');
+});
 test('Grunts wind up before hitting, and a dodge through the wind-up avoids the damage', () => {
   const g = fresh();
   near(g, 40, 52, 0);
