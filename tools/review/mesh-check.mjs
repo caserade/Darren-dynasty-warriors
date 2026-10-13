@@ -127,7 +127,8 @@ for (const node of root.listNodes()) {
         if (Math.abs(l - 1) > 0.02) r.nonUnitNormals++;
         if (len(faceN[i]) > 0 && dot(q, faceN[i]) < 0) {
           r.inwardNormals++;
-          if (process.env.SHOW) console.log('inward normal at', P[i].map((v) => v.toFixed(3)).join(' '));
+          if (process.env.SHOW)
+            console.log('inward normal at', P[i].map((v) => v.toFixed(3)).join(' '));
         }
       }
       if (Jt && Wt) {

@@ -665,3 +665,65 @@ WHAT STILL NEEDS AN ARTIST
 - The deepest tucks (Down, Dodge, the dashes) still stretch the seat and thighs; a sculpted
   corrective shape or softer tuck poses would fix what weights cannot.
 - Hand painting in a 3D package could keep the thighs firm while avoiding the tears.
+
+
+CLAUDE UPDATE 12 · DARREN FULL RIG PASS (3D ONLY, DARREN ONLY) · 2026-10-13
+Built on update 11 (branch claude/darren-weight-paints-bixhky, PR #10). michael reported that
+Darren's wings stretch across his face. Cause: the clips aim the wings in world space, so when a
+move twists his body or the game turns his head, the wing arm and claw swing through his cheeks
+and eyes. Every fix below was measured over all 46 Darren clips and checked in pictures; scan,
+pictures and numbers are in project files darren-rig/ (scan.md). darren.glb is still generated
+by tools/darren-model.mjs; nothing was hand-edited.
+
+NEW REVIEW TOOLS (tools/review/)
+- collide.cjs: counts skin of the wings, arms, legs and tail pushed inside another body part,
+  per clip and per pair, with the game's head look turned each way, the face told apart from
+  the rest of the head; and the lowest the feet and every other part reach (frames in the air
+  are left out, using the game's own hop timings). LOOKS=plain and CLIPS= narrow a run.
+- mesh-check.mjs: close test of the mesh: thin or broken triangles, duplicate faces, holes,
+  edges shared by more than two faces, inward normals, skin weights, and pieces sunk under the
+  skin at rest.
+- review.html: a 'through' view (red = skin poking through, blue = the skin it went into).
+
+FIXES
+- The model now carries small measuring data on its bones (head clearance balls, wing and
+  forearm probes, foot soles, ground probes for the body, head and tail). Other heroes do not
+  carry it, so the new code does nothing for Tormund or Bucky.
+- anim.mjs keepClear: every frame, a wing or forearm that would pass through the head turns
+  just far enough away (runs in the air too).
+- anim.mjs plantFeet, groundBody, groundTail: on the ground, feet are lifted out of the snow
+  with a two-joint leg fix, and the body, head, tail and wings are kept above it. The hips
+  position is restored each frame so these fixes never pile up.
+- clips.mjs: wing aims now ride his chest instead of the world (except when lying down), the
+  forward part of a wing swing is softened, and wing tips fold 45% of what a pose asks. Knees
+  only bend as much as a swung leg still needs to drop, at most 85 degrees.
+- darren-model.mjs: the collar takes a quarter of the shoulder swing, scarf ends are weighted
+  along their length, the scarf ends sit on the belly across their whole width (they dipped
+  3 cm into it), and the horn tip no longer has 24 collapsed triangles.
+- Tried and dropped: a softer tuck in the roll (measured worse), wider hip blends (no gain).
+- tests/darren-model.cjs checks the new bone data is in the model.
+
+RESULT (all clips, PR #10 -> now)
+- Skin poking into the face 3,137 -> under 1,000 vertex-frames; into the rest of the head
+  24,187 -> 15,771 (mostly the nape under the collar); all parts through each other 98,364 ->
+  about 74,800.
+- Feet under the snow: worst -24.6 cm -> -2.4 cm. Tail -50.9 cm -> -4.0 cm. Body lying down
+  -18.7 cm -> -3.2 cm.
+- Torn skin edge-frames 65,561 -> 47,550; strained 271,215 -> 210,780; drift 3.45 -> 3.32 cm;
+  smallest body volume 96.8% -> 96.1%.
+- Wing membrane torn 214 -> 8 vertices; collar torn 156 -> 0.
+- 43 of 46 moves tear less. Run (+2%) and Hurt from behind (+10%) tear slightly more; Walk is
+  back where update 11 had it.
+- Cost: the scarf ends stretch a little more in Dodge (188 torn vertices vs 141 before the
+  belly fix) because they now sit on the belly instead of inside it.
+
+APP
+- Desktop app version 1.7.0 (Darren full rig pass).
+
+WHAT STILL NEEDS AN ARTIST
+- Wings still brush the nape and cross behind him in fast spins; the armpit and hip crease
+  fold in big arm and leg swings.
+- The roll seat stretch needs sculpted corrective shapes.
+- Mesh notes left as they are: 13 edges shared by more than two faces and 55 inward normals at
+  the eye and brow rims, wing claws, paw tips and nape (all from the supplied model), and the
+  horn's open base ring, buried in the skull.
