@@ -1801,6 +1801,8 @@ function tormundLocomotion() {
 // A blade direction plus where the sword arm reaches; the shield on its forearm.
 const TSw = (arm, fore, blade) => T_SWORD(arm, fore, blade);
 const lerpV = (a, b, t) => a.map((x, i) => lerp(x, b[i], t));
+// Through a middle direction, so a swung head arcs over the top instead of cutting through him.
+const arcV = (a, m, b, t) => (t < 0.5 ? lerpV(a, m, 2 * t) : lerpV(m, b, 2 * t - 1));
 const TG_SW = [
   [0.35, -0.8, 0.3],
   [0.05, -0.15, 1],
@@ -2510,11 +2512,14 @@ function tormundSword() {
   };
 }
 
-// ---- Bucky: a heavy beaver with the mallet in his LEFT paw ----
+// ---- Bucky: a heavy little Grarrl with the mallet in his LEFT paw ----
+// axis is the way the handle points from his paw to the mallet head. Since studio pass 4 (Claude
+// update 10) the handle runs through his closed paw along its grip line (the paw's rest forward
+// axis), so it is steered with face; every move's mallet directions are unchanged.
 const B_MAL = (arm, fore, axis) => ({
   armL: { aim: arm },
   foreL: { aim: fore },
-  handL: { aim: across(fore, axis), up: axis },
+  handL: { aim: across(fore, axis), face: axis },
 });
 const B_FREE = (arm, fore, hand) => ({
   armR: { aim: arm },
@@ -2566,7 +2571,7 @@ function buckyArms(kind, s, c) {
       };
     case 'land':
       return {
-        ...B_MAL([0.7, -0.6, 0.4], [0.3, -0.5, 0.8], [0.1, 0.8, 0.6]),
+        ...B_MAL([0.7, -0.6, 0.4], [0.3, -0.5, 0.8], [0.75, -0.35, 0.55]),
         ...B_FREE([-0.7, -0.6, 0.4], [-0.3, -0.7, 0.6]),
       };
     case 'roll':
@@ -2577,11 +2582,11 @@ function buckyArms(kind, s, c) {
     case 'hurt':
       return s > 0
         ? {
-            ...B_MAL([0.85, -0.3, -0.2], [0.6, 0.5, -0.3], [0.2, 0.9, -0.3]),
+            ...B_MAL([0.85, -0.3, -0.2], [0.6, 0.5, -0.3], [0.8, 0.45, -0.4]),
             ...B_FREE([-0.85, -0.2, 0.4], [-0.5, 0.4, 0.7]),
           }
         : {
-            ...B_MAL([0.7, -0.6, -0.4], [0.4, -0.6, 0.6], [0.3, 0.6, 0.7]),
+            ...B_MAL([0.7, -0.6, -0.4], [0.4, -0.6, 0.6], [0.8, -0.25, 0.55]),
             ...B_FREE([-0.7, -0.6, -0.4], [-0.3, -0.6, 0.7]),
           };
     case 'down':
@@ -2672,12 +2677,18 @@ function buckyLocomotion() {
 }
 
 // ---- Bucky · Mallet attacks (timed to moves.mjs) ----
+// Guard: mallet held slanting up across his front in both paws, head up by his left shoulder,
+// as in the design sheet's ready poses.
 const BG_M = [
-  [0.5, -0.6, 0.5],
-  [0.2, 0.3, 0.95],
-  [0.2, 0.85, 0.4],
+  [0.3, -0.8, 0.5],
+  [-0.3, -0.1, 0.95],
+  [0.6, 0.75, 0.25],
 ];
+// Ready stance: both paws on the handle, as in the design's swings (the free paw is solved onto
+// the handle by anim.mjs, twoHands). Every attack key starts from this, so the big blows are
+// two-handed; the spins let go (twoHands: 0) and swing it out at arm's length.
 const B_GUARD = {
+  twoHands: 1,
   ...crouch(0.2, 0.5, 10),
   hips: { p: [0, -0.04, 0] },
   spine: [4, 0, 0],
@@ -2688,35 +2699,11 @@ const B_GUARD = {
 };
 const BGd = (p = {}) => mix(B_GUARD, p);
 const BM = (arm, fore, axis) => B_MAL(arm, fore, axis);
-// Bucky curled into a ball, rolling turns times over u (0..1).
-function buckyBall(u0, turns) {
-  const u = u0,
-    th = TAU * turns * u,
-    tuck = sin(PI * clamp01(u0 / 0.95)) ** 0.4,
-    oy = 0.3,
-    oz = 0.1,
-    cy = lerp(0.55 + oy, 0.62, tuck);
-  return {
-    hips: {
-      r: [360 * turns * u, 0, 0],
-      p: [0, cy - (oy * cos(th) - oz * sin(th)) - 0.55, oz - (oy * sin(th) + oz * cos(th))],
-    },
-    spine: [35 * tuck, 0, 0],
-    chest: [25 * tuck, 0, 0],
-    neck: [25 * tuck, 0, 0],
-    head: [20 * tuck, 0, 0],
-    ...legs([90 * tuck, 110 * tuck, 0, 10], [90 * tuck, 110 * tuck, 0, 10]),
-    ...BM([0.5, -0.5, 0.6], [0, 0.4, 0.9], [0.2, 0.6, -0.8]),
-    ...B_FREE([-0.5, -0.5, 0.6], [0, -0.3, 0.95]),
-    tail1: [40 * tuck, 0, 0],
-    tail2: [30 * tuck, 0, 0],
-  };
-}
 function buckyMallet() {
   const M = MOVESETS.bucky,
     N = M.normal,
     Cc = M.charge;
-  const smashUp = BM([0.3, 0.95, -0.1], [0.1, 0.4, -0.9], [0, 0.2, -1]),
+  const smashUp = BM([0.3, 0.95, -0.1], [0.1, 0.4, -0.9], [0, 0.6, -0.8]),
     smashDown = BM([0.15, -0.2, 1], [0, -0.6, 0.8], [0, -0.6, 0.8]);
   return {
     // N1: a big flat swing from his left across to his right; the weight drags him round.
@@ -2863,6 +2850,7 @@ function buckyMallet() {
       fn: spinKeys(0.16, 0.62, 2, (u, t) => {
         const e = sin(PI * clamp01((t - 0.04) / 0.86));
         return BGd({
+          twoHands: 1 - e,
           ...crouch(0.3 * e, 0.5, 16),
           hips: { r: [-8 * e, 0, 0] },
           spine: [-8 * e, 0, -10 * e],
@@ -2886,6 +2874,7 @@ function buckyMallet() {
         [
           0.12,
           BGd({
+            twoHands: 0,
             hips: { r: [12, 0, 0], p: [0, -0.04, -0.08] },
             spine: [14, 0, 0],
             ...BM([0.7, -0.5, -0.4], [0.5, 0.3, -0.8], [0.3, 0.6, -0.7]),
@@ -2896,6 +2885,7 @@ function buckyMallet() {
         [
           0.24,
           BGd({
+            twoHands: 0,
             hips: { r: [-22, 0, 0], p: [0, 0.02, 0.18] },
             spine: [-18, 0, 0],
             chest: [-6, 0, 0],
@@ -2965,9 +2955,10 @@ function buckyMallet() {
       fn: spinKeys(0.1, 1.22, 4, (u, t) => {
         const e = smooth(clamp01(t / 0.14)) * (1 - smooth(clamp01((t - 1.2) / 0.18)));
         return BGd({
+          twoHands: 1 - e,
           ...crouch(0.25 * e, 0.5, 16),
-          hips: { r: [-14 * e, 0, 0], p: [0, 0, -0.06 * e] },
-          spine: [-14 * e, 0, 0],
+          hips: { r: [-6 * e, 0, 0], p: [0, 0, -0.04 * e] },
+          spine: [-12 * e, 0, 0],
           chest: [-6 * e, 0, 0],
           head: [10 * e, 0, 0],
           ...BM(
@@ -2979,8 +2970,9 @@ function buckyMallet() {
             lerpV([-0.45, -0.55, 0.6], [0.5, 0.1, 0.8], e),
             lerpV([-0.1, -0.2, 1], [0.9, 0.1, 0.3], e)
           ),
-          tail1: [-15 * e, -30 * e, 0],
-          tail2: [-10 * e, -20 * e, 0],
+          // Tail streams out low behind the spin; a big yaw on the first tail bone shears his back.
+          tail1: [-8 * e, -12 * e, 0],
+          tail2: [-8 * e, -22 * e, 0],
         });
       }),
     },
@@ -3054,6 +3046,7 @@ function buckyMallet() {
         [
           0.16,
           {
+            twoHands: 1,
             hips: { r: [-14, 0, 0] },
             spine: [-14, 0, 0],
             ...legs([40, 70, 0, 12], [30, 60, 0, 12]),
@@ -3065,6 +3058,7 @@ function buckyMallet() {
         [
           0.3,
           {
+            twoHands: 1,
             ...crouch(0.75, 0.5, 14),
             hips: { r: [24, 0, 0], p: [0, -0.14, 0.12] },
             spine: [22, 0, 0],
@@ -3078,6 +3072,7 @@ function buckyMallet() {
         [
           0.5,
           {
+            twoHands: 1,
             ...crouch(0.6, 0.5, 14),
             hips: { r: [18, 0, 0], p: [0, -0.1, 0.1] },
             spine: [16, 0, 0],
@@ -3089,7 +3084,38 @@ function buckyMallet() {
       ],
     },
     // Dash attack: curls into a ball and bowls through them.
-    BukDash: { dur: M.dash.dur, fn: (p, t) => buckyBall(clamp01(t / 0.7), 2) },
+    // Dash attack: head down, belly first, mallet held across in both paws like a battering ram,
+    // barrelling through them with quick stomping steps (studio pass 4; the old curled-up roll
+    // crushed his belly into his legs).
+    BukDash: {
+      dur: M.dash.dur,
+      fn: (p, t) => {
+        const e = smooth(clamp01(t / 0.1)) * (1 - smooth(clamp01((t - 0.62) / 0.18))),
+          q = (t / 0.62) * 3.5, // stomping steps
+          s = S(q * 0.5),
+          c = C(q * 0.5),
+          kL = 50 * Math.max(0, c) ** 1.4 + 8,
+          kR = 50 * Math.max(0, -c) ** 1.4 + 8;
+        return BGd({
+          hips: {
+            r: [16 * e, 6 * s * e, 5 * c * e],
+            p: [0, (-0.06 + 0.04 * Math.abs(C(q * 0.5))) * e, 0.06 * e],
+          },
+          spine: [14 * e, -4 * s * e, 0],
+          chest: [6 * e, -3 * s * e, 0],
+          neck: [-6 * e, 0, 0],
+          head: [-10 * e, 0, 0],
+          ...legs([30 * s * e, kL * e, 0, 8], [-30 * s * e, kR * e, 0, 8]),
+          ...BM(
+            lerpV(BG_M[0], [0.45, -0.55, 0.7], e),
+            lerpV(BG_M[1], [-0.2, -0.05, 1], e),
+            lerpV(BG_M[2], [-0.95, 0.15, 0.25], e)
+          ),
+          tail1: [-6 * e, -14 * s * e, 0],
+          tail2: [0, -10 * s * e, 0],
+        });
+      },
+    },
     // Timber Avalanche: three hopping slams, then one leap and a slam that shakes the whole valley.
     BukSpecial: {
       dur: M.special.dur,
@@ -3114,7 +3140,7 @@ function buckyMallet() {
               ...BM(
                 lerpV([0.3, 0.95, -0.1], [0.15, -0.2, 1], down),
                 lerpV([0.1, 0.4, -0.9], [0, -0.6, 0.8], down),
-                lerpV([0, 0.2, -1], [0, -0.6, 0.8], down)
+                arcV([0, 0.6, -0.8], [0, 0.95, 0.3], [0, -0.6, 0.8], down)
               ),
               ...B_FREE(
                 lerpV([-0.3, 0.9, 0], [-0.3, -0.3, 0.9], down),
@@ -3142,7 +3168,7 @@ function buckyMallet() {
             ...BM(
               lerpV(lerpV([0.3, 0.95, -0.1], [0.15, -0.2, 1], down), BG_M[0], rest),
               lerpV(lerpV([0.1, 0.4, -0.9], [0, -0.6, 0.8], down), BG_M[1], rest),
-              lerpV(lerpV([0, 0.2, -1], [0, -0.6, 0.8], down), BG_M[2], rest)
+              lerpV(arcV([0, 0.6, -0.8], [0, 0.95, 0.3], [0, -0.6, 0.8], down), BG_M[2], rest)
             ),
             ...B_FREE(
               lerpV([0.2, 0.95, -0.2], [0.15, -0.25, 1], down),
@@ -3875,6 +3901,40 @@ function darrenScarf() {
     },
   };
 }
+// Bucky's tail balances him (studio pass 4, Claude update 10): when he leans into a smash his hips
+// tip forward and the tail, which hangs off the hips, used to swing straight up and drag his back
+// into a sheet. The tail's lift above level (hips plus each tail bone, degrees) is held between
+// a low drag and a modest rise, so it stays out behind him as a counterweight. Rolls are left alone.
+const TAIL_LIFT = [
+  ['tail1', -12, 18],
+  ['tail2', -16, 26],
+  ['tail3', -20, 32],
+];
+// (B_BASE, which every pose is added to, has no hip tilt and no tail.)
+function tailBalance(pose) {
+  const hx = (Array.isArray(pose.hips) ? pose.hips : pose.hips?.r)?.[0] || 0;
+  if (Math.abs(hx) > 60) return pose;
+  const out = { ...pose };
+  let lift = hx;
+  for (const [k, lo, hi] of TAIL_LIFT) {
+    const r = (Array.isArray(out[k]) ? out[k] : out[k]?.r) || [0, 0, 0],
+      want = Math.min(hi, Math.max(lo, lift + r[0]));
+    out[k] = [want - lift, r[1], r[2]];
+    lift = want;
+  }
+  return out;
+}
+function withTailBalance(specs) {
+  const out = {};
+  for (const [name, sp] of Object.entries(specs))
+    out[name] = sp.fn
+      ? { ...sp, fn: (p, t) => tailBalance(sp.fn(p, t)) }
+      : {
+          ...sp,
+          keys: sp.keys.map(([t, pose, f]) => [t, tailBalance(pose || {}), f]),
+        };
+  return out;
+}
 // Left/right mirror of whole clips: every key pose (or pose function) swaps sides.
 function mirrorClips(specs) {
   const out = {};
@@ -3894,7 +3954,10 @@ export const LIBRARY = {
     base: mirror(T_BASE),
     clips: () => mirrorClips({ ...tormundLocomotion(), ...tormundSword() }),
   },
-  Bucky: { base: B_BASE, clips: () => ({ ...buckyLocomotion(), ...buckyMallet() }) },
+  Bucky: {
+    base: B_BASE,
+    clips: () => withTailBalance({ ...buckyLocomotion(), ...buckyMallet() }),
+  },
 };
 
 // Builds every authored clip for one rig. Specs with fn/keys and dur become AnimationClips.

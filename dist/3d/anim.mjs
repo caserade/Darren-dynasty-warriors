@@ -10,7 +10,9 @@
 //     with tw degrees of twist around itself; { aim, up } or { aim, face } also turns the bone about
 //     its aim so the axis that pointed up (or forward) at rest points as near as it can to that
 //     direction: how a held sword blade or a shield face is steered;
-//   - hips.p moves the hips in metres (root motion stays in the simulation, this is body bob).
+//   - hips.p moves the hips in metres (root motion stays in the simulation, this is body bob);
+//   - twoHands: 0..1 brings the free paw onto the weapon's handle (Bucky's mallet, Claude
+//     update 10): the arm is solved to reach it after the rest of the pose is placed.
 // Rotations in a key are added to the clip's base pose; aims replace it.
 import * as THREE from 'three';
 
@@ -144,7 +146,14 @@ export function buildRig(root, name) {
   });
   const role = {};
   for (const [k, v] of Object.entries(roles)) if (byName[v]) role[k] = byName[v];
-  return { name, root, bones, info, role, roles };
+  // Markers built into a model with a two-handed weapon (tools/bucky-model.mjs): where the weapon
+  // paw holds the handle, where the handle meets the head, and where the free paw closes.
+  const mark = (n) => root.getObjectByName(n);
+  const twoHand =
+    mark('mallet_grip') && mark('mallet_neck') && mark('paw_grip_R')
+      ? { grip: mark('mallet_grip'), neck: mark('mallet_neck'), paw: mark('paw_grip_R') }
+      : null;
+  return { name, root, bones, info, role, roles, twoHand };
 }
 
 // ---------- pose math ----------
@@ -158,6 +167,10 @@ export function mix(a = {}, b = {}) {
     const o = out[k];
     if (v === null) {
       delete out[k];
+      continue;
+    }
+    if (typeof v === 'number') {
+      out[k] = v;
       continue;
     }
     const n = {};
@@ -191,6 +204,10 @@ export function mirror(pose) {
   const out = {};
   for (const [k, v] of Object.entries(pose)) {
     const key = k.endsWith('L') ? k.slice(0, -1) + 'R' : k.endsWith('R') ? k.slice(0, -1) + 'L' : k;
+    if (typeof v === 'number') {
+      out[key] = v;
+      continue;
+    }
     const r = rotOf(v),
       n = {};
     if (r) n.r = [r[0], -r[1], -r[2]];
@@ -209,6 +226,10 @@ export function mirror(pose) {
 function channels(pose) {
   const c = {};
   for (const [k, v] of Object.entries(pose)) {
+    if (typeof v === 'number') {
+      c[k] = v;
+      continue;
+    }
     const r = rotOf(v);
     if (r) [c[k + '.rx'], c[k + '.ry'], c[k + '.rz']] = r;
     if (v && !Array.isArray(v)) {
@@ -228,6 +249,10 @@ function unchannels(c) {
   const pose = {};
   for (const [key, val] of Object.entries(c)) {
     const [k, ch] = key.split('.');
+    if (ch === undefined) {
+      pose[k] = val;
+      continue;
+    }
     const b = (pose[k] ??= {});
     if (ch[0] === 'r') (b.r ??= [0, 0, 0])['xyz'.indexOf(ch[1])] = val;
     else if (ch[0] === 'a') (b.aim ??= [0, 0, 0])['xyz'.indexOf(ch[1])] = val;
@@ -239,8 +264,77 @@ function unchannels(c) {
   return pose;
 }
 
-// Applies a pose to the rig's bones (rest pose for every bone the pose leaves out).
+// Applies a pose to the rig's bones (rest pose for every bone the pose leaves out), then brings
+// the free paw onto the weapon's handle when the pose asks for both hands.
 export function applyPose(rig, pose) {
+  applyPoseFK(rig, pose);
+  if (pose.twoHands > 0.001 && rig.twoHand && rig.role.armR) twoHands(rig, pose, pose.twoHands);
+}
+// Two-handed grip (Claude update 10): the free arm (upper arm, forearm, paw) is solved so the paw
+// closes on the handle a little above the weapon paw, its grip line along the handle; the elbow
+// stays on the side the pose put it. w blends from the pose's own arm (0) to the grip (1).
+const IK = { S: new THREE.Vector3(), T: new THREE.Vector3(), Q: new THREE.Quaternion() };
+// A point's or bone's position in character space (the hero root's own space).
+const local = (rig, o, v = new THREE.Vector3()) => rig.root.worldToLocal(o.getWorldPosition(v));
+const lerpDir = (a, b, w) => a.map((x, i) => x + (b[i] - x) * w);
+// The direction a bone points in the current pose, in character space (toward its child bone).
+function aimOf(rig, bone) {
+  const child = bone.children.find((c) => c.isBone);
+  if (child) return local(rig, child).sub(local(rig, bone)).normalize().toArray();
+  bone.getWorldQuaternion(IK.Q);
+  const rq = rig.root.getWorldQuaternion(new THREE.Quaternion()).invert();
+  return new THREE.Vector3(0, 1, 0).applyQuaternion(rq.multiply(IK.Q)).toArray();
+}
+function twoHands(rig, pose, w) {
+  const { armR, foreR, handR } = rig.role,
+    th = rig.twoHand,
+    { S, T } = IK;
+  rig.root.updateMatrixWorld(true);
+  const G = local(rig, th.grip),
+    H = local(rig, th.neck).sub(G),
+    // Where the free paw closes: a little way up the handle from the weapon paw.
+    P = G.clone().addScaledVector(H, 0.5);
+  H.normalize();
+  local(rig, armR, S);
+  const E0 = local(rig, foreR),
+    W0 = local(rig, handR),
+    a = S.distanceTo(E0),
+    b = E0.distanceTo(W0),
+    pole = E0.clone().sub(S), // the elbow keeps to the side the pose bent it
+    fk = [aimOf(rig, armR), aimOf(rig, foreR), aimOf(rig, handR)],
+    out = { ...pose };
+  // Aim the wrist so the paw's grip point lands on P; correct by the miss and solve again.
+  T.copy(P).add(W0).sub(local(rig, th.paw));
+  for (let it = 0; it < 4; it++) {
+    const d = Math.min(Math.max(T.distanceTo(S), 1e-4), (a + b) * 0.999),
+      U = T.clone().sub(S).normalize(),
+      V = pole.clone().addScaledVector(U, -pole.dot(U));
+    if (V.lengthSq() < 1e-8) V.set(0, -1, 0).addScaledVector(U, U.y);
+    V.normalize();
+    const ca = (a * a + d * d - b * b) / (2 * a * d),
+      sa = Math.sqrt(Math.max(0, 1 - ca * ca)),
+      E = S.clone()
+        .addScaledVector(U, a * ca)
+        .addScaledVector(V, a * sa),
+      Wp = S.clone().addScaledVector(U, d),
+      upper = E.clone().sub(S).normalize(),
+      fore = Wp.clone().sub(E).normalize(),
+      // A held handle sits across the paw: the paw points along the forearm, square to the handle.
+      across = fore.clone().addScaledVector(H, -fore.dot(H));
+    if (across.lengthSq() < 1e-6) across.set(H.y, -H.x, 0.3);
+    across.normalize();
+    out.armR = { aim: lerpDir(fk[0], upper.toArray(), w) };
+    out.foreR = { aim: lerpDir(fk[1], fore.toArray(), w) };
+    out.handR = { aim: lerpDir(fk[2], across.toArray(), w) };
+    if (w > 0.5) out.handR.face = H.toArray();
+    applyPoseFK(rig, out);
+    rig.root.updateMatrixWorld(true);
+    const miss = P.clone().sub(local(rig, th.paw));
+    if (miss.lengthSq() < 1e-6 || w < 1) break;
+    T.add(miss);
+  }
+}
+function applyPoseFK(rig, pose) {
   const world = new Map();
   for (const bone of rig.bones) {
     const inf = rig.info.get(bone);
@@ -338,7 +432,7 @@ export function makeClip(rig, spec) {
     keys.forEach((k, i) => {
       if (n in k.c) return;
       if (n in baseC) k.c[n] = baseC[n];
-      else if (/\.(r|p)[xyz]$/.test(n)) k.c[n] = 0;
+      else if (/\.(r|p)[xyz]$/.test(n) || !n.includes('.')) k.c[n] = 0;
       else {
         for (let d = 1; d < keys.length; d++) {
           const o = keys[i - d]?.c[n] ?? keys[i + d]?.c[n];

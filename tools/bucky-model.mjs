@@ -431,6 +431,10 @@ async function buildMallet(sx, hand) {
   // Markers: the head's middle (impact effects) and the near and far sides of the head along the
   // handle, which the swing trail runs between.
   addMarker('mallet_head', hand, new THREE.Vector3(g0.x, g0.y, hz));
+  // Where the paw holds the handle, and where the other paw closes for a two-handed swing
+  // (anim.mjs twoHands).
+  addMarker('mallet_grip', hand, g0.clone());
+  addMarker('paw_grip_R', 'hand_R', gripCentre(-1));
   addMarker('mallet_neck', hand, new THREE.Vector3(g0.x, g0.y, hz - head));
   addMarker('mallet_crown', hand, new THREE.Vector3(g0.x, g0.y, hz + head));
 }
