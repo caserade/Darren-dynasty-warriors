@@ -1009,10 +1009,13 @@ function rec(area, check, ok, note = '') {
       SnowdayShared.rememberButtons({ attack: 5 });
     });
     await load3d();
+    // Title screen, then the main menu, which names the pixel game's progress.
+    await p.click('#fx-start');
+    await p.click('#fx-main-list [data-go="story"]');
     const s = await p.evaluate(() => ({
-      note: document.querySelector('#other-game').textContent,
-      noteShown: !document.querySelector('#other-game').hidden,
-      firewood: !document.querySelector('#firewood').disabled,
+      note: document.querySelector('#fx-main-other').textContent,
+      noteShown: !!document.querySelector('#fx-main-other').textContent,
+      firewood: document.querySelectorAll('.fx-battle')[4].querySelector('.fx-chip').textContent,
       mode: snowdayTest.game.mode,
       modeBox: document.querySelector('#mode').value,
       sound: document.querySelector('#sound').checked,
@@ -1021,11 +1024,16 @@ function rec(area, check, ok, note = '') {
     await shot(p, '3d-30-shared-menu');
     rec(
       'shared',
-      '3D menu shows pixel-game progress',
+      '3D main menu shows pixel-game progress',
       s.noteShown && /Ruffy is home/.test(s.note),
       s.note
     );
-    rec('shared', 'pixel rescue opens Firewood for Mom in 3D', s.firewood);
+    rec(
+      'shared',
+      'pixel rescue opens Firewood for Mom in the 3D story select',
+      s.firewood === 'Open',
+      s.firewood
+    );
     rec(
       'shared',
       'new 3D game starts in the mode picked in the pixel game',
@@ -1038,23 +1046,23 @@ function rec(area, check, ok, note = '') {
       s.pad.combo === 5 && s.pad.interact === 2,
       JSON.stringify(s.pad)
     );
-    await p.click('#firewood');
+    const begin = async (sel) => {
+      await p.click(sel);
+      await p.click('#fx-hero-opts .fx-go');
+      await p.click('#fx-begin');
+    };
+    await begin('.fx-battle:has(.fx-chip.open)');
     await p.waitForFunction(() => snowdayTest.game.quest.chapter === 'firewood', null, {
       timeout: 60000,
     });
+    // The rescue is still unfinished: the story select leads back to it.
     await p.evaluate(() => snowdayTest.pause());
-    const back = await p.evaluate(() => document.querySelector('#firewood').textContent);
-    rec(
-      'shared',
-      'early firewood offers the way back to the rescue',
-      /Back to Ruffy/.test(back),
-      back
-    );
-    await p.click('#firewood');
+    await p.click('#to-story');
+    await begin('.fx-battle:has(.fx-chip.next)');
     await p.waitForFunction(() => snowdayTest.game.quest.chapter === 'rescue', null, {
       timeout: 60000,
     });
-    rec('shared', 'back to the rescue works', true);
+    rec('shared', 'back to the rescue from the story select works', true);
     // Now change things in 3D and look at the pixel game.
     await p.evaluate(() => {
       snowdayTest.game.quest.clues[0] = true; // one camp cleared in 3D
