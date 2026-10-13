@@ -5,6 +5,7 @@ import { buildRig, Animator } from './anim.mjs';
 import { buildClips } from './clips.mjs';
 import { ScarfRibbon } from './ribbon.mjs';
 import { WeaponTrail } from './trail.mjs';
+import { addMetalShine } from './look.mjs';
 
 const $ = (id) => document.getElementById(id),
   canvas = $('view'),
@@ -671,16 +672,236 @@ function ring(e) {
   scene.add(m);
   rings.push({ m, life: 0.55, max: 0.55, r: e.r || 1.2 });
 }
+// Darren's hit effects (studio pass 5): a bright impact star and a burst of snow where his blow
+// lands, flung the way he struck, and a short camera kick the same way on heavy blows.
+// Tormund's sword gets the same, plus a spray of steel sparks (Tormund studio pass 5).
+// Bucky's mallet gets the same, plus wood chips, and his ground smashes throw a low wave of
+// snow out round the ring and kick the camera down (Bucky studio pass 5).
+const impacts = [];
+let starMap = null,
+  snowGeo = null,
+  sparkGeo = null,
+  chipGeo = null,
+  kick = 0,
+  kickX = 0,
+  kickY = 0,
+  kickZ = 0;
+function starTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d'),
+    grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.3, 'rgba(255,226,140,0.9)');
+  grad.addColorStop(0.6, 'rgba(255,150,60,0.45)');
+  grad.addColorStop(1, 'rgba(255,120,40,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  // Four sharp rays make it read as a hit, not a glow.
+  g.fillStyle = 'rgba(255,255,255,0.9)';
+  for (const [w, h] of [
+    [64, 5],
+    [5, 64],
+  ])
+    g.fillRect(32 - w / 2, 32 - h / 2, w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function impactBurst(e) {
+  starMap ??= starTexture();
+  snowGeo ??= new THREE.IcosahedronGeometry(0.05, 0);
+  const heavy = e.power > 1,
+    low = $('quality').value !== 'high',
+    star = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: starMap,
+        color: 0xfff0c8,
+        transparent: true,
+        depthWrite: false,
+        // Drawn over the foe it lands on (its centre is inside the foe's body).
+        depthTest: false,
+      })
+    );
+  star.renderOrder = 5;
+  star.position.set(e.x, e.y - 0.35, e.z);
+  star.material.rotation = Math.random() * Math.PI;
+  scene.add(star);
+  impacts.push({ m: star, life: 0.22, max: 0.22, size: heavy ? 2 : 1.4, star: true });
+  const n = (heavy ? 12 : 7) >> (low ? 1 : 0),
+    dx = Math.sin(e.angle),
+    dz = Math.cos(e.angle);
+  for (let i = 0; i < n; i++) {
+    const m = new THREE.Mesh(
+      snowGeo,
+      new THREE.MeshBasicMaterial({ color: 0xf6fbff, transparent: true, depthWrite: false })
+    );
+    m.position.set(e.x, e.y - 0.2, e.z);
+    const spread = (Math.random() - 0.5) * 1.6,
+      sp = (heavy ? 4.5 : 3) * (0.6 + Math.random() * 0.6);
+    m.userData.v = new THREE.Vector3(
+      (dx * Math.cos(spread) + dz * Math.sin(spread)) * sp,
+      1.5 + Math.random() * 2.5,
+      (dz * Math.cos(spread) - dx * Math.sin(spread)) * sp
+    );
+    m.scale.setScalar(0.6 + Math.random() * 0.9);
+    scene.add(m);
+    impacts.push({ m, life: 0.45 + Math.random() * 0.2, max: 0.6 });
+  }
+  if (e.actor === 1) steelSparks(e.x, e.y - 0.3, e.z, dx, dz, (heavy ? 14 : 9) >> (low ? 1 : 0));
+  if (e.actor === 2) woodChips(e.x, e.y - 0.3, e.z, dx, dz, (heavy ? 10 : 6) >> (low ? 1 : 0));
+  trimImpacts();
+  if (heavy) {
+    kick = 1;
+    kickX = dx * 0.12;
+    kickY = 0;
+    kickZ = dz * 0.12;
+  }
+}
+function trimImpacts() {
+  while (impacts.length > 90) {
+    const f = impacts.shift();
+    scene.remove(f.m);
+    f.m.material.dispose();
+  }
+}
+// Short bright streaks thrown mostly the way the blade travelled, falling as they fade.
+function steelSparks(x, y, z, dx, dz, n, spread = 1.4) {
+  sparkGeo ??= new THREE.BoxGeometry(0.014, 0.014, 0.17);
+  for (let i = 0; i < n; i++) {
+    const m = new THREE.Mesh(
+      sparkGeo,
+      new THREE.MeshBasicMaterial({
+        color: i % 3 ? 0xffe2a0 : 0xffffff,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      })
+    );
+    m.position.set(x, y, z);
+    const a = (Math.random() - 0.5) * spread,
+      sp = 5 + Math.random() * 4;
+    m.userData.v = new THREE.Vector3(
+      (dx * Math.cos(a) + dz * Math.sin(a)) * sp,
+      1 + Math.random() * 3.5,
+      (dz * Math.cos(a) - dx * Math.sin(a)) * sp
+    );
+    scene.add(m);
+    impacts.push({ m, life: 0.18 + Math.random() * 0.14, max: 0.32, spark: true });
+  }
+}
+// Little splinters knocked off the log mallet: tumbling, falling, not glowing.
+function woodChips(x, y, z, dx, dz, n) {
+  chipGeo ??= new THREE.BoxGeometry(0.05, 0.022, 0.09);
+  for (let i = 0; i < n; i++) {
+    const m = new THREE.Mesh(
+      chipGeo,
+      new THREE.MeshBasicMaterial({
+        color: i % 3 ? 0xc8894a : 0xe9c48a,
+        transparent: true,
+        depthWrite: false,
+      })
+    );
+    m.position.set(x, y, z);
+    m.rotation.set(Math.random() * 6, Math.random() * 6, 0);
+    const a = (Math.random() - 0.5) * 2.2,
+      sp = 2.5 + Math.random() * 2.5;
+    m.userData.v = new THREE.Vector3(
+      (dx * Math.cos(a) + dz * Math.sin(a)) * sp,
+      2.5 + Math.random() * 3,
+      (dz * Math.cos(a) - dx * Math.sin(a)) * sp
+    );
+    m.userData.spin = (Math.random() - 0.5) * 30;
+    scene.add(m);
+    impacts.push({ m, life: 0.5 + Math.random() * 0.25, max: 0.75 });
+  }
+}
+// Bucky's ground smash: a low wave of snow puffs rolling out to the edge of the shock ring.
+function snowWave(e) {
+  snowGeo ??= new THREE.IcosahedronGeometry(0.05, 0);
+  const n = $('quality').value !== 'high' ? 12 : 24;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + Math.random() * 0.2,
+      m = new THREE.Mesh(
+        snowGeo,
+        new THREE.MeshBasicMaterial({ color: 0xf6fbff, transparent: true, depthWrite: false })
+      );
+    m.position.set(e.x + Math.sin(a) * 0.4, e.y + 0.05, e.z + Math.cos(a) * 0.4);
+    // Out to the ring's radius in its life, with a low hop.
+    const sp = e.r * (1.6 + Math.random() * 0.4);
+    m.userData.v = new THREE.Vector3(Math.sin(a) * sp, 1.2 + Math.random() * 1.6, Math.cos(a) * sp);
+    m.scale.setScalar(1.4 + Math.random() * 1.4);
+    scene.add(m);
+    impacts.push({ m, life: 0.5 + Math.random() * 0.15, max: 0.65 });
+  }
+  trimImpacts();
+  kick = 1;
+  kickX = 0;
+  kickY = -0.16;
+  kickZ = 0;
+}
+// Tormund's parry (studio pass 5): a flash and sparks on the shield itself, and a ringing clang.
+function shieldFlash(e) {
+  const h = heroes[e.actor],
+    mark = h?.root.getObjectByName('shield_centre'),
+    p = new THREE.Vector3(e.x, e.y, e.z),
+    a = game.actors[e.actor];
+  if (mark) mark.getWorldPosition(p);
+  starMap ??= starTexture();
+  const star = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: starMap,
+      color: 0xe8f3ff,
+      transparent: true,
+      depthWrite: false,
+      depthTest: false,
+    })
+  );
+  star.renderOrder = 5;
+  star.position.copy(p);
+  scene.add(star);
+  impacts.push({ m: star, life: 0.28, max: 0.28, size: 2.4, star: true });
+  const dx = Math.sin(a?.yaw || 0),
+    dz = Math.cos(a?.yaw || 0);
+  steelSparks(p.x, p.y, p.z, dx, dz, $('quality').value !== 'high' ? 8 : 16, 2.6);
+  trimImpacts();
+}
+function updateImpacts(dt) {
+  for (let i = impacts.length - 1; i >= 0; i--) {
+    const f = impacts[i];
+    f.life -= dt;
+    const k = Math.max(0, f.life / f.max);
+    if (f.star) {
+      f.m.scale.setScalar(f.size * (1.4 - k * 0.8));
+      f.m.material.opacity = k;
+    } else {
+      const v = f.m.userData.v;
+      v.y -= 14 * dt;
+      f.m.position.addScaledVector(v, dt);
+      f.m.material.opacity = Math.min(1, k * 2);
+      // Sparks point along their flight, so they read as streaks.
+      if (f.spark) f.m.lookAt(f.m.position.x + v.x, f.m.position.y + v.y, f.m.position.z + v.z);
+      else if (f.m.userData.spin) f.m.rotation.x += f.m.userData.spin * dt;
+    }
+    if (f.life <= 0) {
+      scene.remove(f.m);
+      f.m.material.dispose();
+      impacts.splice(i, 1);
+    }
+  }
+}
 function events() {
   for (const e of game.events.splice(0)) {
     if (e.type === 'save') save();
     if (e.type === 'swing') {
       ring(e);
       tone(e.strong ? 100 : 220, 0.2);
+      if (e.actor === 2 && e.strong) snowWave(e);
     }
     if (e.type === 'hit') {
       ring(e);
       tone(660, 0.08);
+      if (e.actor >= 0 && e.actor <= 2 && e.angle !== undefined) impactBurst(e);
     }
     if (e.type === 'snowburst') ring(e);
     if (e.type === 'throw') tone(380, 0.2);
@@ -693,6 +914,10 @@ function events() {
       ring({ x: e.x, z: e.z, y: e.y - 1.2, r: 1.6, strong: true, color: 0xfff1b0 });
       floater(e.x, e.y + 0.3, e.z, 'PARRY!', 'heal');
       tone(1180, 0.12, 0.05);
+      if (e.actor === 1) {
+        shieldFlash(e);
+        tone(1570, 0.18, 0.035);
+      }
     }
     if (e.type === 'special') {
       banner(e.name, 'SPECIAL');
@@ -1270,6 +1495,15 @@ function updateCamera(dt) {
     cameraInitialized = true;
   } else camera.position.lerp(desired, 1 - Math.exp(-dt * 12));
   camera.lookAt(aim);
+  // Kick from the heroes' heavy blows: a quick push the way he struck (down, for Bucky's ground
+  // smashes) that eases straight back.
+  if (kick > 0 && !game.paused) {
+    kick = Math.max(0, kick - dt * 7);
+    const k = Math.sin(kick * Math.PI) * kick;
+    camera.position.x += kickX * k;
+    camera.position.y += kickY * k;
+    camera.position.z += kickZ * k;
+  }
   if (shake > 0 && !game.paused) {
     shake = Math.max(0, shake - dt);
     camera.position.x += (Math.random() - 0.5) * shake * 0.5;
@@ -1338,7 +1572,8 @@ function heroPose(a, i, h) {
     if (!actionKeys.has(id)) actionKeys.set(id, 'act' + actionSerial++);
     let clip = act.anim || act.name;
     if (clip === 'Jump' && an.has('JumpUp')) clip = 'JumpUp';
-    if (!an.has(clip)) clip = /^(Hurt|Knock|GetUp)/.test(clip) ? 'Idle' : 'Attack1';
+    if (!an.has(clip))
+      clip = /^(Hurt|Knock|GetUp)/.test(clip) || !an.has('Attack1') ? 'Idle' : 'Attack1';
     const c = an.clips[clip],
       time = c && act.duration ? (act.time / act.duration) * c.duration : act.time;
     return {
@@ -1435,7 +1670,9 @@ function updateScene(dt) {
       h.base.y * sq,
       (h.base.z * (1 + 0.07 * belly)) / Math.sqrt(sq)
     );
-    if (h.trail) h.trail.update(game.paused ? 0 : dt, swinging(a));
+    // Darren's two paw trails show only in Bare Paws; the Polka Scarf has its own ribbon.
+    const swing = swinging(a) && (i !== 0 || game.style !== 'scarf');
+    for (const t of h.trails) t.update(game.paused ? 0 : dt, swing);
     if (h.ribbon) {
       h.ribbon.setActive(game.style === 'scarf');
       h.ribbon.floor = world.height(a.x, a.z) + 0.03;
@@ -1444,6 +1681,7 @@ function updateScene(dt) {
     }
   }
   updateFoes(dt);
+  updateImpacts(game.paused ? 0 : dt);
   updateFloaters(dt);
   const a = game.player,
     o = game.objective();
@@ -1687,6 +1925,8 @@ async function boot() {
             o.material.map.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
         }
       });
+      // Tormund's silver armour, sword and gold trim need something to reflect (studio pass 3).
+      if (i === 1) addMetalShine(root, renderer);
       scene.add(root);
       // Authored clips (clips.mjs) replace the supplied ones of the same name; anything not yet
       // authored keeps the supplied clip.
@@ -1709,15 +1949,21 @@ async function boot() {
       const hide = [];
       if (i === 0)
         root.traverse((o) => o.isMesh && /^Scarf_(tail|polka)/.test(o.name) && hide.push(o));
-      // Sword (Tormund) and mallet head (Bucky) leave a short trail through each swing.
-      const trail =
+      // Sword (Tormund) and mallet head (Bucky) leave a short trail through each swing, and so do
+      // Darren's paws (studio pass 5; his hand bones hold forearm and paw, the paw is the far end).
+      const trails =
         i === 1
-          ? new WeaponTrail(scene, rig, rig.role.handL, 0.2, 0.82, 0xffd77a)
+          ? // From the blade's base to its point (markers built into his model, studio pass 3).
+            [WeaponTrail.between(scene, root, 'blade_base', 'blade_tip', 0xffd77a)]
           : i === 2
-            ? new WeaponTrail(scene, rig, rig.role.handL, 0.3, 0.62, 0xbfe4ff)
-            : null;
+            ? // Across the mallet's log head, from markers built into his model (studio pass 3).
+              [WeaponTrail.between(scene, root, 'mallet_neck', 'mallet_crown', 0xbfe4ff)]
+            : [rig.role.handL, rig.role.handR].map(
+                (b) => new WeaponTrail(scene, rig, b, 0.2, 0.36, 0xff9a5c, true)
+              );
       heroes.push({
-        trail,
+        trails,
+        trail: trails[0],
         ribbon: i === 0 ? new ScarfRibbon(scene, rig, hide) : null,
         root,
         animator,

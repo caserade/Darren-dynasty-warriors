@@ -1,0 +1,320 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Character review</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #c9dbe6;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+    <script type="importmap">
+      { "imports": { "three": "/vendor/three.module.js", "three/addons/": "/vendor/" } }
+    </script>
+  </head>
+  <body>
+    <canvas id="c" width="640" height="640"></canvas>
+    <script type="module">
+      // Character review stage (Claude update 8): loads one hero with the game's own rig, clips and
+      // animator, and poses it at any clip time and angle for turnaround and contact sheets.
+      import * as THREE from 'three';
+      import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+      import { buildRig, Animator, applyPose, mix } from '/anim.mjs';
+      import { LIBRARY } from '/clips.mjs';
+      import { buildClips } from '/clips.mjs';
+      import { addMetalShine } from '/look.mjs';
+      const q = new URLSearchParams(location.search);
+      const name = q.get('hero') || 'Darren';
+      const canvas = document.getElementById('c');
+      const renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: true,
+        preserveDrawingBuffer: true,
+      });
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.1;
+      renderer.shadowMap.enabled = true;
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xc9dbe6);
+      scene.add(new THREE.HemisphereLight(0xe9f7ff, 0x747b66, 2.4));
+      const sun = new THREE.DirectionalLight(0xffe6bd, 3.2);
+      sun.position.set(4, 8, 5);
+      sun.castShadow = true;
+      sun.shadow.mapSize.set(1024, 1024);
+      sun.shadow.normalBias = 0.02;
+      scene.add(sun);
+      const ground = new THREE.Mesh(
+        new THREE.CircleGeometry(3, 48),
+        new THREE.MeshStandardMaterial({ color: 0xf3f8fb, roughness: 0.9 })
+      );
+      ground.rotation.x = -Math.PI / 2;
+      ground.receiveShadow = true;
+      scene.add(ground);
+      const camera = new THREE.PerspectiveCamera(30, 1, 0.05, 50);
+      const gltf = await new GLTFLoader().loadAsync(`/assets/${name.toLowerCase()}.glb`);
+      const root = gltf.scene;
+      scene.add(root);
+      const meshes = [];
+      root.traverse((o) => {
+        if (o.isMesh) {
+          o.castShadow = o.receiveShadow = true;
+          o.frustumCulled = false;
+          meshes.push(o);
+          o.userData.mat = o.material;
+        }
+      });
+      // Same look as in the game (game.mjs gives Tormund the metal shine).
+      if (name === 'Tormund') addMetalShine(root, renderer);
+      const rig = buildRig(root, name);
+      const authored = buildClips(rig);
+      const names = new Set(authored.map((c) => c.name));
+      const all = [...authored, ...gltf.animations.filter((c) => !names.has(c.name))];
+      const animator = new Animator(root, rig, all, {});
+      const clay = new THREE.MeshStandardMaterial({ color: 0xb8b2a8, roughness: 0.75 });
+      const wire = new THREE.MeshBasicMaterial({ color: 0x223344, wireframe: true });
+      const skel = new THREE.SkeletonHelper(root);
+      skel.visible = false;
+      scene.add(skel);
+      // Colors each vertex by how much one named bone moves it (red = fully, blue = not at all).
+      function weightMaterial(mesh, bone) {
+        const g = mesh.geometry,
+          j = g.attributes.skinIndex,
+          w = g.attributes.skinWeight;
+        const bi = mesh.skeleton.bones.findIndex((b) => b.name === bone);
+        const col = new Float32Array(g.attributes.position.count * 3);
+        for (let i = 0; i < g.attributes.position.count; i++) {
+          let v = 0;
+          for (let k = 0; k < 4; k++) if (j.getComponent(i, k) === bi) v += w.getComponent(i, k);
+          col.set([v, 0.15 * (1 - v), 1 - v], i * 3);
+        }
+        setDebugColors(g, col);
+        return new THREE.MeshBasicMaterial({ vertexColors: true });
+      }
+      // Debug views paint their own vertex colours; the model's own (baked shading) come back after.
+      function setDebugColors(g, col) {
+        if (!('ownColor' in g.userData)) g.userData.ownColor = g.attributes.color || null;
+        g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      }
+      function restoreColors() {
+        for (const m of meshes) {
+          const g = m.geometry;
+          if (!('ownColor' in g.userData)) continue;
+          if (g.userData.ownColor) g.setAttribute('color', g.userData.ownColor);
+          else g.deleteAttribute('color');
+          delete g.userData.ownColor;
+        }
+      }
+      // Colours each vertex by how much the current pose stretches (red) or squashes (blue) the
+      // edges around it; grey = unchanged. Called after the pose is set (see shot()).
+      function stretchMaterial(m) {
+        m.userData.stretchMat ??= new THREE.MeshBasicMaterial({ vertexColors: true });
+        m.userData.needsStretch = true;
+        return m.userData.stretchMat;
+      }
+      function paintStretch(m) {
+        const g = m.geometry,
+          pos = g.attributes.position,
+          idx = g.index,
+          n = pos.count,
+          posed = [],
+          a = new THREE.Vector3(),
+          b = new THREE.Vector3(),
+          worst = new Float32Array(n);
+        for (let i = 0; i < n; i++) posed.push(m.getVertexPosition(i, new THREE.Vector3()));
+        for (let t = 0; idx && t < idx.count; t += 3)
+          for (let k = 0; k < 3; k++) {
+            const p = idx.getX(t + k),
+              q = idx.getX(t + ((k + 1) % 3));
+            a.fromArray(m.userData.rest, p * 3);
+            b.fromArray(m.userData.rest, q * 3);
+            const rest = a.distanceTo(b);
+            if (rest < 1e-5) continue;
+            const l = Math.log(posed[p].distanceTo(posed[q]) / rest);
+            for (const v of [p, q]) if (Math.abs(l) > Math.abs(worst[v])) worst[v] = l;
+          }
+        const col = new Float32Array(n * 3);
+        for (let i = 0; i < n; i++) {
+          const s = Math.min(1, Math.abs(worst[i]) / Math.log(1.8));
+          col.set(
+            worst[i] > 0
+              ? [0.75 + 0.25 * s, 0.75 * (1 - s), 0.75 * (1 - s)]
+              : [0.75 * (1 - s), 0.75 * (1 - s), 0.75 + 0.25 * s],
+            i * 3
+          );
+        }
+        setDebugColors(g, col);
+      }
+      // The painted colours with no lighting (albedo), or the metal map as grey (white = metal).
+      function flatMaterial(m, mode) {
+        const src = m.userData.mat,
+          k = mode + 'Flat';
+        if (!src[k]) {
+          const map = mode === 'metal' ? src.metalnessMap : src.map;
+          src[k] = new THREE.MeshBasicMaterial({ map, color: map ? 0xffffff : src.color });
+          if (mode === 'metal' && map)
+            src[k].onBeforeCompile = (sh) => {
+              sh.fragmentShader = sh.fragmentShader.replace(
+                '#include <map_fragment>',
+                '#include <map_fragment>\n diffuseColor.rgb = vec3(texture2D(map, vMapUv).b);'
+              );
+            };
+          if (mode === 'metal' && !map) src[k].color.setScalar(src.metalness);
+        }
+        return src[k];
+      }
+      window.review = {
+        clips: all.map((c) => ({ name: c.name, dur: c.duration })),
+        bones: rig.bones.map((b) => b.name),
+        stats: () => {
+          root.updateMatrixWorld(true);
+          const box = new THREE.Box3();
+          for (const m of meshes) {
+            const p = m.geometry.attributes.position,
+              v = new THREE.Vector3();
+            for (let i = 0; i < p.count; i += 3) {
+              m.getVertexPosition(i, v);
+              m.localToWorld(v);
+              box.expandByPoint(v);
+            }
+          }
+          return { min: box.min.toArray(), max: box.max.toArray(), scale: root.scale.toArray() };
+        },
+        // Mesh stretch at one clip time (Claude update 9): every edge's posed length over its
+        // rest length; returns, per bone that mostly drives the edge, the worst stretch and squash.
+        stretch(o = {}) {
+          this.shot({ ...o, mode: 'tex' });
+          const out = {},
+            a = new THREE.Vector3(),
+            b = new THREE.Vector3();
+          for (const m of meshes) {
+            const g = m.geometry,
+              pos = g.attributes.position,
+              idx = g.index,
+              j = g.attributes.skinIndex,
+              w = g.attributes.skinWeight;
+            if (!m.isSkinnedMesh || !idx) continue;
+            const posed = new Float32Array(pos.count * 3);
+            for (let i = 0; i < pos.count; i++) {
+              m.getVertexPosition(i, a);
+              posed.set(a.toArray(), i * 3);
+            }
+            const top = (i) => {
+              let bi = 0;
+              for (let k = 1; k < 4; k++) if (w.getComponent(i, k) > w.getComponent(i, bi)) bi = k;
+              return m.skeleton.bones[j.getComponent(i, bi)].name;
+            };
+            for (let t = 0; t < idx.count; t += 3)
+              for (let k = 0; k < 3; k++) {
+                const p = idx.getX(t + k),
+                  q = idx.getX(t + ((k + 1) % 3));
+                a.fromArray(m.userData.rest, p * 3);
+                b.fromArray(m.userData.rest, q * 3);
+                const rest = a.distanceTo(b);
+                if (rest < 0.006) continue; // ignore tiny edges, where any change looks huge
+                a.fromArray(posed, p * 3);
+                b.fromArray(posed, q * 3);
+                const r = a.distanceTo(b) / rest,
+                  name = top(p),
+                  e = (out[name] ??= { max: 1, min: 1, bad: 0 });
+                if (r > 1.6 || r < 0.5) e.bad++;
+                e.max = Math.max(e.max, r);
+                e.min = Math.min(e.min, r);
+              }
+          }
+          return out;
+        },
+        // opts: { clip, t, yaw (deg), pitch (deg), mode: tex|clay|wire|weights|skeleton, bone, dist, h,
+        //         target: [x, z] to look at instead of the middle, bind: true for the unposed model }
+        shot(o = {}) {
+          const mode = o.mode || 'tex';
+          restoreColors();
+          for (const m of meshes)
+            m.material =
+              mode === 'clay'
+                ? clay
+                : mode === 'wire'
+                  ? wire
+                  : mode === 'weights'
+                    ? weightMaterial(m, o.bone)
+                    : mode === 'stretch'
+                      ? stretchMaterial(m)
+                      : mode === 'albedo' || mode === 'metal'
+                        ? flatMaterial(m, mode)
+                        : m.userData.mat;
+          skel.visible = mode === 'skeleton';
+          if (mode === 'skeleton')
+            for (const m of meshes) {
+              m.material = clay;
+            }
+          animator.entries = [];
+          animator.current = null;
+          animator.update(0, {
+            key: 'k' + Math.random(),
+            clip: o.clip || 'Idle',
+            time: o.t || 0,
+            blend: 0.001,
+            speed: 0,
+            yaw: 0,
+            x: 0,
+            y: 0,
+            z: 0,
+            air: 0,
+          });
+          animator.update(0.001, {
+            key: animator.current,
+            clip: o.clip || 'Idle',
+            time: o.t || 0,
+            speed: 0,
+            yaw: 0,
+            x: 0,
+            y: 0,
+            z: 0,
+            air: 0,
+          });
+          // A raw pose on top of the hero's base stance (for checking pose directions).
+          if (o.pose) applyPose(rig, mix(LIBRARY[name].base, o.pose));
+          // The model exactly as built, before any animation (bind pose).
+          if (o.bind)
+            for (const b of rig.bones) {
+              const i = rig.info.get(b);
+              b.quaternion.copy(i.restQ);
+              b.position.copy(i.restP);
+            }
+          root.updateMatrixWorld(true);
+          for (const m of meshes)
+            if (m.userData.needsStretch && mode === 'stretch') paintStretch(m);
+          const yaw = ((o.yaw ?? 25) * Math.PI) / 180,
+            pitch = ((o.pitch ?? 12) * Math.PI) / 180;
+          const d = o.dist ?? 4.2,
+            h = o.h ?? 0.75;
+          const [tx, tz] = o.target || [0, 0];
+          camera.position.set(
+            tx + Math.sin(yaw) * Math.cos(pitch) * d,
+            h + Math.sin(pitch) * d,
+            tz + Math.cos(yaw) * Math.cos(pitch) * d
+          );
+          camera.lookAt(tx, h, tz);
+          renderer.render(scene, camera);
+          return true;
+        },
+      };
+      // Rest positions as the game shows them (bind pose through the skin, so packed/quantized
+      // vertex data compares like for like), for the stretch views.
+      review.shot({ bind: true });
+      for (const m of meshes) {
+        const pos = m.geometry.attributes.position,
+          v = new THREE.Vector3();
+        m.userData.rest = new Float32Array(pos.count * 3);
+        for (let i = 0; i < pos.count; i++)
+          m.userData.rest.set(m.getVertexPosition(i, v).toArray(), i * 3);
+      }
+      window.reviewReady = true;
+    </script>
+  </body>
+</html>

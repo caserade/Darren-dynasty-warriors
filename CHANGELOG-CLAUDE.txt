@@ -418,3 +418,201 @@ Fresh clone from GitHub:
 - README/START-HERE say the Windows zip is not stored in GitHub and how to build it.
 - package-lock.json added for the root test dependency.
 Windows zip rebuilt from this branch (1.2.0, no updater) and replaced in the project files.
+
+CLAUDE UPDATE 8 · DARREN STUDIO PASS (3D ONLY, DARREN ONLY) · 2026-10-12
+Michael asked for Darren to be brought up to the level of a well-made studio game: a full
+scan of his model first, then four fix passes. Tormund and Bucky are untouched; they wait
+for Michael's go-ahead. The pixel game is untouched. Scan report with before pictures:
+project files darren-studio/scan.md.
+
+HOW THE MODEL IS MADE NOW
+- art-source/darren-3d-original.glb is the supplied model as it first arrived (from git).
+- tools/darren-model.mjs rebuilds dist/3d/assets/darren.glb from it, every step in code
+  (needs gltf-transform + sharp via npm i --no-save, like tools/shrink-models.mjs).
+- tools/review/ renders turnarounds, skin-weight views and frame-by-frame sheets of every
+  clip with the game's own animation code (node tools/review/shoot.cjs <out> <jobs.json>).
+
+PASS 2 · RIG AND SKIN
+- Skin weights rebuilt: the head bone moves only the head (it used to twist the chest,
+  belly and part of a wing), the wing bones only the wings (they used to pull his cheek),
+  the feet follow their bones fully, eyes and brows ride the head.
+- Elbows: hand_L/hand_R moved from the paw tip to mid-arm and now carry forearm and paw,
+  so the forearm aims every clip already had finally bend his arms.
+- Knees: new shin_L/shin_R bones between leg and foot (anim.mjs roles shinL/shinR).
+- The 11 supplied clips inside the file are gone (all were replaced by clips.mjs or were
+  frozen); game.mjs falls back to Idle when a hero has no Attack1.
+
+PASS 3 · MODEL AND LOOK
+- Head: the row of four spikes is smoothed into the skull (rebuilt as an even, fold-free
+  patch) and one curved horn sweeping back grows in its place, as in the approved design.
+  The old spike paint on the crown is covered with the crown's own red.
+- Scarf: the faceted ring, flat box and three balls are replaced by a soft knitted collar,
+  a knot and two loose ends, yellow with big pink dots (generated texture). The ends keep
+  the "Scarf tail" names the game hides while the long scarf whip is out.
+- Glossy finish (clearcoat) instead of one rough matte coat, soft shadowing baked into the
+  vertex colours (armpits, under chin and wings), smooth normals across texture seams.
+- darren.glb 0.66 MB -> 0.75 MB.
+
+PASS 4 · ANIMATION
+- Every Darren clip now uses his knees: lowering the hips crouches with the feet kept on
+  the ground, legs swung forward fold at the knee (clips.mjs dKnees/withKnees).
+- His stance holds bent arms with paws in front, like the design, instead of arms hanging
+  straight.
+
+PASS 5 · COMBAT FEEL AND EFFECTS
+- Bare Paws swings leave a warm trail from both paws (trail.mjs gains an along-bone mode).
+- Darren's landed blows flash with an impact star and throw snow chips the way he struck;
+  heavy blows give the camera a short kick in that direction.
+- Polka Scarf whip: wider, the same knit yellow and pink as his scarf, and it leaves from
+  his paw again (the hand bone now starts at the elbow).
+- sim.mjs: hit events carry who struck (actor, -1 for friends) and the angle.
+
+TESTS
+- New tests/darren-model.cjs (in npm test): joints, elbows, knees, horn, scarf parts by
+  name, gloss and baked shading, no supplied clips, file size.
+- tests/three-d.mjs: new check that Darren's hits say who struck and which way.
+
+WHAT STILL NEEDS AN ARTIST
+- The colour texture is still the supplied AI-made one; hand-painted textures, real fists
+  and fingers, eyelids for blinking and a full re-sculpt need an artist and 3D tools that
+  are not part of this project.
+
+CLAUDE UPDATE 9 · TORMUND STUDIO PASS (3D ONLY, TORMUND ONLY) · 2026-10-13
+After Darren's pass Michael gave the go-ahead for Tormund: the same full scan, then four fix
+passes. This branch is built on Darren's branch, so it also carries update 8. Darren, Bucky
+and the pixel game are untouched. Scan report with before pictures: project files
+tormund-studio/scan.md.
+
+HOW THE MODEL IS MADE NOW
+- art-source/tormund-3d-original.glb is the supplied model as it first arrived (from git).
+- tools/tormund-model.mjs rebuilds dist/3d/assets/tormund.glb from it, every step in code
+  (needs gltf-transform + sharp via npm i --no-save, like tools/darren-model.mjs).
+- tools/review/ gains albedo, metal and stretch views, an in-game shooter (ingame.cjs) and a
+  stretch check over every clip (stretch.cjs), which counts edges pulled past 1.6x or squeezed
+  under half their length, measured against the skinned bind pose.
+
+PASS 2 · RIG AND SKIN
+- Fists: both paws are curled shut around a grip by a bend applied to the paw mesh, so the
+  sword sits in a closed fist instead of poking through flat fingers.
+- The neck and head bones now stop at the collar, so looking around no longer twists the top
+  of the breastplate and scarf.
+- Tried and dropped after measuring: rigid breastplate and shoulder plates, tabard flaps hung
+  from the hips, and softer blends at every joint. His body is one fused surface (plates,
+  sleeves, tabard and trousers are not separate pieces), so each made the stretching worse or
+  just moved it; the chainmail visibly squeezed into the shoulder plates.
+
+PASS 3 · MODEL AND LOOK
+- A real sword replaces the box: a bevelled steel blade, gold cross-guard with gold tips and
+  blue gems, a spiral-wrapped leather grip and a gem pommel.
+- A real heater shield replaces the box: domed blue face with the cream fleur-de-lis
+  (generated texture), gold rim with 16 rivets, wooden back with a strap.
+- Silver armour that reads silver: dist/3d/look.mjs gives his materials a small snowy sky
+  to reflect (reflections only, so fur, cloth and leather are lit exactly as before).
+  Before, the polished plates had nothing to reflect and went dark brown or black.
+- Soft shadowing baked into the vertex colours (under the scarf, belt and tabard, between
+  the legs, the tail root) and smooth normals across texture seams.
+- tormund.glb 2.76 MB -> 2.96 MB.
+
+PASS 4 · ANIMATION
+- Sword in his right paw and shield on his left, as in the design and the pixel game.
+  clips.mjs mirrors every Tormund pose when the library is built, so all his moves
+  (locomotion, the five-hit string, finishers, special, parry) match the new sides.
+- The off hand holds the shield face forward in his sword stance.
+- The supplied clips inside the file are gone; his fallback is Idle, not the stiff Attack1.
+
+PASS 5 · COMBAT FEEL AND EFFECTS
+- His landed blows get the impact star, snow burst and heavy-blow camera kick Darren got,
+  plus a spray of steel sparks.
+- The sword trail follows the real blade (trail.mjs between two markers in the model,
+  blade_base and blade_tip).
+- A successful parry flashes and sparks on the shield itself (shield_centre marker) with a
+  ringing clang.
+
+TESTS
+- New tests/tormund-model.cjs (in npm test): joints, real sword and shield, sword in the
+  right paw and shield on the left, blade and shield markers, baked shading, no supplied
+  clips, file size.
+- tests/three-d.mjs: new check that Tormund's hits say who struck and which way.
+
+APP
+- Desktop app version 1.4.0 (studio pass for Darren and Tormund).
+
+WHAT STILL NEEDS AN ARTIST
+- Hard armour still bends with the body and the tabard still stretches in long strides,
+  because his armour, sleeves and tabard are one fused surface; an artist needs to cut them
+  into separate pieces before they can move as rigid plates and loose cloth.
+- The shield still rides his paw bone, as the old box did (the rig has no strap bone).
+- The colour texture is still the supplied AI-made one; hand-painted textures, real
+  separate fingers (the fists are a bend, not a sculpt), sharper armour edges and a
+  re-sculpt need an artist and 3D tools that are not part of this project.
+- Mirroring the moves raised the stretch count about 10% over the original clips (the
+  supplied rig's weights are not symmetrical), as measured by the stretch check.
+
+CLAUDE UPDATE 10 · BUCKY STUDIO PASS (3D ONLY, BUCKY ONLY) · 2026-10-13
+After Tormund's pass Michael gave the go-ahead for Bucky, the third hero: the same full scan,
+then four fix passes. This branch is built on Tormund's branch, so it also carries updates 8
+and 9. Darren, Tormund (apart from shared animation code that only acts when a model has the
+new two-hand markers) and the pixel game are untouched. Scan report with before and after
+pictures: project files bucky-studio/scan.md.
+
+HOW THE MODEL IS MADE NOW
+- art-source/bucky-3d-original.glb is the supplied model as it first arrived (from git).
+- tools/bucky-model.mjs rebuilds dist/3d/assets/bucky.glb from it, every step in code
+  (needs gltf-transform + sharp via npm i --no-save, like the Darren and Tormund tools).
+- tools/review/stretch.cjs takes STRETCH_SKIP (clip names to leave out of the count).
+
+PASS 2 · RIG AND SKIN
+- Shoulder, elbow, wrist, hip, knee and ankle joints moved onto the middle of each limb (the
+  supplied ones sat at the skin's edge) and the skin re-bound to them.
+- Softer blend between hips, thighs and belly, so falling and getting up no longer pull his
+  bottom into a sheet.
+- Both paws curled shut around a grip by a bend applied to the paw mesh.
+- Tried and dropped after measuring: re-skinning the tail and moving the tail joints. Both
+  made the stretch count worse; the tail fix is in the poses instead (pass 4).
+
+PASS 3 · MODEL AND LOOK
+- A real log mallet replaces the four boxes: a round log head with tree rings on both ends,
+  bark-grain sides, two dark iron bands with rivets and a grained handle, held in his left
+  paw. Markers in the model (mallet_neck, mallet_crown, mallet_grip, paw_grip_R) drive the
+  trail and the two-handed grip.
+- Soft shadowing baked into the vertex colours (under the chin, armpits, belly and thighs,
+  tail root) and smooth normals across texture seams.
+- Eyes, teeth, claws and mouth are a little glossier than his skin.
+- The four leftover supplied clips (Attack1-3, Jump) are gone; his fallback is Idle.
+- bucky.glb 1.80 MB -> 2.02 MB.
+
+PASS 4 · ANIMATION
+- Two-handed blows: anim.mjs gains a small two-bone reach (twoHands) that puts his free paw
+  on the handle for the guard stance, the jump attack, the big overheads and the start and
+  end of the spin, from the grip markers in the model.
+- His tail now counter-balances his body in every move (lifts as he leans forward, drops as
+  he leans back) within limits, instead of swinging the whole lower back.
+- The curled-up rolling dash that crushed him is replaced by a belly-first charge with the
+  mallet held across.
+- Hurt, landing, dodge, ground-smash and special poses keep the mallet head clear of his
+  face and belly; overhead swings arc over the top.
+- Stretch check (worst frame per bone, all clips): 5,712 before the pass, 4,827 after.
+
+PASS 5 · COMBAT FEEL AND EFFECTS
+- His landed blows get the impact star, snow burst and heavy-blow camera kick, plus a spray
+  of tumbling wood chips.
+- Ground smashes (moves with a shock ring) throw a low wave of snow out to the ring and dip
+  the camera.
+- The swing trail follows the real mallet head (mallet_neck to mallet_crown markers).
+
+TESTS
+- New tests/bucky-model.cjs (in npm test): joints, a real mallet (not boxes) in the left paw,
+  mallet markers, baked shading, no supplied clips, file size.
+- tests/three-d.mjs: new check that Bucky's hits and swings say who struck.
+
+APP
+- Desktop app version 1.5.0 (studio pass for Darren, Tormund and Bucky).
+
+WHAT STILL NEEDS AN ARTIST
+- The colour texture is still the supplied AI-made one; a hand-painted texture, sculpted
+  scales, real separate fingers (the fists are a bend, not a sculpt) and blinking eyes need
+  an artist and 3D tools that are not part of this project.
+- The tail is still skinned as supplied; big tail swings in the spin attack still pull at
+  his lower back a little. A proper fix is re-weighting by hand in a 3D package.
+- The mallet rides his paw bone (the rig has no weapon bone), and the two-handed grip is a
+  computed reach, so the free paw can slip slightly off the handle in fast blends.

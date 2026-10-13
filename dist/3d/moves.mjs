@@ -255,7 +255,7 @@ const SCARF = {
 };
 
 // ---- Tormund · Sword and Shield: a steady knight; reach with the blade, the shield to bully ----
-// The sword is in his left paw and the shield on his right. Holding Charge from neutral keeps his
+// The sword is in his right paw and the shield on his left (clips.mjs mirrors his poses). Holding Charge from neutral keeps his
 // Crescent cleave power move (ChargeAttack in sim.mjs).
 const TORMUND = {
   name: 'Sword and Shield',
