@@ -43,16 +43,30 @@ const D_ARMS = (l, r) => ({
 // Knees (studio pass 4): Darren's legs gained a knee joint. Any pose that lowers the hips bends
 // both knees just enough to keep the feet on the ground (thigh forward, shin back, foot flat), and a
 // leg swung forward folds a little at the knee. A pose that sets shinL/shinR itself is left alone.
-const LEG = 0.39;
+// Claude update 12: a leg the pose already swings forward or back has its foot off the ground
+// by that much, so it only crouches for the drop that is left (it used to crouch for the whole
+// drop on top of the swing, which folded lunging legs up past 150 degrees), and the knee never
+// folds past KNEE_MAX; anim.mjs plantFeet() lifts any foot still left in the ground.
+const LEG = 0.39,
+  KNEE_MAX = 85;
 function dKnees(pose) {
   const drop = Math.max(0, -(pose.hips?.p?.[1] ?? 0)),
-    crouch = drop > 0 ? (2 * Math.acos(Math.max(0.2, 1 - drop / LEG)) * 180) / PI : 0;
+    hipPitch = (Array.isArray(pose.hips) ? pose.hips : pose.hips?.r)?.[0] ?? 0;
   let out = { ...pose };
   for (const s of ['L', 'R']) {
     if (pose['shin' + s]) continue;
     const leg = pose['leg' + s],
-      swing = Math.max(0, -((Array.isArray(leg) ? leg : leg?.r)?.[0] ?? 0)),
-      flex = Math.min(85, crouch + swing * 0.55);
+      pitch = (Array.isArray(leg) ? leg : leg?.r)?.[0] ?? 0,
+      swing = Math.max(0, -pitch),
+      // How much higher a straight leg at this angle holds its foot than a leg hanging down.
+      tilt = Math.min(80, Math.abs(pitch + hipPitch)),
+      left = Math.max(0, drop - LEG * (1 - cos((tilt * PI) / 180))),
+      fold = swing * 0.55,
+      crouch = Math.min(
+        KNEE_MAX - Math.min(KNEE_MAX, fold),
+        left > 0 ? (2 * Math.acos(Math.max(0.2, 1 - left / LEG)) * 180) / PI : 0
+      ),
+      flex = crouch + fold;
     if (flex < 0.5) continue;
     out['shin' + s] = [flex, 0, 0];
     out = mix(out, {
@@ -62,12 +76,69 @@ function dKnees(pose) {
   }
   return out;
 }
+// Wings (Claude update 12). The wings stand right beside Darren's big head, and every clip aimed
+// them in world directions while the body twisted, leaned and rolled underneath them, so the head
+// turned into the wing arm and its claw, and rolls dragged the wings through his back. Now:
+//   - a wing aim is read as relative to his chest (hips and spine turn it with them), so the
+//     wings stay on his back however he moves; keys without their own wing aim keep the stance's.
+//     Lying on his back (hips tipped back past 45 degrees) is the one exception: there the
+//     clips spread the wings flat on the ground in world directions, which stays as it was;
+//   - a wing may swing forward only part of the way: the forward share of the aim is eased back
+//     behind WING_Z, so the wings frame his face instead of covering it.
+// anim.mjs keepClear() then keeps the last few centimetres clear in the game.
+const WING_Z = -0.45,
+  WING_GIVE = 0.3,
+  WINGTIP_K = 0.45;
+const rotOfKey = (v) => (Array.isArray(v) ? v : v?.r || [0, 0, 0]);
+// Euler degrees, order YXZ about character axes (as anim.mjs reads poses), applied to a vector.
+function eulerApply([ex, ey, ez], [x, y, z]) {
+  const [cx, sx] = [cos(ex * (PI / 180)), sin(ex * (PI / 180))],
+    [cy, sy] = [cos(ey * (PI / 180)), sin(ey * (PI / 180))],
+    [cz, sz] = [cos(ez * (PI / 180)), sin(ez * (PI / 180))];
+  [x, y] = [x * cz - y * sz, x * sz + y * cz];
+  [y, z] = [y * cx - z * sx, y * sx + z * cx];
+  [x, z] = [x * cy + z * sy, -x * sy + z * cy];
+  return [x, y, z];
+}
+function dWings(pose) {
+  const lying = rotOfKey(pose.hips)[0] < -45,
+    hips = lying ? [0, 0, 0] : rotOfKey(pose.hips),
+    spine = lying ? [0, 0, 0] : rotOfKey(pose.spine);
+  const turned = hips.some((v) => v) || spine.some((v) => v);
+  let out = pose;
+  for (const k of ['wingL', 'wingR']) {
+    const a = pose[k]?.aim || (turned && D_STANCE[k].aim);
+    if (!a) continue;
+    const len = Math.hypot(a[0], a[1], a[2]) || 1;
+    let v = [a[0] / len, a[1] / len, a[2] / len];
+    if (v[2] > WING_Z) {
+      const z2 = WING_Z + (v[2] - WING_Z) * WING_GIVE,
+        f = Math.sqrt(1 - z2 * z2) / (Math.sqrt(1 - v[2] * v[2]) || 1);
+      v = [v[0] * f, v[1] * f, z2];
+    }
+    v = eulerApply(hips, eulerApply(spine, v));
+    if (out === pose) out = { ...pose };
+    out[k] = { ...pose[k], aim: v };
+  }
+  // The wing tip folds at most WINGTIP_K of what a pose asks: the thin membrane between the wing
+  // arm and the body cannot follow a sharper fold and tore in the wing clap (Paw combo 5).
+  for (const k of ['wingtipL', 'wingtipR']) {
+    const r = pose[k];
+    if (!r) continue;
+    if (out === pose) out = { ...pose };
+    out[k] = Array.isArray(r)
+      ? r.map((v) => v * WINGTIP_K)
+      : { ...r, r: r.r?.map((v) => v * WINGTIP_K) };
+  }
+  return out;
+}
 function withKnees(specs) {
-  const out = {};
+  const out = {},
+    fix = (pose) => dKnees(dWings(pose));
   for (const [name, sp] of Object.entries(specs))
     out[name] = sp.fn
-      ? { ...sp, fn: (p, t) => dKnees(sp.fn(p, t)) }
-      : { ...sp, keys: sp.keys.map(([t, pose, f]) => [t, dKnees(pose || {}), f]) };
+      ? { ...sp, fn: (p, t) => fix(sp.fn(p, t)) }
+      : { ...sp, keys: sp.keys.map(([t, pose, f]) => [t, fix(pose || {}), f]) };
   return out;
 }
 // A tucked forward roll; u runs 0..1 over the roll.

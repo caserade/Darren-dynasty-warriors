@@ -88,6 +88,19 @@ const checks = [
       assert(!json.animations?.length);
     },
   ],
+  [
+    'rig data the game uses to keep wings off the face and feet on the ground (update 12)',
+    () => {
+      assert(node('head').extras?.clear?.length >= 8, 'head clearance balls missing');
+      for (const s of ['L', 'R']) {
+        assert(node('wing_' + s).extras?.probe?.length > 0, 'wing_' + s + ' probes missing');
+        assert(node('hand_' + s).extras?.probe?.length > 0, 'hand_' + s + ' probes missing');
+        assert(node('foot_' + s).extras?.sole?.length > 0, 'foot_' + s + ' sole missing');
+      }
+      for (const n of ['hips', 'spine', 'head', 'tail_1', 'tail_5'])
+        assert(node(n).extras?.ground?.length > 0, n + ' ground probes missing');
+    },
+  ],
   ['the file stays small', () => assert(glb.length < 1.2 * 1048576, glb.length + ' bytes')],
 ];
 for (const [name, fn] of checks) {

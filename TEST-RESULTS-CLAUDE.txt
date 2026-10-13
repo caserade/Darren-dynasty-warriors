@@ -1,3 +1,71 @@
+TEST RESULTS · CLAUDE UPDATE 12 (DARREN FULL RIG PASS · 3D ONLY) · 2026-10-13
+All runs below were made in a Linux container on branch claude/darren-full-rig-pass-bck586
+(built on update 11, PR #10), with headless Chromium using software WebGL (SwiftShader).
+Earlier results further down are history, not verification of this branch.
+
+npm test (node 22.22): all pass. tests/darren-model.cjs has 8 checks (new: the bone data for
+  face clearance, wing and forearm probes, foot soles and ground probes is in the model).
+  tools/verify-scene.cjs is a native Canvas stand-in, not a browser.
+tests/browser-qa.cjs: 63 of 63 (server: node desktop-server.cjs; Playwright pointed at the
+  installed Chromium through a preload; the test file is unchanged). The log keeps the known
+  harmless net::ERR_ABORTED lines for streamed .glb files.
+Extra browser play-through (project files qa/moves-qa.cjs): 16 of 16.
+tests/desktop-app.cjs under xvfb-run: all pass from the checkout.
+Windows build: npm run build:win produced the 1.7.0 x64 zip; its resources/game is identical
+  to dist/. Copied to project files desktop-app/Darren-Snowday-Windows.zip.
+Body parts through each other (new tools/review/collide.cjs, all 46 Darren clips, PR #10 ->
+  now, head look straight ahead): face 3,137 -> 988; rest of head 24,187 -> 15,771; all
+  98,364 -> 74,757. With the head look turned left/right/up/down the face count is 861, 582,
+  989 and 1,021. Lowest foot -0.246 m -> -0.024 m; tail -0.509 m -> -0.040 m; trunk -0.032 m;
+  wings dig in up to 0.128 m mid-Dodge (accepted).
+Skin weights (tools/review/weights.cjs): torn 65,561 -> 47,550; strained 271,215 -> 210,780;
+  drift 3.45 -> 3.32 cm; smallest volume 96.8% -> 96.1%. 43 of 46 clips tear less.
+Mesh close test (new tools/review/mesh-check.mjs): no bad numbers, duplicate faces, bad
+  weights or missing bones. Body: 13 edges shared by more than two faces, 55 inward normals,
+  5 thin triangles (all from the supplied model). Horn: tip fixed, 24-edge open base buried
+  in the skull. Scarf ends: 18 vertices up to 29 mm inside the belly -> 0. The collar's inner
+  half sits inside the neck at rest (251 vertices, unchanged from PR #10, not visible).
+Pictures were rendered with tools/review and looked at after each pass and for every move
+  (5 moments each); boards are in project files darren-rig/.
+Only dist/3d/anim.mjs, dist/3d/clips.mjs and dist/3d/assets/darren.glb changed under dist/.
+  The new anim.mjs code acts only on a model that carries the new bone data (Darren's).
+
+LIMITS
+- Not run on a real Windows PC, real GPU, physical controller, phone or Mac.
+- The measurements are geometric; how Darren moves was judged from renders, not by an artist
+  or in hands-on play.
+
+TEST RESULTS · CLAUDE UPDATE 11 (DARREN WEIGHT PAINTS · 3D ONLY) · 2026-10-13
+All runs below were made in a Linux container on branch claude/darren-weight-paints-bixhky
+(main after PR #9 was merged), with headless Chromium using software WebGL (SwiftShader).
+Earlier results further down are history, not verification of this branch.
+
+npm test on main right after the PR #9 merge (node 22.22): all pass.
+npm test on this branch: all pass (tests/darren-model.cjs included; darren.glb 0.75 MB).
+tests/browser-qa.cjs: 63 of 63 (Playwright pointed at the installed Chromium through a
+  preload, as in updates 9-10; the test file is unchanged). The log keeps one 404 line from
+  the pixel game that earlier runs also showed.
+Extra browser play-through (project files qa/moves-qa.cjs): 16 of 16.
+tests/desktop-app.cjs under xvfb-run: 13 of 13 from the checkout.
+Windows build: npm run build:win produced the 1.6.0 x64 zip (first try hit a 502 from the
+  Electron download host, the retry worked); its resources/game is identical to dist/.
+  Copied to project files desktop-app/Darren-Snowday-Windows.zip.
+Weight measurements (new tools/review/weights.cjs, all 46 Darren clips at 12 moments each):
+  torn edge-moments 76,969 -> 65,561; strained 328,008 -> 271,215; smallest body volume
+  93.7% -> 96.8%; scarf lifting 63,727 -> 39,251; far-away or wrong-side bone weights 93
+  vertices -> 0; tools/review/stretch.cjs 1,567 -> 1,168. Thigh drift from the leg bone 0.8 cm
+  -> 3.8 cm (worse). 8 of 46 clips got somewhat worse. Building with DARREN_WEIGHTS empty
+  reproduces the previous darren.glb byte for byte.
+Pictures were rendered with tools/review and looked at after each pass (stretch heat maps,
+  bone-ownership maps, clay and textured views); boards are in project files darren-weights/.
+Only dist/3d/assets/darren.glb changed under dist/; Tormund, Bucky and the pixel game are
+  untouched, and anim.mjs is unchanged.
+
+LIMITS
+- Not run on a real Windows PC, real GPU, physical controller, phone or Mac.
+- The measurements are geometric; how the new weights look was judged from renders, not by
+  an artist or in hands-on play.
+
 TEST RESULTS · CLAUDE UPDATE 10 (BUCKY STUDIO PASS · 3D ONLY) · 2026-10-13
 All runs below were made in a Linux container on branch claude/bucky-studio-pass-dwh7pf
 (which also carries updates 8 and 9), with headless Chromium using software WebGL

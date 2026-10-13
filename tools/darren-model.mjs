@@ -54,6 +54,12 @@ for (const side of ['L', 'R']) {
   hand.setTranslation([t[0] / 2, t[1] / 2, t[2] / 2]);
   addKnee(side);
 }
+// Weight paint passes (Claude update 11), measured with tools/review/weights.cjs over every clip;
+// each pass stays only if it measured better. DARREN_WEIGHTS (comma list) builds with only some
+// passes, for measuring each one alone.
+const PASSES = new Set(
+  (process.env.DARREN_WEIGHTS ?? 'repaint,scarf,wings,clear,feet,ground').split(',').filter(Boolean)
+);
 const joints = skin.listJoints(),
   J = Object.fromEntries(joints.map((j, i) => [j.getName(), i]));
 function rebindAll() {
@@ -230,7 +236,141 @@ function reskinBody(prim) {
     if (top.shell[i] === body)
       for (const b of ['wing_L', 'wing_R', 'wingtip_L', 'wingtip_R']) delete m[J[b]];
   });
+  weightPasses(top, maps, body);
   writeWeights(prim, maps);
+  bodySkin = { top, maps, body };
+}
+
+// ---------- weight paint passes (Claude update 11) ----------
+// Measured with tools/review/weights.cjs over every clip; each pass stays only if it measured
+// better. DARREN_WEIGHTS (comma list) builds with only some passes, for measuring each one alone.
+let bodySkin = null;
+// Tried and dropped (measured worse): pass 1 faded out bones far from each vertex (it left
+// creases where the mesh runs on from cheek to shoulder), and pass 3 added half-way joints at the
+// hips and shoulders driven from anim.mjs (more torn skin, not less).
+function weightPasses(top, maps, body) {
+  // Pass 2, repaint: the body skin painted again from Darren's shape, joint by joint, instead of
+  // patching the supplied (auto-rigged) weights. Every blend is a soft ramp measured in metres,
+  // so it does not depend on how dense the mesh happens to be in that spot. The widths are the
+  // measured best; DARREN_<KEY> overrides one for trying others. The hip blend (pass 6) stops
+  // at 0.38-0.66 m: wider (0.2-0.5) tore even less but left the thighs rubbery.
+  if (PASSES.has('repaint')) {
+    const P = (k, d) => +(process.env['DARREN_' + k] ?? d);
+    const W = {
+      shoulder: [P('SH0', 0.12), P('SH1', 0.28)],
+      armBand: [P('AB0', 0.07), P('AB1', 0.12)],
+      elbow: [P('EL0', 0.34), P('EL1', 0.45)],
+      neck: [P('NK0', 0.95), P('NK1', 1.07)],
+      waist: [P('WA0', 0.45), P('WA1', 0.8)],
+      hip: [P('HP0', 0.38), P('HP1', 0.66)],
+      legSide: [P('LS0', 0), P('LS1', 0.1)],
+      legR: [P('LR0', 0.1), P('LR1', 0.18)],
+      knee: P('KN', 0.07),
+      ankle: [P('AN0', -0.02), P('AN1', 0.08)],
+      tailZ: [P('TZ0', -0.2), P('TZ1', -0.34)],
+      tailB: P('TB', 0.08),
+    };
+    const knee = { L: worldPos('shin_L').y, R: worldPos('shin_R').y },
+      ankle = { L: worldPos('foot_L').y, R: worldPos('foot_R').y },
+      hipJ = { L: worldPos('leg_L'), R: worldPos('leg_R') };
+    // The tail as a curve through its joints and on to the tip.
+    const chain = ['tail_1', 'tail_2', 'tail_3', 'tail_4', 'tail_5'].map(worldPos);
+    chain.push(new THREE.Vector3(0.3, 0.54, -1.3));
+    const arc = [0];
+    for (let k = 1; k < chain.length; k++) arc.push(arc[k - 1] + chain[k].distanceTo(chain[k - 1]));
+    const along = (q) => {
+      let best = 9,
+        s = 0;
+      for (let k = 0; k < chain.length - 1; k++) {
+        const a = chain[k],
+          d = chain[k + 1].clone().sub(a),
+          u = Math.max(0, Math.min(1, q.clone().sub(a).dot(d) / d.lengthSq())),
+          dist = q.distanceTo(a.clone().addScaledVector(d, u));
+        if (dist < best) ((best = dist), (s = arc[k] + u * d.length()));
+      }
+      return s;
+    };
+    const add = (o, j, w) => w > 0 && (o[J[j]] = (o[J[j]] || 0) + w);
+    maps.forEach((m, i) => {
+      if (top.shell[i] !== body) return;
+      const [x, y, z] = top.P[i],
+        side = x >= 0 ? 'L' : 'R',
+        ax = Math.abs(x),
+        q = new THREE.Vector3(x, y, z),
+        o = {};
+      // How much of this vertex is arm, leg or tail; the rest is trunk.
+      const A =
+        smoothstep(W.shoulder[0], W.shoulder[1], ax) *
+        (1 - smoothstep(W.armBand[0], W.armBand[1], Math.abs(y - 0.945)));
+      const rl = Math.hypot(x - hipJ[side].x, z - hipJ[side].z + 0.03);
+      let L =
+        smoothstep(W.legSide[0], W.legSide[1], ax) *
+        (1 - smoothstep(W.hip[0], W.hip[1], y)) *
+        // Near the hip only the round thigh is leg; from the knee down everything is.
+        (1 - smoothstep(W.legR[0], W.legR[1], rl) * smoothstep(0.3, 0.4, y)) *
+        // and never back on the tail lying behind him.
+        (1 - smoothstep(-0.22, -0.32, z));
+      // Behind the back the tail starts; only beside the body does height matter (the tip curls up).
+      let T =
+        smoothstep(W.tailZ[0], W.tailZ[1], z) *
+        (1 - smoothstep(0.72, 0.8, y) * (1 - smoothstep(-0.4, -0.5, z)));
+      const sum = A + L + T;
+      if (sum > 1) [L, T] = [(L / sum) * (1 - A / sum) * sum, (T / sum) * (1 - A / sum) * sum];
+      const trunk = Math.max(0, 1 - A - L - T);
+      const h = smoothstep(W.neck[0], W.neck[1], y);
+      add(o, 'head', trunk * h);
+      const sp = smoothstep(W.waist[0], W.waist[1], y);
+      add(o, 'spine', trunk * (1 - h) * sp);
+      add(o, 'hips', trunk * (1 - h) * (1 - sp));
+      const e = smoothstep(W.elbow[0], W.elbow[1], ax);
+      add(o, 'arm_' + side, A * (1 - e));
+      add(o, 'hand_' + side, A * e);
+      const foot = 1 - smoothstep(ankle[side] + W.ankle[0], ankle[side] + W.ankle[1], y),
+        shin = (1 - smoothstep(knee[side] - W.knee, knee[side] + W.knee, y)) * (1 - foot);
+      add(o, 'foot_' + side, L * foot);
+      add(o, 'shin_' + side, L * shin);
+      add(o, 'leg_' + side, L * (1 - foot - shin));
+      if (T > 0) {
+        const s = along(q);
+        let prev = 1;
+        for (let k = 0; k < 5; k++) {
+          const t = k < 4 ? smoothstep(arc[k + 1] - W.tailB, arc[k + 1] + W.tailB, s) : 0;
+          add(o, 'tail_' + (k + 1), T * (prev - t));
+          prev = t;
+        }
+        // The first stretch of tail blends into the pelvis.
+        const root = 1 - smoothstep(0, 0.1, s);
+        const t1 = o[J.tail_1] || 0;
+        o[J.tail_1] = t1 * (1 - root * 0.5);
+        add(o, 'hips', t1 * root * 0.5);
+      }
+      maps[i] = o;
+    });
+    smoothWeights(top, maps, +(process.env.DARREN_RSMOOTH ?? 8), 0.6);
+    maps.forEach((m, i) => {
+      if (top.shell[i] !== body) return;
+      if (top.P[i][1] < 0.93) delete m[J.head];
+      for (const b of ['wing_L', 'wing_R', 'wingtip_L', 'wingtip_R']) delete m[J[b]];
+    });
+  }
+  // Pass 5, wings: each wing membrane is painted along its own length, root to tip, instead of
+  // the supplied patchy split. Skin far below the tip joint (the hanging lower corner) used to be
+  // half tip, so every flap swung it through a wide arc and tore the thin membrane edge.
+  if (PASSES.has('wings')) {
+    const U0 = +(process.env.DARREN_WU0 ?? 0.3),
+      U1 = +(process.env.DARREN_WU1 ?? 1.1);
+    for (const ws of ['L', 'R']) {
+      const a = worldPos('wing_' + ws),
+        d = worldPos('wingtip_' + ws).sub(a),
+        L2 = d.lengthSq();
+      maps.forEach((m, i) => {
+        if (top.shell[i] === body || !(J['wing_' + ws] in m || J['wingtip_' + ws] in m)) return;
+        const u = new THREE.Vector3(...top.P[i]).sub(a).dot(d) / L2,
+          t = smoothstep(U0, U1, u);
+        maps[i] = { [J['wing_' + ws]]: 1 - t, [J['wingtip_' + ws]]: t };
+      });
+    }
+  }
 }
 
 // ---------- head: one swept-back horn (studio pass 3) ----------
@@ -335,7 +475,9 @@ function hornPrimitive(crown, redUV, material) {
     N = [],
     index = [];
   const centre = (t) => new THREE.Vector3(0, base + H * t, zc + 0.02 - S * t * t * 1.15);
-  for (let r = 0; r <= RINGS; r++) {
+  // Rings stop one short of the tip (Claude update 12): the last ring used to shrink to a single
+  // point on the tip itself, 24 collapsed triangles that the mesh check flagged.
+  for (let r = 0; r < RINGS; r++) {
     const t = r / RINGS,
       c = centre(t),
       d = centre(Math.min(1, t + 0.01))
@@ -359,7 +501,7 @@ function hornPrimitive(crown, redUV, material) {
   }
   const tip = centre(1);
   P.push(tip);
-  for (let r = 0; r < RINGS; r++)
+  for (let r = 0; r < RINGS - 1; r++)
     for (let s = 0; s < SEG; s++) {
       const a = r * SEG + s,
         b = r * SEG + ((s + 1) % SEG),
@@ -368,7 +510,7 @@ function hornPrimitive(crown, redUV, material) {
       index.push(a, c, b, b, c, d);
     }
   for (let s = 0; s < SEG; s++)
-    index.push(RINGS * SEG + s, P.length - 1, RINGS * SEG + ((s + 1) % SEG));
+    index.push((RINGS - 1) * SEG + s, P.length - 1, (RINGS - 1) * SEG + ((s + 1) % SEG));
   // Outward winding check: the first side face must point away from the horn's axis.
   const g = new THREE.BufferGeometry().setFromPoints(P);
   g.setIndex(index);
@@ -534,13 +676,50 @@ function finish(geo, closedEnds) {
   g.computeVertexNormals();
   return g;
 }
-function partFromGeometry(g, uv, weightOf, material) {
+// group (optional): vertex index -> key; vertices with the same key share one averaged weight
+// (a whole ring of a knitted tube, so the knit never shears across its own thickness).
+// along (optional, Claude update 12): rounds of averaging each group's weights with the groups
+// next to it (ring k with rings k-1 and k+1), so a loose scarf end bends smoothly along its
+// length instead of shearing where the belly under it folds.
+function partFromGeometry(g, uv, weightOf, material, group, along = 0) {
   const n = g.attributes.position.count,
     joints = new Uint8Array(n * 4),
-    weights = new Float32Array(n * 4);
+    weights = new Float32Array(n * 4),
+    pa = g.attributes.position,
+    per = [];
+  for (let i = 0; i < n; i++) per.push(weightOf(pa.getY(i), pa.getX(i), pa.getZ(i)));
+  if (group) {
+    const sums = new Map();
+    per.forEach((w, i) => {
+      const k = group(i),
+        s = sums.get(k) || {};
+      for (const [j, v] of w) s[j] = (s[j] || 0) + v;
+      sums.set(k, s);
+    });
+    for (let r = 0; r < along; r++) {
+      const next = new Map();
+      for (const [k, s] of sums) {
+        const o = {},
+          nb = [k - 1, k, k + 1].filter((x) => sums.has(x));
+        for (const x of nb) {
+          const sx = sums.get(x),
+            tot = Object.values(sx).reduce((a, v) => a + v, 0) || 1;
+          for (const [j, v] of Object.entries(sx)) o[j] = (o[j] || 0) + v / tot / nb.length;
+        }
+        next.set(k, o);
+      }
+      for (const [k, o] of next) sums.set(k, o);
+    }
+    for (let i = 0; i < n; i++) {
+      const top4 = Object.entries(sums.get(group(i)))
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 4);
+      const t = top4.reduce((a, [, v]) => a + v, 0);
+      per[i] = top4.map(([j, v]) => [+j, v / t]);
+    }
+  }
   for (let i = 0; i < n; i++) {
-    const w = weightOf(g.attributes.position.getY(i));
-    w.forEach(([j, v], k) => {
+    per[i].forEach(([j, v], k) => {
       joints[i * 4 + k] = j;
       weights[i * 4 + k] = v;
     });
@@ -576,7 +755,7 @@ async function buildScarf(prim) {
     .setEmissiveFactor([0.22, 0.22, 0.22])
     .setDoubleSided(false);
   // The collar follows the chest, its top edge turns a little with the head like the neck does.
-  const neckW = (y) => {
+  let neckW = (y) => {
     const h = smoothstep(0.95, 1.07, y) * 0.8;
     return h > 0.01
       ? [
@@ -585,7 +764,54 @@ async function buildScarf(prim) {
         ]
       : [[J.spine, 1]];
   };
-  const chest = () => [[J.spine, 1]];
+  let chest = () => [[J.spine, 1]];
+  // Ring of a tube built by tubeGeometry (cap centres join the end rings); off without pass 4.
+  const ringOf = (seg, rings) =>
+    PASSES.has('scarf')
+      ? (i) => (i < seg * rings ? Math.floor(i / seg) : i === seg * rings ? 0 : rings - 1)
+      : null;
+  // Pass 4, scarf (Claude update 11): every scarf vertex moves like the skin right under it (the
+  // nearest few body vertices, closer ones counting more), so the collar rides the neck and
+  // shoulders and the ends ride the belly instead of the chest bone alone.
+  if (PASSES.has('scarf') && bodySkin) {
+    const { top, maps, body } = bodySkin,
+      ids = [];
+    // Skin from the chin down only: the collar sits under the jowls but must not turn with them.
+    top.P.forEach((p, i) => top.shell[i] === body && p[1] < 0.99 && ids.push(i));
+    const fromSkin = (y, x, z) => {
+      const best = [];
+      for (const i of ids) {
+        const p = top.P[i],
+          d = (p[0] - x) ** 2 + (p[1] - y) ** 2 + (p[2] - z) ** 2;
+        if (best.length < 6 || d < best[5][0]) {
+          best.push([d, i]);
+          best.sort((a, b) => a[0] - b[0]);
+          if (best.length > 6) best.pop();
+        }
+      }
+      const acc = {};
+      for (const [d, i] of best)
+        for (const [j, w] of Object.entries(maps[i])) acc[j] = (acc[j] || 0) + w / (d + 1e-5);
+      const top4 = Object.entries(acc)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 4);
+      const sum = top4.reduce((s, [, w]) => s + w, 0);
+      return top4.map(([j, w]) => [+j, w / sum]);
+    };
+    // The collar is a stiff knitted roll: it takes only part of the shoulders' swing (the rest
+    // stays with the chest), so an arm raise does not wrench it out of shape.
+    const armShare = +(process.env.DARREN_COLLAR_ARM ?? 0.25);
+    neckW = (y, x, z) => {
+      const out = {};
+      for (const [j, w] of fromSkin(y, x, z)) {
+        const arm = /^(arm|hand)_/.test(joints[j].getName());
+        out[j] = (out[j] || 0) + w * (arm ? armShare : 1);
+        if (arm) out[J.spine] = (out[J.spine] || 0) + w * (1 - armShare);
+      }
+      return Object.entries(out).map(([j, w]) => [+j, w]);
+    };
+    chest = fromSkin;
+  }
   const parts = [];
   // Collar: a thick knitted loop sitting a little lower at the front, bunched where it is tied.
   {
@@ -614,7 +840,10 @@ async function buildScarf(prim) {
     }
     const geo = tubeGeometry(path, across, out, a, b, 14, 1, 4.5);
     // Close the loop exactly: the last ring is the first ring.
-    parts.push(['Polka scarf collar', partFromGeometry(finish(geo, 0), geo.UV, neckW, mat)]);
+    parts.push([
+      'Polka scarf collar',
+      partFromGeometry(finish(geo, 0), geo.UV, neckW, mat, ringOf(14, N + 1)),
+    ]);
   }
   const front = bodyFront(prim);
   // Knot at the front left of the collar.
@@ -624,7 +853,7 @@ async function buildScarf(prim) {
     g.scale(0.065, 0.055, 0.04);
     g.translate(c.x, c.y, c.z);
     const uv = Array.from(g.attributes.uv.array, (v) => v * 2);
-    parts.push(['Polka scarf knot', partFromGeometry(g, uv, chest, mat)]);
+    parts.push(['Polka scarf knot', partFromGeometry(g, uv, chest, mat, () => 0)]);
   }
   // Two loose ends hanging over the chest and belly, the front one shorter.
   for (const [name, x0, x1, len, lift, width] of [
@@ -641,7 +870,12 @@ async function buildScarf(prim) {
       const t = i / (N - 1),
         x = x0 + (x1 - x0) * t + 0.012 * Math.sin(t * Math.PI * 2),
         y = 0.9 - len * t,
-        z = Math.max(front(x, y), 0.15) + 0.022 + lift;
+        // Clear of the belly across the end's whole width, not only under its middle (the
+        // wider end dipped 3 cm into the belly at its sides, Claude update 12).
+        z =
+          Math.max(0.15, ...[-1, -0.5, 0, 0.5, 1].map((k) => front(x + k * width * 1.1, y))) +
+          0.022 +
+          lift;
       path.push(new THREE.Vector3(x, y, z));
     }
     for (let i = 0; i < N; i++) {
@@ -659,7 +893,17 @@ async function buildScarf(prim) {
       b.push(0.014);
     }
     const geo = tubeGeometry(path, across, out, a, b, 12, 1, len / 0.25);
-    parts.push([name, partFromGeometry(finish(geo, 12), geo.UV, chest, mat)]);
+    parts.push([
+      name,
+      partFromGeometry(
+        finish(geo, 12),
+        geo.UV,
+        chest,
+        mat,
+        ringOf(12, N),
+        +(process.env.DARREN_TAIL_ALONG ?? 3)
+      ),
+    ]);
   }
   for (const [name, p] of parts) {
     p.knit = true;
@@ -845,12 +1089,304 @@ function bakeAO(prims) {
   }
 }
 
+// ---------- clearance: wings and paws keep out of the head (Claude update 12) ----------
+// The wings rise right beside his big head, so a wing swung forward (or the head turned toward a
+// foe) pushed the wing arm and its claw through his cheeks and eyes. The model now carries what
+// the game needs to stop that (anim.mjs keepClear): the head's shape as a few balls in the head
+// bone's own frame (extras.clear on the head), and probe points on each wing and forearm, in the
+// frames of the bones that move them (extras.probe on wing_X and hand_X). Every frame the game
+// turns a wing or arm away from the head just enough that no probe sinks into a ball.
+function clearance(prim) {
+  if (!['clear', 'feet', 'ground'].some((p) => PASSES.has(p)) || !bodySkin) return;
+  const { top, maps, body } = bodySkin,
+    pos = prim.getAttribute('POSITION'),
+    idx = prim.getIndices(),
+    n = pos.getCount(),
+    P = Array.from({ length: n }, (_, i) => pos.getElement(i, []));
+  const topBone = maps.map((m) => {
+    let best = -1,
+      bw = 0;
+    for (const [j, w] of Object.entries(m)) if (w > bw) ((bw = w), (best = +j));
+    return best;
+  });
+  const isWing = (i) => top.shell[i] !== body && topBone[i] !== J.head;
+  // Voxels inside the head: the body and eyes made solid, then the cells whose nearest skin is
+  // head skin.
+  const V = 0.02,
+    min = [-0.8, 0.6, -0.6],
+    dims = [80, 75, 60],
+    at = (x, y, z) => (x * dims[1] + y) * dims[2] + z,
+    cell = (p) => p.map((v, k) => Math.floor((v - min[k]) / V)),
+    inside = (c) => c.every((v, k) => v >= 0 && v < dims[k]),
+    grid = new Uint8Array(dims[0] * dims[1] * dims[2]);
+  const tri = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+  for (let t = 0; t < idx.getCount(); t += 3) {
+    const v = [0, 1, 2].map((k) => idx.getScalar(t + k));
+    if (v.some(isWing)) continue;
+    for (let k = 0; k < 3; k++) tri[k].fromArray(P[v[k]]);
+    const len = Math.max(
+        tri[0].distanceTo(tri[1]),
+        tri[1].distanceTo(tri[2]),
+        tri[2].distanceTo(tri[0])
+      ),
+      steps = Math.max(1, Math.ceil(len / (V * 0.5)));
+    for (let a = 0; a <= steps; a++)
+      for (let b = 0; b <= steps - a; b++) {
+        const u = a / steps,
+          w = b / steps,
+          c = cell(
+            [0, 1, 2].map(
+              (k) =>
+                tri[0].getComponent(k) * (1 - u - w) +
+                tri[1].getComponent(k) * u +
+                tri[2].getComponent(k) * w
+            )
+          );
+        if (inside(c)) grid[at(...c)] = 1;
+      }
+  }
+  // Below the box is all body; flood the outside from the box's top corner.
+  const outside = new Uint8Array(grid.length),
+    stack = [at(0, dims[1] - 1, 0)];
+  outside[stack[0]] = 1;
+  while (stack.length) {
+    const i = stack.pop(),
+      z = i % dims[2],
+      y = Math.floor(i / dims[2]) % dims[1],
+      x = Math.floor(i / dims[2] / dims[1]);
+    for (const [dx, dy, dz] of [
+      [1, 0, 0],
+      [-1, 0, 0],
+      [0, 1, 0],
+      [0, -1, 0],
+      [0, 0, 1],
+      [0, 0, -1],
+    ]) {
+      const c = [x + dx, y + dy, z + dz];
+      if (!inside(c) || c[1] === 0) continue; // the open bottom of the box is not outside
+      const j = at(...c);
+      if (!outside[j] && !grid[j]) {
+        outside[j] = 1;
+        stack.push(j);
+      }
+    }
+  }
+  const skin = [];
+  for (let i = 0; i < n; i++) if (!isWing(i)) skin.push(i);
+  const headSkin = skin.filter((i) => topBone[i] === J.head);
+  const nearestIsHead = (p) => {
+    let best = 9,
+      head = false;
+    for (const i of skin) {
+      const q = P[i],
+        d = (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2 + (q[2] - p[2]) ** 2;
+      if (d < best) ((best = d), (head = topBone[i] === J.head));
+    }
+    return head;
+  };
+  const cells = [];
+  for (let x = 0; x < dims[0]; x++)
+    for (let y = 1; y < dims[1]; y++)
+      for (let z = 0; z < dims[2]; z++)
+        if (!outside[at(x, y, z)] && (x + y + z) % 2 === 0) {
+          const p = [x, y, z].map((c, k) => min[k] + (c + 0.5) * V);
+          if (nearestIsHead(p)) cells.push(p);
+        }
+  // Balls: greedily the one that fills most of what is still uncovered, each as big as fits
+  // inside the head skin.
+  const radius = (p) => {
+    let best = 9;
+    for (const i of headSkin) {
+      const q = P[i];
+      best = Math.min(best, (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2 + (q[2] - p[2]) ** 2);
+    }
+    return Math.sqrt(best);
+  };
+  // Greedily the ball that brings the most head skin to within 2.5 cm of a ball, each as big as
+  // fits inside the head skin, until nearly all of it is.
+  const cand = cells.filter((_, k) => k % 2 === 0).map((p) => [...p, radius(p)]),
+    surf = headSkin.filter((_, k) => k % 2 === 0).map((i) => P[i]),
+    left = new Set(surf.keys()),
+    balls = [],
+    M = 0.025;
+  while (balls.length < 32 && left.size > surf.length * 0.02) {
+    let best = null,
+      bestN = 0;
+    for (const c of cand) {
+      let k = 0;
+      const rr = (c[3] + M) ** 2;
+      for (const i of left) {
+        const p = surf[i];
+        if ((p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2 + (p[2] - c[2]) ** 2 < rr) k++;
+      }
+      if (k > bestN) ((bestN = k), (best = c));
+    }
+    if (!best) break;
+    balls.push(best);
+    for (const i of [...left]) {
+      const p = surf[i];
+      if (
+        (p[0] - best[0]) ** 2 + (p[1] - best[1]) ** 2 + (p[2] - best[2]) ** 2 <
+        (best[3] + M) ** 2
+      )
+        left.delete(i);
+    }
+  }
+  const local = (name, p) =>
+    new THREE.Vector3(...p).applyMatrix4(
+      new THREE.Matrix4().fromArray(nodeByName(name).getWorldMatrix()).invert()
+    );
+  const r3 = (v) => Math.round(v * 1000) / 1000;
+  const head = nodeByName('head');
+  if (PASSES.has('clear'))
+    head.setExtras({
+      ...head.getExtras(),
+      clear: balls.map((b) => [...local('head', b).toArray(), b[3]].map(r3)),
+    });
+  // Clearance of a point from the balls at rest (negative = already inside).
+  const gap = (p) =>
+    Math.min(...balls.map((b) => Math.hypot(p[0] - b[0], p[1] - b[1], p[2] - b[2]) - b[3]));
+  // Probe points: spread evenly over the part (farthest point first), skipping skin near the
+  // root that never comes near the head anyway. Each keeps the gap it has at rest as a floor,
+  // so a probe that rests close to the head is only kept from getting closer.
+  const probes = (ids, bones, rootPos, count) => {
+    const pts = ids.filter((i) => new THREE.Vector3(...P[i]).distanceTo(rootPos) > 0.15),
+      chosen = [];
+    if (!pts.length) return [];
+    let far = pts.map(() => 9);
+    let next = pts.reduce((a, i, k) => (P[i][1] > P[pts[a]][1] ? k : a), 0);
+    while (chosen.length < count) {
+      const c = pts[next];
+      chosen.push(c);
+      far = far.map((d, k) => {
+        const q = P[pts[k]];
+        return Math.min(d, Math.hypot(q[0] - P[c][0], q[1] - P[c][1], q[2] - P[c][2]));
+      });
+      next = far.reduce((a, d, k) => (d > far[a] ? k : a), 0);
+    }
+    return chosen.map((i) => {
+      const m = maps[i],
+        tot = bones.reduce((s, b) => s + (m[J[b]] || 0), 0) || 1,
+        t = bones.length > 1 ? (m[J[bones[1]]] || 0) / tot : 0;
+      return [
+        ...local(bones[0], P[i]).toArray(),
+        ...(bones[1] ? local(bones[1], P[i]).toArray() : [0, 0, 0]),
+        t,
+        Math.min(0.03, gap(P[i])),
+      ].map(r3);
+    });
+  };
+  for (const s of PASSES.has('clear') ? ['L', 'R'] : []) {
+    const wingIds = [],
+      foreIds = [];
+    for (let i = 0; i < n; i++) {
+      if (isWing(i) && (s === 'L') === P[i][0] > 0) wingIds.push(i);
+      if (top.shell[i] === body && topBone[i] === J['hand_' + s]) foreIds.push(i);
+    }
+    const wing = nodeByName('wing_' + s),
+      hand = nodeByName('hand_' + s);
+    wing.setExtras({
+      ...wing.getExtras(),
+      probe: probes(wingIds, ['wing_' + s, 'wingtip_' + s], worldPos('wing_' + s), 48),
+    });
+    hand.setExtras({
+      ...hand.getExtras(),
+      probe: probes(foreIds, ['hand_' + s], worldPos('hand_' + s), 16),
+    });
+  }
+  // Soles (fix pass 2): points spread over the bottom of each foot, in the foot bone's frame, so
+  // the game can lift a foot that a pose pushes into the ground (anim.mjs plantFeet).
+  if (PASSES.has('feet'))
+    for (const s of ['L', 'R']) {
+      const ids = [];
+      for (let i = 0; i < n; i++)
+        if (top.shell[i] === body && topBone[i] === J['foot_' + s]) ids.push(i);
+      const low = Math.min(...ids.map((i) => P[i][1])),
+        sole = ids.filter((i) => P[i][1] < low + 0.03),
+        chosen = [sole[0]];
+      while (chosen.length < 10) {
+        let best = -1,
+          bd = -1;
+        for (const i of sole) {
+          const d = Math.min(
+            ...chosen.map((c) => Math.hypot(P[i][0] - P[c][0], P[i][2] - P[c][2]))
+          );
+          if (d > bd) ((bd = d), (best = i));
+        }
+        chosen.push(best);
+      }
+      const foot = nodeByName('foot_' + s);
+      foot.setExtras({
+        ...foot.getExtras(),
+        sole: chosen.map((i) =>
+          local('foot_' + s, P[i])
+            .toArray()
+            .map(r3)
+        ),
+      });
+    }
+  // Ground probes (fix pass 5): points spread over the trunk, head and each tail bone's skin, in
+  // the frame of the bone that moves them, so the game can keep his body, head and tail out of
+  // the ground (anim.mjs groundBody and groundTail).
+  if (PASSES.has('ground')) {
+    const spread = (ids, count) => {
+      const chosen = [ids.reduce((a, i) => (P[i][1] < P[a][1] ? i : a), ids[0])],
+        far = new Map(ids.map((i) => [i, 9]));
+      while (chosen.length < Math.min(count, ids.length)) {
+        const c = chosen[chosen.length - 1];
+        let best = -1,
+          bd = -1;
+        for (const i of ids) {
+          const d = Math.min(
+            far.get(i),
+            Math.hypot(P[i][0] - P[c][0], P[i][1] - P[c][1], P[i][2] - P[c][2])
+          );
+          far.set(i, d);
+          if (d > bd) ((bd = d), (best = i));
+        }
+        chosen.push(best);
+      }
+      return chosen;
+    };
+    for (const [name, count] of [
+      ['hips', 24],
+      ['spine', 24],
+      ['head', 40],
+      ['tail_1', 8],
+      ['tail_2', 8],
+      ['tail_3', 8],
+      ['tail_4', 8],
+      ['tail_5', 8],
+    ]) {
+      const ids = [];
+      for (let i = 0; i < n; i++) if (top.shell[i] === body && topBone[i] === J[name]) ids.push(i);
+      if (!ids.length) continue;
+      const bone = nodeByName(name);
+      bone.setExtras({
+        ...bone.getExtras(),
+        ground: spread(ids, count).map((i) => local(name, P[i]).toArray().map(r3)),
+      });
+    }
+  }
+  console.log(
+    'clearance:',
+    balls.length,
+    'head balls',
+    'fitted to the head;',
+    headSkin.filter((i) => gap(P[i]) < 0.03).length,
+    'of',
+    headSkin.length,
+    'head skin points within 3 cm of a ball'
+  );
+}
+
 const mainMesh = root.listMeshes().find((m) => m.getName() === 'Darren_Game'),
   main = mainMesh.listPrimitives()[0];
 rebindAll();
 reskinBody(main);
 const { crown, redUV } = flattenCrest(main);
 smoothNormals(main);
+clearance(main);
 const hornMesh = doc
   .createMesh('Darren_Horn')
   .addPrimitive(hornPrimitive(crown, redUV, main.getMaterial()));
