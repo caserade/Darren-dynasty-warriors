@@ -475,7 +475,9 @@ function hornPrimitive(crown, redUV, material) {
     N = [],
     index = [];
   const centre = (t) => new THREE.Vector3(0, base + H * t, zc + 0.02 - S * t * t * 1.15);
-  for (let r = 0; r <= RINGS; r++) {
+  // Rings stop one short of the tip (Claude update 12): the last ring used to shrink to a single
+  // point on the tip itself, 24 collapsed triangles that the mesh check flagged.
+  for (let r = 0; r < RINGS; r++) {
     const t = r / RINGS,
       c = centre(t),
       d = centre(Math.min(1, t + 0.01))
@@ -499,7 +501,7 @@ function hornPrimitive(crown, redUV, material) {
   }
   const tip = centre(1);
   P.push(tip);
-  for (let r = 0; r < RINGS; r++)
+  for (let r = 0; r < RINGS - 1; r++)
     for (let s = 0; s < SEG; s++) {
       const a = r * SEG + s,
         b = r * SEG + ((s + 1) % SEG),
@@ -508,7 +510,7 @@ function hornPrimitive(crown, redUV, material) {
       index.push(a, c, b, b, c, d);
     }
   for (let s = 0; s < SEG; s++)
-    index.push(RINGS * SEG + s, P.length - 1, RINGS * SEG + ((s + 1) % SEG));
+    index.push((RINGS - 1) * SEG + s, P.length - 1, (RINGS - 1) * SEG + ((s + 1) % SEG));
   // Outward winding check: the first side face must point away from the horn's axis.
   const g = new THREE.BufferGeometry().setFromPoints(P);
   g.setIndex(index);
@@ -868,7 +870,12 @@ async function buildScarf(prim) {
       const t = i / (N - 1),
         x = x0 + (x1 - x0) * t + 0.012 * Math.sin(t * Math.PI * 2),
         y = 0.9 - len * t,
-        z = Math.max(front(x, y), 0.15) + 0.022 + lift;
+        // Clear of the belly across the end's whole width, not only under its middle (the
+        // wider end dipped 3 cm into the belly at its sides, Claude update 12).
+        z =
+          Math.max(0.15, ...[-1, -0.5, 0, 0.5, 1].map((k) => front(x + k * width * 1.1, y))) +
+          0.022 +
+          lift;
       path.push(new THREE.Vector3(x, y, z));
     }
     for (let i = 0; i < N; i++) {
