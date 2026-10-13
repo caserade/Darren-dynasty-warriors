@@ -13,8 +13,9 @@ PUT THIS ON YOUR WINDOWS DESKTOP
 
 WINDOWS DESKTOP APP (no Node.js or Python needed)
 Unzip Darren-Snowday-Windows.zip (right-click, Extract All) and double-click
-"Darren Snowday.exe" inside the extracted folder. Keep the folder together. A start
-screen picks the pixel or the 3D game; Ctrl+H returns to it, F11 is full screen.
+"Darren Snowday.exe" inside the extracted folder. Keep the folder together. It opens on
+the title screen (Story Mode, Free Mode, Heroes, Options, Pixel Adventure); Ctrl+H
+returns to it, F11 is full screen.
 The first time, Windows may say "Windows protected your PC" because the app is not
 signed: click "More info", then "Run anyway". Saves made in the app are kept in
 %APPDATA%\Darren's Snowday Search and are separate from browser saves.

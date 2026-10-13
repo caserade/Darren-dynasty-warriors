@@ -727,3 +727,59 @@ WHAT STILL NEEDS AN ARTIST
 - Mesh notes left as they are: 13 edges shared by more than two faces and 55 inward normals at
   the eye and brow rims, wing claws, paw tips and nape (all from the supplied model), and the
   horn's open base ring, buried in the skull.
+
+CLAUDE UPDATE 13 · DYNASTY-STYLE MENUS: TITLE SCREEN AND STORY SELECT (3D) · 2026-10-13
+michael asked for the game's options and pages to feel like Dynasty Warriors, with a start screen
+and a story select. Built on main after PR #11 (which carried PR #10) was merged. The pixel game
+is unchanged; it is opened from the new main menu.
+
+FRONT DOOR
+- dist/3d/ now opens on a title screen: the game's name in gold over the valley, the three
+  friends standing at the cottage behind it, and Press Start (any key, click, tap or controller
+  button). The Windows app opens straight onto it (desktop-app 1.8.0); Ctrl+H returns to it,
+  Ctrl+1 opens the pixel game and Ctrl+2 the old two-game chooser.
+- Main menu: Continue (names the battle the story goes on with), Story Mode, Free Mode, Heroes,
+  Options, Pixel Adventure. A line at the bottom explains the highlighted choice.
+
+STORY SELECT
+- The story is split into five battles in two chapters, built from what the game already has:
+  Chapter One, Ruffy's Rescue: Spud Barricade, Windswept Ring, Coop Command, Bramble Hollow.
+  Chapter Two: Firewood for Mom. Each has a briefing, its enemy commander, its victory goals, a
+  valley map with the route and the battle marked, and the best record.
+- Battles open in order (locked ones show ? ? ?). Status is read from the existing 3D save, so
+  older saves count at once and the save format (snowday-3d-v1) is unchanged. Ruffy rescued in
+  the pixel game still opens Firewood for Mom early.
+- Picking a battle leads to the hero select (Darren, Tormund or Bucky, Darren's Bare Paws or
+  Polka Scarf, Adventure or Cozy), then a briefing scroll, then Begin battle. The party starts
+  at the cottage, or beside the last camp cleared, as Try again already did.
+- A battle ends when its goal is done (camp clue found; for Bramble Hollow, Ruffy brought home;
+  six bundles delivered). The results scroll shows battle time, K.O. count, longest combo and
+  health lost, a rank from C to S, new records, then Next battle / Story select / Title screen.
+  Ranks are a rough guide (par times and K.O. counts were set by hand, not play-tested).
+- Free Mode replays any cleared battle with any hero. Replays never write the story save; best
+  records go to their own record, snowday-3d-records-v1. Picking a cleared battle in Story Mode
+  also replays it this way, so the story never goes backwards.
+
+OTHER PAGES
+- Heroes: each friend's title, description, Power/Speed/Reach/Guard stars, weapon and special.
+  The camera frames the chosen hero alone; Darren's style choice shows on him straight away.
+- Options: sound, difficulty, picture detail, controller buttons (the same settings as the
+  pause menu) and Start the story over (asks twice; records are kept).
+- The pause menu now has Story select and Title screen (Leave battle during a replay) in place
+  of the Firewood for Mom button, whose job the story select took over. Story text that said
+  "from Pause" now says "in the Story select".
+
+CONTROLS ON THE MENUS
+- Keyboard: arrows or WASD move, Enter/Space/J confirm, Esc/Backspace/K go back.
+- Controller: d-pad or left stick move, A or Start confirm, B goes back. A button still held from
+  the press that opened a page is ignored.
+- Mouse and touch: click or tap; a Back button sits in the bottom bar. Pointing at an item only
+  highlights it after a real mouse move, so a page opening under a still cursor picks nothing.
+
+CODE
+- New dist/3d/story.mjs (battles, chapters, status rules, replay saves, ranks, records) and
+  dist/3d/front.mjs (the pages and their controls). game.mjs: menu camera (slow sway in front of
+  the friends, pulled in front of walls, scene shifted beside the menu), idle animation behind
+  menus, battle start/leave, replays. sim.mjs: Game.reload(save) swaps in another save.
+- New tests/story-select.mjs (8 checks) is part of npm test. tests/browser-qa.cjs and
+  tests/desktop-app.cjs now enter the game through the title screen.

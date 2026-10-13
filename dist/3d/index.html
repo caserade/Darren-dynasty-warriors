@@ -78,9 +78,9 @@
         </div>
       </div>
     </div>
-    <section id="menu" class="overlay">
+    <section id="menu" class="overlay" hidden>
       <div class="panel">
-        <div class="eyebrow">DARREN · TORMUND · BUCKY</div>
+        <div class="eyebrow">PAUSED · DARREN · TORMUND · BUCKY</div>
         <h1>Snowday<span>The Three Friends</span></h1>
         <p id="menu-copy">
           Explore the snowy valley, bring Ruffy home, and gather firewood with your friends.
@@ -88,8 +88,8 @@
         <p id="other-game" class="other-game" hidden></p>
         <div class="rule"></div>
         <button id="play" class="primary" disabled>Preparing the valley…</button
-        ><button id="firewood" disabled>Firewood for Mom</button
-        ><button id="return-home" hidden>Return to the cottage</button>
+        ><button id="return-home" hidden>Return to the cottage</button
+        ><button id="to-story">Story select</button><button id="to-title">Title screen</button>
         <div class="settings">
           <label>Sound <input id="sound" type="checkbox" checked /></label
           ><label
@@ -110,9 +110,9 @@
           WASD / left stick to move · tap J for a combo string<br />K right after a combo hit for
           its finisher · hold K from standing to charge<br />J in the air or after a sprint for jump
           and dash attacks<br />L special when the gold meter is full · Q swaps Darren between Bare
-          Paws and the Polka Scarf<br />Space jump · Shift dodge (Tormund standing still: shield parry)
-          · E interact<br />1–3 switch hero ·
-          Drag / right stick look<br />Cookies heal the party · every 3 makes Darren hit harder
+          Paws and the Polka Scarf<br />Space jump · Shift dodge (Tormund standing still: shield
+          parry) · E interact<br />1–3 switch hero · Drag / right stick look<br />Cookies heal the
+          party · every 3 makes Darren hit harder
         </p>
         <p class="help" id="pad-help"></p>
         <details id="pad-settings">
@@ -141,8 +141,117 @@
           >Clear the three camps, beat their bosses and the Bramble Baron, and bring Ruffy home.
           Cozy mode softens every hit.</small
         ><a href="../index.html">Open the pixel adventure</a>
+      </div>
+    </section>
+    <section id="front" aria-label="Game menus">
+      <div class="fx-shade"></div>
+      <div id="fx-title" class="fx-page">
+        <div class="fx-logo">
+          <small class="fx-eyebrow">DARREN · TORMUND · BUCKY</small>
+          <h1><span>Darren’s</span>Snowday Search</h1>
+          <div class="fx-sub"><i></i><em>The Three Friends</em><i></i></div>
+        </div>
+        <button id="fx-start" class="fx-press" disabled>Preparing the valley…</button>
         <p id="error" role="alert" hidden></p>
       </div>
+      <div id="fx-main" class="fx-page" hidden>
+        <header class="fx-head">
+          <small>MAIN MENU</small>
+          <h2>Snowday Search</h2>
+        </header>
+        <nav id="fx-main-list" class="fx-list" aria-label="Main menu"></nav>
+        <div class="fx-note">
+          <p id="fx-main-note"></p>
+          <small id="fx-main-other"></small>
+        </div>
+      </div>
+      <div id="fx-story" class="fx-page" hidden>
+        <header class="fx-head">
+          <small id="fx-story-kind">STORY MODE</small>
+          <h2>Choose a battle</h2>
+        </header>
+        <div class="fx-story">
+          <ol id="fx-story-list" class="fx-battles" aria-label="Battles"></ol>
+          <article class="fx-card fx-sel">
+            <canvas id="fx-map" width="440" height="318" aria-label="Valley map"></canvas>
+            <h3 id="fx-sel-name"></h3>
+            <small id="fx-sel-place" class="fx-place"></small>
+            <p id="fx-sel-text"></p>
+            <dl>
+              <dt>Enemy commander</dt>
+              <dd id="fx-sel-foe"></dd>
+              <dt>Victory</dt>
+              <dd><ul id="fx-sel-goals"></ul></dd>
+            </dl>
+            <small id="fx-sel-record" class="fx-record"></small>
+          </article>
+        </div>
+      </div>
+      <div id="fx-heroes" class="fx-page" hidden>
+        <header class="fx-head">
+          <small id="fx-hero-kind">CHOOSE YOUR HERO</small>
+          <h2 id="fx-hero-battle"></h2>
+        </header>
+        <div class="fx-heroes">
+          <div class="fx-hero-side">
+            <div id="fx-hero-row" class="fx-hero-row" aria-label="Heroes"></div>
+            <div id="fx-hero-opts" class="fx-list fx-opts"></div>
+          </div>
+          <article class="fx-card fx-hero-info">
+            <small id="fx-hi-title" class="fx-place"></small>
+            <h3 id="fx-hi-name"></h3>
+            <p id="fx-hi-about"></p>
+            <ul id="fx-hi-stars" class="fx-stars"></ul>
+            <dl>
+              <dt>Weapon</dt>
+              <dd id="fx-hi-weapon"></dd>
+              <dt>Special</dt>
+              <dd id="fx-hi-special"></dd>
+            </dl>
+          </article>
+        </div>
+      </div>
+      <div id="fx-options" class="fx-page" hidden>
+        <header class="fx-head">
+          <small>OPTIONS</small>
+          <h2>Settings</h2>
+        </header>
+        <div id="fx-options-list" class="fx-list fx-opts fx-wide"></div>
+      </div>
+      <div id="fx-brief" class="fx-page" hidden>
+        <article class="fx-scroll">
+          <small id="fx-brief-kind" class="fx-eyebrow"></small>
+          <h2 id="fx-brief-name"></h2>
+          <p id="fx-brief-text"></p>
+          <div class="fx-brief-cols">
+            <div>
+              <small>Victory</small>
+              <ul id="fx-brief-goals"></ul>
+            </div>
+            <div>
+              <small>Enemy commander</small><b id="fx-brief-foe"></b> <small>Your hero</small
+              ><b id="fx-brief-hero"></b> <small>Difficulty</small><b id="fx-brief-mode"></b>
+            </div>
+          </div>
+          <button id="fx-begin" class="fx-item fx-go" type="button">Begin battle</button>
+        </article>
+      </div>
+      <div id="fx-results" class="fx-page" hidden>
+        <article class="fx-scroll fx-res">
+          <small id="fx-res-kind" class="fx-eyebrow">VICTORY</small>
+          <h2 id="fx-res-name"></h2>
+          <div class="fx-res-body">
+            <ul id="fx-res-stats" class="fx-res-stats"></ul>
+            <div class="fx-res-rank">
+              <small>Rank</small><b id="fx-res-rank" class="fx-stamp"></b>
+            </div>
+          </div>
+          <div id="fx-res-actions" class="fx-list fx-res-actions"></div>
+        </article>
+      </div>
+      <footer class="fx-bar">
+        <button id="fx-back" type="button">‹ Back</button><span id="fx-help"></span>
+      </footer>
     </section>
     <section id="defeat" class="overlay" hidden>
       <div class="panel">

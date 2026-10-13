@@ -1,3 +1,35 @@
+TEST RESULTS · CLAUDE UPDATE 13 (DYNASTY-STYLE MENUS · 3D FRONT END) · 2026-10-13
+All runs below were made in a Linux container on branch claude/dynasty-menus-ng1nvh (main after
+PR #11, which carried PR #10, was merged), with headless Chromium using software WebGL
+(SwiftShader). Earlier results further down are history, not verification of this branch.
+
+npm test (node 22.22): all pass, including the new tests/story-select.mjs (8 checks: battle
+  unlock order, Bramble Hollow until Ruffy is home, pixel rescue opening Firewood for Mom early,
+  replay saves for all five battles loading into the game without touching the story save,
+  Game.reload leaving nothing behind, map spots, ranks and records). tools/verify-scene.cjs is
+  a native Canvas stand-in, not a browser.
+tests/browser-qa.cjs: 64 of 64 (server: node desktop-server.cjs). The 3D sections now enter
+  through the title screen, Story Mode, the next battle, the hero select and the briefing; the
+  firewood and shared-save checks pick chapters from the story select instead of the removed
+  Firewood for Mom button; new checks: opens on the title screen, the Options page holds the
+  controller buttons. The log keeps the known harmless net::ERR_ABORTED lines for streamed .glb
+  files.
+Extra browser walk-throughs (not saved as tests): keyboard through every page on a 1440x900
+  screen; a simulated controller (Start, d-pad, A, B) through title, main menu, story select,
+  hero select (picking Tormund), briefing and into the battle on a 412x915 phone screen; a
+  results screen after a won battle, its record saved and the next battle offered. No page
+  errors. Screenshots in project files menus/.
+tests/desktop-app.cjs under xvfb-run: 15 of 15 from the checkout (opens on the 3D title screen,
+  chooser still reachable, a story battle starts from the menus).
+Windows build: npm run build:win produced the 1.8.0 x64 zip; its resources/game is identical
+  to dist/. Copied to project files desktop-app/Darren-Snowday-Windows.zip. (The first build
+  attempt stopped on a stream error while preparing Electron; running it again worked.)
+
+LIMITS
+- Not run on a real Windows PC, real GPU, physical controller, phone or Mac.
+- Rank targets (par time and K.O. count per battle) were set by hand, not play-tested.
+- The menu camera and layout were judged from screenshots at 1440x900, 412x915 and 915x412.
+
 TEST RESULTS · CLAUDE UPDATE 12 (DARREN FULL RIG PASS · 3D ONLY) · 2026-10-13
 All runs below were made in a Linux container on branch claude/darren-full-rig-pass-bck586
 (built on update 11, PR #10), with headless Chromium using software WebGL (SwiftShader).

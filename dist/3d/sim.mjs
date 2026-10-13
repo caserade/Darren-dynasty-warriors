@@ -417,6 +417,13 @@ export class Game {
         c >= 0 && c < 3 && this.bosses[c] ? c : this.bosses.slice(0, 3).lastIndexOf(true);
     }
   }
+  // Swap in a different save (story select, battle replays): a brand-new session from that save,
+  // keeping this object so everything holding the game sees the change.
+  reload(saved) {
+    Object.assign(this, new Game(this.world, saved, { enemies: this.enemiesOn }));
+    this.danger = null;
+    this.striker = -1;
+  }
   setMode(mode) {
     this.mode = mode === 'cozy' ? 'cozy' : 'adventure';
     this.emit('save');
@@ -1314,7 +1321,11 @@ export class Game {
         return { x: 129.6, z: 53.2, label: 'Find Ruffy beside Bramble Keep' };
       }
       if (!q.home) return { x: 16.8, z: 50.4, label: 'Bring Ruffy home' };
-      return { x: 16.8, z: 50.4, label: 'Ruffy is home! Start Firewood for Mom from Pause.' };
+      return {
+        x: 16.8,
+        z: 50.4,
+        label: 'Ruffy is home! Firewood for Mom waits in the Story select.',
+      };
     }
     const i = q.wood.indexOf(false);
     if (i >= 0) {
@@ -1376,7 +1387,7 @@ export class Game {
       } else if (!q.home) {
         q.home = true;
         this.emit('dialogue', {
-          text: 'Mom: You’re all home! Come warm your paws. Firewood for Mom is now available in Pause.',
+          text: 'Mom: You’re all home! Come warm your paws. Firewood for Mom is now open in the Story select.',
         });
       } else return false;
     } else {
