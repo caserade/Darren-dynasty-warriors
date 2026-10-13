@@ -547,3 +547,72 @@ WHAT STILL NEEDS AN ARTIST
   re-sculpt need an artist and 3D tools that are not part of this project.
 - Mirroring the moves raised the stretch count about 10% over the original clips (the
   supplied rig's weights are not symmetrical), as measured by the stretch check.
+
+CLAUDE UPDATE 10 · BUCKY STUDIO PASS (3D ONLY, BUCKY ONLY) · 2026-10-13
+After Tormund's pass Michael gave the go-ahead for Bucky, the third hero: the same full scan,
+then four fix passes. This branch is built on Tormund's branch, so it also carries updates 8
+and 9. Darren, Tormund (apart from shared animation code that only acts when a model has the
+new two-hand markers) and the pixel game are untouched. Scan report with before and after
+pictures: project files bucky-studio/scan.md.
+
+HOW THE MODEL IS MADE NOW
+- art-source/bucky-3d-original.glb is the supplied model as it first arrived (from git).
+- tools/bucky-model.mjs rebuilds dist/3d/assets/bucky.glb from it, every step in code
+  (needs gltf-transform + sharp via npm i --no-save, like the Darren and Tormund tools).
+- tools/review/stretch.cjs takes STRETCH_SKIP (clip names to leave out of the count).
+
+PASS 2 · RIG AND SKIN
+- Shoulder, elbow, wrist, hip, knee and ankle joints moved onto the middle of each limb (the
+  supplied ones sat at the skin's edge) and the skin re-bound to them.
+- Softer blend between hips, thighs and belly, so falling and getting up no longer pull his
+  bottom into a sheet.
+- Both paws curled shut around a grip by a bend applied to the paw mesh.
+- Tried and dropped after measuring: re-skinning the tail and moving the tail joints. Both
+  made the stretch count worse; the tail fix is in the poses instead (pass 4).
+
+PASS 3 · MODEL AND LOOK
+- A real log mallet replaces the four boxes: a round log head with tree rings on both ends,
+  bark-grain sides, two dark iron bands with rivets and a grained handle, held in his left
+  paw. Markers in the model (mallet_neck, mallet_crown, mallet_grip, paw_grip_R) drive the
+  trail and the two-handed grip.
+- Soft shadowing baked into the vertex colours (under the chin, armpits, belly and thighs,
+  tail root) and smooth normals across texture seams.
+- Eyes, teeth, claws and mouth are a little glossier than his skin.
+- The four leftover supplied clips (Attack1-3, Jump) are gone; his fallback is Idle.
+- bucky.glb 1.80 MB -> 2.02 MB.
+
+PASS 4 · ANIMATION
+- Two-handed blows: anim.mjs gains a small two-bone reach (twoHands) that puts his free paw
+  on the handle for the guard stance, the jump attack, the big overheads and the start and
+  end of the spin, from the grip markers in the model.
+- His tail now counter-balances his body in every move (lifts as he leans forward, drops as
+  he leans back) within limits, instead of swinging the whole lower back.
+- The curled-up rolling dash that crushed him is replaced by a belly-first charge with the
+  mallet held across.
+- Hurt, landing, dodge, ground-smash and special poses keep the mallet head clear of his
+  face and belly; overhead swings arc over the top.
+- Stretch check (worst frame per bone, all clips): 5,712 before the pass, 4,827 after.
+
+PASS 5 · COMBAT FEEL AND EFFECTS
+- His landed blows get the impact star, snow burst and heavy-blow camera kick, plus a spray
+  of tumbling wood chips.
+- Ground smashes (moves with a shock ring) throw a low wave of snow out to the ring and dip
+  the camera.
+- The swing trail follows the real mallet head (mallet_neck to mallet_crown markers).
+
+TESTS
+- New tests/bucky-model.cjs (in npm test): joints, a real mallet (not boxes) in the left paw,
+  mallet markers, baked shading, no supplied clips, file size.
+- tests/three-d.mjs: new check that Bucky's hits and swings say who struck.
+
+APP
+- Desktop app version 1.5.0 (studio pass for Darren, Tormund and Bucky).
+
+WHAT STILL NEEDS AN ARTIST
+- The colour texture is still the supplied AI-made one; a hand-painted texture, sculpted
+  scales, real separate fingers (the fists are a bend, not a sculpt) and blinking eyes need
+  an artist and 3D tools that are not part of this project.
+- The tail is still skinned as supplied; big tail swings in the spin attack still pull at
+  his lower back a little. A proper fix is re-weighting by hand in a 3D package.
+- The mallet rides his paw bone (the rig has no weapon bone), and the two-handed grip is a
+  computed reach, so the free paw can slip slightly off the handle in fast blends.

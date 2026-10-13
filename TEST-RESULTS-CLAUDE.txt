@@ -1,3 +1,37 @@
+TEST RESULTS · CLAUDE UPDATE 10 (BUCKY STUDIO PASS · 3D ONLY) · 2026-10-13
+All runs below were made in a Linux container on branch claude/bucky-studio-pass-dwh7pf
+(which also carries updates 8 and 9), with headless Chromium using software WebGL
+(SwiftShader). Earlier results further down are history, not verification of this branch.
+
+npm test (node 22.22): all pass.
+  tests/three-d.mjs 46 checks (new: Bucky's mallet hits and swings say who struck), new
+  tests/bucky-model.cjs 7 checks, tests/tormund-model.cjs, tests/darren-model.cjs,
+  shared-save, gameplay, firewood, phone, controllers, screen-fit, tools/verify-scene.cjs
+  (a native Canvas stand-in, not a browser), desktop packaging + standalone.
+tests/browser-qa.cjs: 63 of 63. The log keeps the known harmless net::ERR_ABORTED lines for
+  streamed .glb files. (This container's Playwright looks for a browser build that is not
+  installed, so the run pointed it at the installed Chromium through a preload; the test file
+  is unchanged.)
+Extra browser play-through (project files qa/moves-qa.cjs): 16 of 16, every hero's string,
+  charge and special, the Polka Scarf, Tormund's parry, 8 fps stability, style in the save.
+Bucky review sheets (tools/review): turnarounds, skin-weight views, stretch views and six
+  frames of each of his clips were rendered and looked at after each pass; in-game shots
+  checked his look, the mallet trail, wood chips, snow and impact stars.
+Stretch check (tools/review/stretch.cjs, worst frame per bone, edges past 1.6x or under
+  0.5x, all clips): 5,712 for the original model and clips, 4,827 after the pass. Tail
+  re-skinning and moved tail joints measured worse (up to 6,372) and were dropped.
+tests/desktop-app.cjs under xvfb-run: 13 of 13 from the checkout.
+Windows build: npm run build:win produced the 1.5.0 x64 zip; its resources/game is
+  identical to dist/. Copied to project files desktop-app/Darren-Snowday-Windows.zip.
+Pixel game: no file under dist/ outside dist/3d/ changed. Darren's and Tormund's models are
+  unchanged by this update; the shared two-hand code in anim.mjs only acts on a model that
+  carries the mallet grip markers (Bucky's).
+
+LIMITS
+- Not run on a real Windows PC, real GPU, physical controller, phone or Mac. How the new
+  effects look on a real graphics card and how they affect frame rate were not measured.
+- The look was judged from renders against the design sheet, not by an artist.
+
 TEST RESULTS · CLAUDE UPDATE 9 (TORMUND STUDIO PASS · 3D ONLY) · 2026-10-13
 All runs below were made in a Linux container on branch claude/tormund-studio-pass-noquuq
 (which also carries update 8), with headless Chromium using software WebGL (SwiftShader).
