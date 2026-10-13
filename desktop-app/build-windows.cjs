@@ -58,7 +58,6 @@ function move(from, to) {
         /^\/build-windows\.cjs$/,
         /^\/icon\.ico$/,
         /^\/README/,
-        /^\/update-config\.json$/,
         /^\/update-token\.txt$/,
       ],
       icon: path.join(here, 'icon.ico'),
@@ -77,6 +76,13 @@ function move(from, to) {
     fs.cpSync(path.join(here, '..', 'dist'), path.join(dest, 'resources', 'game'), {
       recursive: true,
     });
+    // Its manifest (build number and every file's checksum) lets the updater tell what is new
+    // and download only the files that changed.
+    const { gameManifest } = require('../tools/publish-game-update.cjs');
+    fs.writeFileSync(
+      path.join(dest, 'resources', 'game-manifest.json'),
+      JSON.stringify(gameManifest(path.join(dest, 'resources', 'game')))
+    );
     fs.writeFileSync(
       path.join(dest, 'HOW-TO-PLAY.txt'),
       [
@@ -94,10 +100,13 @@ function move(from, to) {
         'opens the pixel game, Ctrl+2 the game chooser, F11 is full screen. Controllers,',
         'keyboard and mouse work as in the browser versions.',
         '',
-        'This standalone app always plays the game included in this folder.',
-        'It never checks for or downloads updates, and no GitHub key is needed.',
-        'For a future version, close this app, extract the new ZIP to a new folder,',
-        'and launch the new EXE. Do not delete your save folder.',
+        'UPDATES: the app checks for a newer game when it starts and every hour after.',
+        'When one is out, the title screen and main menu say so. Open Update in the',
+        'main menu and press Update now: only the changed files download, then the game',
+        'restarts on the title screen with your saves kept. Game > Check for updates',
+        'in the menu bar does the same. If a new version of the app itself is out, the',
+        'Update page has a Get the new app button: extract that ZIP to a new folder and',
+        'run its EXE. No GitHub account or key is needed. Do not delete your save folder.',
         '',
         "Saves live in %APPDATA%\\Darren's Snowday Search (Test > Open save folder).",
         'They are separate from saves made in a web browser.',

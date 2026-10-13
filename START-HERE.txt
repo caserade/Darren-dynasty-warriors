@@ -22,10 +22,14 @@ signed: click "More info", then "Run anyway". Saves made in the app are kept in
 The app is built from desktop-app/ (see desktop-app/README.md). A fresh copy of the
 project from GitHub does not include the ZIP: build it there with npm install and
 npm run build:win, or use the copy kept with the project files.
-Versions 1.2.0 and later are standalone: the app never checks for or downloads game updates and
-needs no GitHub key. For a later version, close the old app, extract the new ZIP
-into a new folder and launch its EXE. Keep the same save folder; old downloaded
-game caches are ignored and left untouched.
+UPDATES (app 1.9.0 and later): the app checks GitHub for a newer game when it starts
+and every hour. When one is out, the title screen and main menu say so; open Update
+in the main menu and press Update now. Only the changed files download, then the
+game restarts on the title screen with your saves kept. Game > Check for updates in
+the menu bar does the same. When a new version of the app itself is out, the Update
+page has Get the new app: extract that ZIP into a new folder and run its EXE. No
+GitHub account or key is needed (the repository is public). Versions 1.2.0 to 1.8.0
+never update: replace them once with 1.9.0 or later.
 
 PLAY LOCALLY
 Double-click PLAY-3D.cmd for the 3D exploration game, or PLAY-PIXEL.cmd for the

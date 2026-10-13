@@ -1,0 +1,56 @@
+# Publishes updates for the Windows app (Claude update 14). On every push to main:
+# 1. If desktop-app/package.json has a version with no release yet, builds the Windows app and
+#    publishes it as the release app-v<version> (the app tells the player a new launcher is out).
+# 2. Rebuilds the public game-updates branch (one commit, replaced each time) with latest.json
+#    and game/. The app checks that branch and downloads only the files that changed.
+# Needs the repository to be public: the app reads it without any key.
+name: Publish game update
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-game-update
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Release the app if its version is new
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./desktop-app/package.json').version")
+          if gh release view "app-v$VERSION" >/dev/null 2>&1; then
+            echo "app-v$VERSION is already released"
+            exit 0
+          fi
+          cd desktop-app
+          npm ci --no-audit --no-fund
+          npm run build:win
+          gh release create "app-v$VERSION" out/Darren-Snowday-Windows.zip \
+            --title "Darren's Snowday Search for Windows $VERSION" \
+            --notes "Download Darren-Snowday-Windows.zip below, extract it to a new folder and run Darren Snowday.exe. Your saves carry over. Windows may warn the first time because the app is unsigned: click More info, then Run anyway."
+      - name: Build the game update
+        run: node tools/publish-game-update.cjs "$RUNNER_TEMP/update"
+      - name: Replace the game-updates branch
+        working-directory: ${{ runner.temp }}/update
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git init -q -b game-updates
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "Game update from ${GITHUB_SHA::7}"
+          git push -f "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" game-updates

@@ -4,7 +4,7 @@ const path = require('node:path');
 
 function assertBuildEnvironment(env = process.env) {
   if (env.SNOWDAY_UPDATE_TOKEN)
-    throw new Error('Packaging refused: remove SNOWDAY_UPDATE_TOKEN from the build environment. This standalone app does not use update credentials.');
+    throw new Error('Packaging refused: remove SNOWDAY_UPDATE_TOKEN from the build environment. The updater reads a public repo and uses no credentials.');
 }
 
 function assertSafeTree(root, { skip = () => false } = {}) {
@@ -20,8 +20,10 @@ function assertSafeTree(root, { skip = () => false } = {}) {
         throw new Error('Packaging refused: credential-like file or directory; remove it from the input tree');
       if (item.isDirectory()) { visit(file, relative); continue; }
       if (!item.isFile()) throw new Error('Packaging refused: unsupported file type');
-      if (/^(?:update-config\.json|updater\.cjs|update-settings\.cjs|game-manifest\.json)$/i.test(name))
-        throw new Error('Packaging refused: obsolete update settings or code must not be distributed');
+      // The updater reads a public repo and needs no settings file or key, so a settings file
+      // (where a key could hide) is never shipped.
+      if (/^(?:update-config\.json|update-settings\.cjs)$/i.test(name))
+        throw new Error('Packaging refused: obsolete update settings must not be distributed');
       const bytes = fs.readFileSync(file);
       const content = bytes.toString('utf8');
       if (/(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----)/.test(content))
@@ -32,7 +34,16 @@ function assertSafeTree(root, { skip = () => false } = {}) {
 }
 
 // Exact runtime inputs: stray files (including editor backups) never enter app.asar.
-const APP_FILES = ['package.json', 'main.cjs', 'home/index.html', 'home/icon.png', 'home/darren.jpg'];
+const APP_FILES = [
+  'package.json',
+  'main.cjs',
+  'preload.cjs',
+  'updater.cjs',
+  'game-manifest.cjs',
+  'home/index.html',
+  'home/icon.png',
+  'home/darren.jpg',
+];
 function stageApp(source, dest) {
   assertSafeTree(source, { skip: (rel) => /^(?:node_modules|out)(?:\/|$)/.test(rel) });
   fs.mkdirSync(dest, { recursive: true });

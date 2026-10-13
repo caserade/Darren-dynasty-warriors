@@ -13,12 +13,30 @@ const packaged = process.argv[2];
 const out = path.join(__dirname, '..', 'qa-screenshots') + path.sep;
 fs.mkdirSync(out, { recursive: true });
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'snowday-desktop-'));
+// A local web folder plays the part of the game-updates branch on GitHub. It is empty (nothing
+// published) until the update checks at the end publish a newer game into it.
+const http = require('node:http');
+const { buildManifest } = require('../desktop-app/game-manifest.cjs');
+const updDir = fs.mkdtempSync(path.join(os.tmpdir(), 'snowday-updsrv-'));
+let updRequests = [];
+const updServer = http.createServer((req, res) => {
+  const rel = decodeURIComponent(req.url.split('?')[0]);
+  updRequests.push(rel);
+  const file = path.join(updDir, rel);
+  if (!file.startsWith(updDir + path.sep) || !fs.existsSync(file)) {
+    res.writeHead(404);
+    return res.end();
+  }
+  res.writeHead(200);
+  res.end(fs.readFileSync(file));
+});
 let fails = 0;
 function rec(check, ok, note = '') {
   if (!ok) fails++;
   console.log(ok ? 'PASS' : 'FAIL', 'desktop ·', check, note);
 }
 async function launch(env = {}) {
+  env = { SNOWDAY_UPDATE_URL: 'http://127.0.0.1:' + updServer.address().port, ...env };
   const args = ['--no-sandbox', '--user-data-dir=' + profile, '--ignore-gpu-blocklist'];
   const app = await electron.launch(
     packaged
@@ -42,6 +60,7 @@ async function launch(env = {}) {
 }
 const tag = packaged ? 'packaged' : 'checkout';
 (async () => {
+  await new Promise((r) => updServer.listen(0, '127.0.0.1', r));
   let { app, p, log } = await launch();
   rec('opens on the 3D title screen', p.url() === 'snowday://game/3d/', p.url());
   await p.waitForFunction(() => !document.querySelector('#fx-start').disabled, null, {
@@ -152,6 +171,114 @@ const tag = packaged ? 'packaged' : 'checkout';
     (await p.evaluate(() => localStorage.getItem('desktop-test-marker'))) === 'kept'
   );
   await app.close();
+
+  // ---- Updates: a newer game is published, the menus say so, Update installs it ----
+  const game = path.join(updDir, 'game');
+  fs.cpSync(path.join(appDir, '..', 'dist'), game, { recursive: true });
+  const html = path.join(game, '3d', 'index.html');
+  fs.writeFileSync(
+    html,
+    fs
+      .readFileSync(html, 'utf8')
+      .replace('<head>', '<head>\n    <meta name="snowday-test" content="updated-game" />')
+  );
+  fs.writeFileSync(
+    path.join(updDir, 'latest.json'),
+    JSON.stringify({
+      ...buildManifest(game, { build: 4000000000, notes: 'Test update from the desktop check' }),
+      minApp: '1.9.0',
+      app: {
+        version: '9.9.9',
+        url: 'https://github.com/caserade/darren-dynasty-warriors/releases',
+      },
+    })
+  );
+  ({ app, p, log } = await launch());
+  await p.waitForFunction(() => !document.querySelector('#fx-start').disabled, null, {
+    timeout: 240000,
+  });
+  await p.waitForSelector('#fx-upd-note:not([hidden])', { timeout: 20000 }).catch(() => {});
+  rec(
+    'title screen says a new update is available',
+    /update available/i.test((await p.textContent('#fx-upd-note').catch(() => '')) || '') &&
+      (await p.isVisible('#fx-upd-note'))
+  );
+  rec(
+    'window title says so too',
+    /update available/.test(
+      await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getTitle())
+    )
+  );
+  await p.screenshot({ path: out + `desktop-04-update-notice-${tag}.png` });
+  await p.click('#fx-start');
+  await p.waitForTimeout(500);
+  rec(
+    'main menu has Update marked NEW',
+    await p.evaluate(() => {
+      const b = document.querySelector('#fx-main-list [data-go="update"]');
+      return !!b && b.classList.contains('fx-upd-new') && /ready to install/.test(b.textContent);
+    })
+  );
+  await p.screenshot({ path: out + `desktop-05-update-menu-${tag}.png` });
+  await p.click('#fx-main-list [data-go="update"]');
+  await p.waitForSelector('#fx-upd-actions [data-act="install"]', { timeout: 15000 });
+  rec(
+    'Update page explains the update',
+    /A new update is ready/.test(await p.textContent('#fx-upd-head')) &&
+      /Test update from the desktop check/.test(await p.textContent('#fx-upd-text'))
+  );
+  rec(
+    'Update page offers the new app as well',
+    await p.isVisible('#fx-upd-actions [data-act="app"]')
+  );
+  rec(
+    'Update now has focus, ready for Enter or the A button',
+    await p.evaluate(() => document.activeElement?.dataset.act === 'install')
+  );
+  await p.waitForTimeout(700); // let the scroll finish unrolling
+  await p.screenshot({ path: out + `desktop-06-update-page-${tag}.png` });
+  updRequests = [];
+  await Promise.all([
+    p.waitForNavigation({ timeout: 60000 }),
+    p.click('#fx-upd-actions [data-act="install"]'),
+  ]);
+  await p.waitForLoadState('load');
+  rec(
+    'only the changed file was downloaded',
+    updRequests.filter((u) => u.startsWith('/game/')).join() === '/game/3d/index.html',
+    updRequests.join(' ')
+  );
+  rec(
+    'the game restarts as the new version',
+    (await p.evaluate(() => document.querySelector('meta[name="snowday-test"]')?.content)) ===
+      'updated-game'
+  );
+  await p.waitForFunction(() => !document.querySelector('#fx-start').disabled, null, {
+    timeout: 240000,
+  });
+  await p.waitForSelector('#fx-upd-note:not([hidden])', { timeout: 10000 }).catch(() => {});
+  rec(
+    'title screen says the game was updated',
+    /Updated to the newest version/.test(await p.textContent('#fx-upd-note'))
+  );
+  rec(
+    'saves are kept through the update',
+    (await p.evaluate(() => localStorage.getItem('desktop-test-marker'))) === 'kept'
+  );
+  await p.screenshot({ path: out + `desktop-07-updated-${tag}.png` });
+  const real2 = log.filter((l) => !/^\[reqfail\] \S+\.glb net::ERR_ABORTED$/.test(l));
+  rec('no page errors during the update', real2.length === 0, real2.slice(0, 5).join(' | '));
+  await app.close();
+
+  ({ app, p, log } = await launch());
+  rec(
+    'after reopening the app the new version is still used',
+    (await p.evaluate(() => document.querySelector('meta[name="snowday-test"]')?.content)) ===
+      'updated-game'
+  );
+  await app.close();
+  updServer.close();
+  fs.rmSync(updDir, { recursive: true, force: true });
 
   fs.rmSync(profile, { recursive: true, force: true });
   console.log(fails ? fails + ' failed' : 'all desktop checks passed');
