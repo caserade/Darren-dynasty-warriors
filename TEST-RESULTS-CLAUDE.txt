@@ -1,3 +1,37 @@
+TEST RESULTS · CLAUDE UPDATE 14 (WINDOWS APP UPDATES ITSELF FROM GITHUB) · 2026-10-13
+All runs below were made in a Linux container on branch claude/launcher-updates-ekmrfu (main
+after PR #12), with headless Chromium using software WebGL (SwiftShader). GitHub itself was not
+used: a local web folder played the part of the public game-updates branch. Earlier results
+further down are history, not verification of this branch.
+
+npm test (node 22.22): all pass, including the new tests/desktop-update.cjs (41 checks: newer
+  game offered, not downloaded, until Update; only changed files download; checksums; unsafe
+  file names; offline; a game needing a newer app; new app announced only with an https
+  GitHub link; same game published again not offered; a finished download used from the next
+  start; damaged downloads fall back to the bundled game; the old game-updates folder ignored)
+  and the rewritten tests/desktop-standalone.cjs (main.cjs with a stand-in Electron: the
+  public raw.githubusercontent.com address with no key, update calls refused from pages
+  outside the game). tools/verify-scene.cjs is a native Canvas stand-in, not a browser.
+tests/desktop-app.cjs under xvfb-run: 26 of 26 from the checkout and 26 of 26 against a packaged
+  Linux build of the same app (DESKTOP_PLATFORM=linux). New checks: the title screen and window
+  title say an update is available, the main menu's Update item is marked NEW, the Update page
+  explains it and offers the new app, Update now downloads only the changed file, the game
+  restarts as the new version and says so, saves are kept, the new version is still used after
+  reopening the app. Screenshots qa-screenshots/desktop-04..07 (not committed).
+tests/browser-qa.cjs: 64 of 64 (server: node desktop-server.cjs). The browser game shows no
+  Update item.
+Windows build: npm run build:win produced the 1.9.0 x64 zip; its resources/game is identical
+  to dist/ and resources/game-manifest.json lists all 53 files. Copied to project files
+  desktop-app/Darren-Snowday-Windows.zip. (The first build attempt stopped on the known stream
+  error while preparing Electron; running it again worked.)
+
+LIMITS
+- Not run on a real Windows PC. The real GitHub path (workflow, game-updates branch, release
+  build, raw.githubusercontent.com) cannot work until the repository is public and this is
+  merged; it was not exercised here.
+- raw.githubusercontent.com may serve a copy up to a few minutes old right after a publish;
+  the app then says the update did not finish and to try again in a few minutes.
+
 TEST RESULTS · CLAUDE UPDATE 13 (DYNASTY-STYLE MENUS · 3D FRONT END) · 2026-10-13
 All runs below were made in a Linux container on branch claude/dynasty-menus-ng1nvh (main after
 PR #11, which carried PR #10, was merged), with headless Chromium using software WebGL

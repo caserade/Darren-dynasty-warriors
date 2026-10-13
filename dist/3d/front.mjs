@@ -89,6 +89,7 @@ export function createFront(api) {
     );
     help.innerHTML = touch() ? '' : HELP[name] || HELP.default;
     $('fx-back').hidden = name === 'title' || name === 'results';
+    updNotice();
     camera();
   }
   const HELP = {
@@ -121,6 +122,186 @@ export function createFront(api) {
     );
     b.onpointermove = (e) => hover(b, e);
     return b;
+  }
+
+  // ---- Updates (Windows app only, Claude update 14) ----
+  // The app checks GitHub when it starts and every hour; window.snowdayDesktop (preload.cjs)
+  // passes its status here. The notice on the title screen and main menu says when a new game
+  // or a new app is out; the Update page downloads it and the app restarts on the title screen.
+  const desk = window.snowdayDesktop?.updates || null;
+  let upd = null,
+    updState = '',
+    welcome = '';
+  const MB = (b) =>
+    (b < 1048576
+      ? Math.max(0.1, b / 1048576).toFixed(1)
+      : (b / 1048576).toFixed(b < 10485760 ? 1 : 0)) + ' MB';
+  function when(build) {
+    if (!build || build < 1e9) return 'the version that came with the app';
+    return new Date(build * 1000).toLocaleString(undefined, {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }
+  const updWanted = () =>
+    !!upd && (['available', 'ready', 'needs-app'].includes(upd.state) || !!upd.app);
+  function updLine() {
+    if (!upd) return '';
+    if (upd.state === 'available') return 'New version ready to install';
+    if (upd.state === 'downloading') return 'Downloading… ' + Math.round(upd.progress * 100) + '%';
+    if (upd.state === 'ready') return 'Downloaded · restart to play it';
+    if (upd.state === 'needs-app' || upd.app) return 'A new version of the app is out';
+    if (upd.state === 'current') return 'Your game is up to date';
+    if (upd.state === 'checking') return 'Checking…';
+    return '';
+  }
+  function updNotice() {
+    const note = $('fx-upd-note');
+    const onMenu = page === 'title' || page === 'main';
+    let text = '';
+    if (welcome) text = welcome;
+    else if (upd?.state === 'available')
+      text = 'New update available · open Update in the main menu';
+    else if (upd?.state === 'ready') text = 'Update downloaded · open Update to restart with it';
+    else if (upd?.state === 'needs-app' || upd?.app)
+      text = 'A new version of the app is out · see Update';
+    note.hidden = !desk || !onMenu || !text;
+    note.textContent = text;
+    note.classList.toggle('fx-upd-done', !!welcome);
+  }
+  $('fx-upd-note').onclick = () => {
+    if (welcome) {
+      welcome = '';
+      return updNotice();
+    }
+    if (page === 'title') enterMain();
+    if (page === 'main') show('update', '[data-act="install"]');
+  };
+  function renderUpdate(fresh) {
+    const s = upd || { state: 'checking', game: {}, progress: 0 };
+    const head = $('fx-upd-head'),
+      text = $('fx-upd-text'),
+      bar = $('fx-upd-bar'),
+      box = $('fx-upd-actions');
+    const o = s.offer;
+    const heads = {
+      checking: ['Checking for updates…', 'Looking on GitHub for a newer version of the game.'],
+      current: [
+        'Your game is up to date',
+        'You have the newest version. The app checks again every hour, and this screen tells you when something new is out.',
+      ],
+      available: [
+        'A new update is ready',
+        o
+          ? `${o.notes || 'Fixes and improvements'}. Download size ${MB(o.downloadBytes)}. Your saves and settings are kept, and the game restarts on the title screen.`
+          : '',
+      ],
+      downloading: [
+        'Downloading the update…',
+        'Only the files that changed are downloaded. Please keep the app open.',
+      ],
+      ready: [
+        'Update downloaded',
+        'The game restarts on the title screen to use the new version. Your saves are kept.',
+      ],
+      'needs-app': [
+        'A new app is needed',
+        'The newest game needs the new version of the app. Get the new app, extract it to a new folder and run it. Your saves carry over.',
+      ],
+      offline: [
+        'Could not check for updates',
+        s.message || 'Check the internet connection and try again.',
+      ],
+      error: [
+        'The update did not finish',
+        s.message || 'Your current game was kept. Try again in a few minutes.',
+      ],
+      off: ['Updates are off', s.message || 'This copy does not check for updates.'],
+      idle: ['Checking for updates…', ''],
+    };
+    const [title, body] = heads[s.state] || heads.idle;
+    head.textContent = title;
+    text.textContent = body;
+    bar.hidden = s.state !== 'downloading' && s.state !== 'ready';
+    bar.firstElementChild.style.width =
+      Math.round((s.state === 'ready' ? 1 : s.progress) * 100) + '%';
+    $('fx-upd-have').textContent =
+      when(s.game?.build) +
+      (s.game?.notes ? ' · ' + s.game.notes : '') +
+      (s.appVersion ? ` · app ${s.appVersion}` : '');
+    const newText = o
+      ? when(o.build) + (o.notes ? ' · ' + o.notes : '')
+      : s.app
+        ? `New app ${s.app.version}`
+        : '';
+    $('fx-upd-new').textContent = newText;
+    $('fx-upd-new').hidden = $('fx-upd-new-label').hidden = !newText;
+    // Buttons are rebuilt only when the state changes, so progress never steals focus.
+    if (!fresh && s.state === updState && !(s.app && !box.querySelector('[data-act="app"]')))
+      return;
+    updState = s.state;
+    const had = document.activeElement?.dataset?.act;
+    const acts = [];
+    const act = (id, label, fn, cls = '') => {
+      const b = item(label, { 'data-act': id, class: cls });
+      b.onclick = fn;
+      acts.push(b);
+    };
+    if (s.state === 'available')
+      act(
+        'install',
+        'Update now',
+        () => {
+          api.tone(523, 0.2, 0.05);
+          desk.install();
+        },
+        'fx-go'
+      );
+    if (s.app || s.state === 'needs-app')
+      act(
+        'app',
+        `Get the new app${s.app ? ' (' + s.app.version + ')' : ''}`,
+        () => desk.getApp(),
+        s.state === 'available' ? '' : 'fx-go'
+      );
+    if (['current', 'offline', 'error', 'needs-app'].includes(s.state))
+      act('check', 'Check again', () => desk.check());
+    if (s.state === 'ready') act('restart', 'Restart now', () => location.reload(), 'fx-go');
+    if (s.state !== 'downloading') act('back', 'Back', () => show('main', '[data-go="update"]'));
+    box.replaceChildren(...acts);
+    if (page === 'update') focusItem(box.querySelector(`[data-act="${had}"]`) || acts[0]);
+  }
+  function updateChanged() {
+    if (page === 'update') renderUpdate(false);
+    if (page === 'main') {
+      const b = pages.main.querySelector('[data-go="update"]');
+      if (b) {
+        b.querySelector('.fx-upd-sub').textContent = updLine();
+        b.classList.toggle('fx-upd-new', updWanted());
+      }
+    }
+    updNotice();
+  }
+  if (desk) {
+    desk.onStatus((s) => {
+      upd = s;
+      updateChanged();
+    });
+    desk.status().then((s) => {
+      upd = upd || s;
+      if (s.justUpdated) {
+        welcome = 'Updated to the newest version' + (s.game?.notes ? ' · ' + s.game.notes : '');
+        desk.seen();
+        setTimeout(() => {
+          welcome = '';
+          updNotice();
+        }, 12000);
+      }
+      updateChanged();
+    });
   }
 
   const builders = {
@@ -180,6 +361,15 @@ export function createFront(api) {
       add('options', 'Options', 'Sound, difficulty, picture detail and controller buttons.', () =>
         show('options')
       );
+      // Only the Windows app can update itself; the browser versions show no Update item.
+      if (desk)
+        add(
+          'update',
+          h('span', {}, 'Update', h('small', { class: 'fx-upd-sub', text: updLine() })),
+          'Check for a newer version of the game and install it. Your saves are kept.',
+          () => show('update', '[data-act="install"]'),
+          updWanted() ? 'fx-upd-new' : ''
+        );
       add(
         'pixel',
         'Pixel Adventure',
@@ -323,6 +513,12 @@ export function createFront(api) {
       const back = item('Back');
       back.onclick = () => show('main', '[data-go="options"]');
       box.append(erase, back);
+    },
+    update() {
+      renderUpdate(true);
+      // Opening the page always asks again, unless a check or download is already running.
+      if (!upd || !['checking', 'downloading', 'ready', 'available'].includes(upd.state))
+        desk.check();
     },
     brief() {
       const b = BATTLES[flow.battle],
@@ -633,7 +829,10 @@ export function createFront(api) {
     else if (page === 'heroes')
       heroFrom === 'story' ? show('story', flow.battle) : show('main', '[data-go="heroes"]');
     else if (page === 'options') show('main', '[data-go="options"]');
-    else if (page === 'brief') show('heroes', flow.hero);
+    else if (page === 'update') {
+      if (upd?.state === 'downloading') return nope();
+      show('main', '[data-go="update"]');
+    } else if (page === 'brief') show('heroes', flow.hero);
   }
   function enterMain() {
     if (!ready) return;

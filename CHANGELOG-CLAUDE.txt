@@ -783,3 +783,48 @@ CODE
   menus, battle start/leave, replays. sim.mjs: Game.reload(save) swaps in another save.
 - New tests/story-select.mjs (8 checks) is part of npm test. tests/browser-qa.cjs and
   tests/desktop-app.cjs now enter the game through the title screen.
+
+CLAUDE UPDATE 14 · WINDOWS APP UPDATES ITSELF FROM GITHUB · 2026-10-13
+michael asked for the Windows app to update itself to the newest game: an Update button inside
+the game, and a notice when an update is out. He chose to make the GitHub repository public so
+the app can read updates with no key. This replaces the 2026-10-12 decision to have no updater.
+Built on main after PR #12. Parts of the never-merged PR #3 updater were reused.
+
+WHAT THE PLAYER SEES (Windows app 1.9.0)
+- A few seconds after the app starts, and every hour, it checks GitHub for a newer game.
+- When one is out: a red notice on the title screen and main menu ("New update available"),
+  the main menu's new Update item is marked NEW, and the window title says "update available".
+- Update page (a scroll like the battle briefing): what is new, the download size, the date of
+  your game and of the new one, and Update now. Update now downloads only the files that
+  changed, checks every one, then restarts the game on the title screen, which then says
+  "Updated to the newest version". Saves and settings are kept.
+- Up to date, offline or failed downloads each say so plainly with Check again; a failed
+  download keeps the current game. Game > Check for updates in the menu bar does the same as the
+  Update page (and asks before restarting, so a battle is never cut off without asking).
+- New launcher: when a newer app version is released, the Update page shows Get the new app,
+  which opens its GitHub release page to download the new ZIP. The app itself is still
+  replaced by hand (extract to a new folder); saves carry over.
+- Test > Use the game that came with the app removes downloaded games.
+- The browser versions of the game are unchanged: they have no Update item.
+
+HOW IT WORKS
+- .github/workflows/publish-game-update.yml runs on every push to main: it releases the Windows
+  app as app-v<version> when desktop-app/package.json has a new version, then rebuilds the
+  game-updates branch with latest.json and game/ (tools/publish-game-update.cjs).
+- desktop-app/updater.cjs reads that branch from raw.githubusercontent.com with no key, keeps
+  downloaded games in updates/b<build>/ in the save folder, and never touches resources/game.
+  The old PR #3 folder game-updates/ is ignored. A download is switched in only when a new page
+  of the game starts, so one page never mixes old and new files.
+- desktop-app/preload.cjs gives the game pages window.snowdayDesktop.updates; main.cjs refuses
+  those calls from anything outside snowday://game/. No Node access for the pages.
+- dist/3d/front.mjs, index.html, style.css: the Update item, page and notice.
+- The build writes resources/game-manifest.json. Packaging still refuses credential-like files,
+  tokens and update settings files; the updater files are now part of the app.
+- New tests/desktop-update.cjs (40 checks) is part of npm test; tests/desktop-standalone.cjs was
+  rewritten for the updater (public source, no key, calls refused outside the game);
+  tests/desktop-app.cjs now also runs a full update through the in-game Update page.
+
+NEEDS MICHAEL
+- The repository must be public before the app can see updates (Settings > Danger Zone >
+  Change visibility). Until then the Update page says no updates have been published.
+- Apps 1.8.0 and older have no updater: install 1.9.0 once by hand.
