@@ -38,7 +38,7 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 function resolveFile(pathname) {
-  // /__desktop/ is the app's own start page; everything else is the game's dist/ folder.
+  // /__desktop/ is the app's own game chooser page; everything else is the game's dist/ folder.
   const desktop = pathname === '/__desktop' || pathname.startsWith('/__desktop/');
   const root = desktop ? homeRoot : bundledRoot;
   const rel = desktop ? pathname.slice('/__desktop'.length) : pathname;
@@ -93,9 +93,9 @@ function buildMenu() {
       {
         label: 'Game',
         submenu: [
-          { label: 'Choose a game', accelerator: 'CmdOrCtrl+H', click: () => go('/__desktop/') },
+          { label: 'Title screen', accelerator: 'CmdOrCtrl+H', click: () => go('/3d/') },
           { label: 'Pixel adventure', accelerator: 'CmdOrCtrl+1', click: () => go('/') },
-          { label: '3D adventure', accelerator: 'CmdOrCtrl+2', click: () => go('/3d/') },
+          { label: 'Choose a game', accelerator: 'CmdOrCtrl+2', click: () => go('/__desktop/') },
           { type: 'separator' },
           { role: 'quit', label: 'Quit' },
         ],
@@ -151,7 +151,8 @@ function createWindow() {
     if (/^https?:/i.test(url)) shell.openExternal(url);
   });
   win.on('closed', () => (win = null));
-  go('/__desktop/');
+  // The 3D game's title screen is the front door; its main menu also opens the pixel game.
+  go('/3d/');
 }
 
 // One copy at a time: two copies would write the same saves.

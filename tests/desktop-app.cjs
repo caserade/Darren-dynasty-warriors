@@ -43,7 +43,13 @@ async function launch(env = {}) {
 const tag = packaged ? 'packaged' : 'checkout';
 (async () => {
   let { app, p, log } = await launch();
-  rec('opens on the game chooser', p.url() === 'snowday://game/__desktop/', p.url());
+  rec('opens on the 3D title screen', p.url() === 'snowday://game/3d/', p.url());
+  await p.waitForFunction(() => !document.querySelector('#fx-start').disabled, null, {
+    timeout: 240000,
+  });
+  rec('title screen shows Press Start', await p.isVisible('#fx-start'));
+  await p.screenshot({ path: out + `desktop-00-title-${tag}.png` });
+  await p.goto('snowday://game/__desktop/');
   rec(
     'chooser art loads',
     await p.evaluate(() => document.querySelector('img.hero').naturalWidth > 0)
@@ -76,8 +82,17 @@ const tag = packaged ? 'packaged' : 'checkout';
     'both games share one save storage',
     (await p.evaluate(() => localStorage.getItem('desktop-test-marker'))) === 'kept'
   );
-  await p.click('#play');
+  // Title screen, Story Mode, the next battle, hero select, briefing.
+  for (const sel of [
+    '#fx-start',
+    '#fx-main-list [data-go="story"]',
+    '.fx-battle:has(.fx-chip.next)',
+    '#fx-hero-opts .fx-go',
+    '#fx-begin',
+  ])
+    await p.click(sel);
   await p.waitForTimeout(4000);
+  rec('a story battle starts from the menus', await p.evaluate(() => !snowdayTest.game.paused));
   await p.screenshot({ path: out + `desktop-03-3d-${tag}.png` });
 
   // Leaving to the open web is refused inside the window.

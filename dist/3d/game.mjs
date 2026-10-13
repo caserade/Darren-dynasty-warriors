@@ -6,6 +6,7 @@ import { buildClips } from './clips.mjs';
 import { ScarfRibbon } from './ribbon.mjs';
 import { WeaponTrail } from './trail.mjs';
 import { addMetalShine } from './look.mjs';
+import { createFront } from './front.mjs';
 
 const $ = (id) => document.getElementById(id),
   canvas = $('view'),
@@ -30,7 +31,12 @@ let cameraYaw = 0,
   toastTime = 0,
   dialogOpen = false,
   padPrevious = [],
-  padPresent = false;
+  padPresent = false,
+  // Front end (title, menus, story select): the camera framing it, and whether the running battle
+  // is a Free Mode replay (replays never write the story save).
+  showcase = null,
+  replay = false,
+  frontPad = false;
 const heroes = [],
   rings = [],
   projectiles = [],
@@ -67,7 +73,15 @@ function toast(message) {
   $('toast').classList.add('visible');
   toastTime = 3.5;
 }
+function readStored() {
+  try {
+    return JSON.parse(localStorage.getItem(SAVE) || 'null');
+  } catch {
+    return null;
+  }
+}
 function save() {
+  if (replay || !game) return;
   try {
     localStorage.setItem(SAVE, JSON.stringify(game.save()));
   } catch {
@@ -84,23 +98,29 @@ function clearInput() {
   cameraDrag.id = null;
   game?.cancelCharge();
 }
+// The controller-button settings live in the pause menu, and the front end's Options page borrows them.
+const padSettings = $('pad-settings'),
+  padHome = padSettings.nextElementSibling;
 function pause() {
-  if (!ready || defeatOpen) return;
+  if (!ready || defeatOpen || front.open) return;
   clearInput();
   game.setPause(true);
+  padHome.before(padSettings);
+  padSettings.querySelector('summary').classList.remove('fx-item');
   $('menu').hidden = false;
-  $('play').textContent = 'Continue adventure';
-  $('return-home').hidden = false;
-  updateChapterButton();
-  $('menu-copy').textContent =
-    game.quest.chapter === 'firewood'
+  $('play').textContent = 'Continue battle';
+  $('return-home').hidden = replay;
+  $('to-story').textContent = replay ? 'Leave battle' : 'Story select';
+  $('menu-copy').textContent = replay
+    ? 'Free Mode replay: nothing here changes your story.'
+    : game.quest.chapter === 'firewood'
       ? 'Clear the trail, gather six bundles and carry them home to Mom.'
       : 'Follow the golden marker, beat the camp bosses, and bring Ruffy home.';
   $('mode').value = game.mode;
   save();
 }
 function resume() {
-  if (!ready || defeatOpen) return;
+  if (!ready || defeatOpen || front.open) return;
   unlockAudio();
   clearInput();
   game.setPause(false);
@@ -122,30 +142,9 @@ $('return-home').onclick = () => {
   resume();
   toast('Back at the cottage. Your quest progress is saved.');
 };
-// Firewood for Mom opens once Ruffy is home in this game or in the pixel game.
-// Starting it early leaves the rescue unfinished, so the button then offers the way back.
-function rescueDoneElsewhere() {
-  return !!shared?.story().pixel.rescued;
-}
-function updateChapterButton() {
-  const q = game.quest,
-    back = q.chapter === 'firewood' && !q.home;
-  $('firewood').textContent = back ? 'Back to Ruffy’s rescue' : 'Firewood for Mom';
-  $('firewood').disabled = !(back || q.home || rescueDoneElsewhere());
-}
-$('firewood').onclick = () => {
-  const q = game.quest;
-  if (q.chapter === 'firewood' && !q.home) {
-    game.chapter('rescue');
-    resume();
-    toast('Back to Ruffy’s rescue · follow the golden marker.');
-    return;
-  }
-  if (!q.home && !rescueDoneElsewhere()) return;
-  game.chapter('firewood');
-  resume();
-  toast('Firewood for Mom · follow the golden marker.');
-};
+// Leaving a battle from the pause menu goes back to the front end's story select or title.
+$('to-story').onclick = () => front.leave('story');
+$('to-title').onclick = () => front.leave('title');
 $('dialogue-close').onclick = closeDialogue;
 $('sound').onchange = () => {
   sound = $('sound').checked;
@@ -198,6 +197,11 @@ const gameKeys = [
   'Escape',
 ];
 window.addEventListener('keydown', (e) => {
+  if (front.open) {
+    if (e.code === 'Escape' && cancelBind()) return;
+    if (!e.repeat || /Arrow|Key[WASD]/.test(e.code)) front.key(e);
+    return;
+  }
   if (!ready) return;
   if (gameKeys.includes(e.code) && e.target.tagName !== 'SELECT') e.preventDefault();
   if (e.repeat) return;
@@ -511,6 +515,15 @@ function padInput(dt) {
     padPrevious = pressed;
     return { x: 0, z: 0 };
   }
+  if (front.open) {
+    // Buttons still held from the press that opened a menu page don't count as new presses.
+    if (!frontPad) front.padReset(padPrevious);
+    frontPad = true;
+    front.pad(pressed, pad.axes, dt);
+    padPrevious = pressed;
+    return { x: 0, z: 0 };
+  }
+  frontPad = false;
   if (defeatOpen) {
     if (edge(12)) menuFocus(-1);
     if (edge(13)) menuFocus(1);
@@ -892,6 +905,7 @@ function updateImpacts(dt) {
 }
 function events() {
   for (const e of game.events.splice(0)) {
+    front.event(e);
     if (e.type === 'save') save();
     if (e.type === 'swing') {
       ring(e);
@@ -1474,7 +1488,54 @@ const aim = new THREE.Vector3(),
   desired = new THREE.Vector3(),
   ray = new THREE.Raycaster();
 let cameraInitialized = false;
+// Menu camera: a slow drift around the three friends, or close on one hero for the hero select.
+// The picture shifts right (setViewOffset) so the heroes stand beside the menu, not under it.
+const showAim = new THREE.Vector3(),
+  showPos = new THREE.Vector3();
+let showYaw = 0;
+function showcaseCamera(dt) {
+  // On the menus the three friends turn to face the camera, with the cottage behind them.
+  for (const h of game.actors) h.yaw = 0;
+  const s = showcase,
+    wide = innerWidth > 760,
+    a = s.hero !== undefined ? game.actors[s.hero] : game.actors[1];
+  let dist, height, look;
+  if (s.hero !== undefined) {
+    showYaw = a.yaw + 0.35 + Math.sin(performance.now() / 2600) * 0.12;
+    dist = s.near ? 4.6 : 3.6;
+    height = 0.85;
+    look = 0.95;
+  } else {
+    // A slow sway in front of the three, never round to their backs.
+    showYaw = a.yaw + 0.2 + Math.sin(performance.now() / (s.wide ? 7000 : 9000)) * 0.45;
+    dist = s.wide ? 9.5 : 7.2;
+    height = s.wide ? 2.6 : 1.8;
+    look = 1.1;
+  }
+  showAim.set(a.x, a.y + look, a.z);
+  showPos.set(Math.sin(showYaw) * dist, height - look, Math.cos(showYaw) * dist);
+  // Pull in in front of a wall or tree rather than filming through it.
+  ray.set(showAim, showPos.clone().normalize());
+  ray.far = showPos.length();
+  const hit = ray.intersectObjects(shadowMeshes, false)[0];
+  if (hit) showPos.setLength(Math.max(2.2, hit.distance - 0.4));
+  showPos.add(showAim);
+  showPos.y = Math.max(showPos.y, world.height(showPos.x, showPos.z) + 0.6);
+  if (!cameraInitialized) {
+    camera.position.copy(showPos);
+    cameraInitialized = true;
+  } else camera.position.lerp(showPos, 1 - Math.exp(-dt * 3));
+  camera.lookAt(showAim);
+  const shift = wide && !s.wide ? 0.17 : 0;
+  if (shift)
+    camera.setViewOffset(innerWidth, innerHeight, -innerWidth * shift, 0, innerWidth, innerHeight);
+  else camera.clearViewOffset();
+  sun.position.set(a.x + 12, a.y + 20, a.z + 10);
+  sun.target.position.set(a.x, a.y, a.z);
+  sun.target.updateMatrixWorld();
+}
 function updateCamera(dt) {
+  if (showcase) return showcaseCamera(dt);
   const a = game.player;
   aim.set(a.x, a.y + 1.25, a.z);
   desired
@@ -1659,9 +1720,13 @@ function updateScene(dt) {
     const a = game.actors[i],
       h = heroes[i],
       an = h.animator;
-    an.update(game.paused ? 0 : dt, heroPose(a, i, h));
+    // Menus keep the heroes breathing in their idle poses behind the pages.
+    const live = game.paused && !showcase ? 0 : dt;
+    an.update(live, heroPose(a, i, h));
     h.hurt = null;
     h.root.position.set(a.x, a.y + 0.01, a.z);
+    // The hero select shows one hero at a time.
+    h.root.visible = showcase?.hero === undefined || showcase.hero === i;
     h.root.rotation.y = an.yaw;
     const belly = i === 0 ? game.belly : 0,
       sq = an.squashY;
@@ -1672,12 +1737,12 @@ function updateScene(dt) {
     );
     // Darren's two paw trails show only in Bare Paws; the Polka Scarf has its own ribbon.
     const swing = swinging(a) && (i !== 0 || game.style !== 'scarf');
-    for (const t of h.trails) t.update(game.paused ? 0 : dt, swing);
+    for (const t of h.trails) t.update(live, swing);
     if (h.ribbon) {
-      h.ribbon.setActive(game.style === 'scarf');
+      h.ribbon.setActive(game.style === 'scarf' && h.root.visible);
       h.ribbon.floor = world.height(a.x, a.z) + 0.03;
       h.root.updateMatrixWorld(true);
-      h.ribbon.update(game.paused ? 0 : dt, scarfPull(a), camera, h.base.y);
+      h.ribbon.update(live, scarfPull(a), camera, h.base.y);
     }
   }
   updateFoes(dt);
@@ -1687,6 +1752,7 @@ function updateScene(dt) {
     o = game.objective();
   marker.position.set(o.x, world.height(o.x, o.z) + 2.4 + Math.sin(game.time * 2) * 0.15, o.z);
   marker.rotation.y = game.time;
+  marker.visible = selectedRing.visible = !showcase;
   selectedRing.position.set(a.x, world.height(a.x, a.z) + 0.06, a.z);
   selectedRing.material.color.setHex(game.kit.color);
   cookies.forEach((m, i) => {
@@ -1849,6 +1915,7 @@ function frame(now) {
     accumulator -= 1 / 60;
   }
   events();
+  front.tick(dt);
   updateScene(dt);
   hud();
   if (toastTime > 0) {
@@ -1861,6 +1928,135 @@ function frame(now) {
   }
   renderer.render(scene, camera);
 }
+// Rebuild the views after the game swapped saves (story select, replays, a fresh story).
+function afterReload() {
+  for (const [id, o] of foeViews) {
+    dropView(o);
+    removeTell(id);
+  }
+  foeViews.clear();
+  for (const [, m] of pickupViews) {
+    scene.remove(m);
+    m.material.dispose();
+  }
+  pickupViews.clear();
+  if (!game.quest.home) ruffy.position.set(129.6, world.height(129.6, 53.2), 53.2);
+  pendingSwitch = null;
+  cameraInitialized = false;
+}
+function closeOverlays() {
+  dialogOpen = defeatOpen = false;
+  $('dialogue').hidden = $('defeat').hidden = $('menu').hidden = true;
+  $('hud').hidden = true;
+  clearInput();
+  game.setPause(true);
+}
+const front = createFront({
+  game: () => game,
+  readSave: () => (game && !replay ? game.save() : readStored()),
+  isReplay: () => replay,
+  shared,
+  tone,
+  unlock: unlockAudio,
+  sound: () => sound,
+  setSound(on) {
+    sound = $('sound').checked = on;
+    shared?.setSound(on);
+    unlockAudio();
+  },
+  mode: () => game?.mode ?? 'adventure',
+  setMode(m) {
+    game.setMode(m);
+    $('mode').value = game.mode;
+    shared?.setMode(game.mode);
+    save();
+  },
+  quality: () => $('quality').value,
+  setQuality(v) {
+    $('quality').value = v;
+    setQuality();
+  },
+  worldData: () => world.data,
+  mapBackground: () => mapBackground,
+  selectedHero: () => game.selected,
+  style: () => game.style,
+  openPixel() {
+    save();
+    location.href = '../index.html';
+  },
+  showcase(s) {
+    // Cut when going between battle and menus; glide between menu pages.
+    if (!showcase !== !s) cameraInitialized = false;
+    showcase = s;
+    if (!s && camera) camera.clearViewOffset();
+  },
+  eraseStory() {
+    const mode = game.mode;
+    try {
+      localStorage.removeItem(SAVE);
+    } catch {}
+    replay = false;
+    game.reload(null);
+    game.mode = mode;
+    afterReload();
+  },
+  // Set the valley up for a battle: the chosen hero and style, the right chapter, and the party
+  // standing at the battle's starting point (the cottage, or beside the last camp cleared).
+  startBattle({ index, free, hero, style, save: replayData }) {
+    closeOverlays();
+    if (free) {
+      replay = true;
+      game.reload(replayData);
+      afterReload();
+    } else if (replay) {
+      replay = false;
+      game.reload(readStored());
+      afterReload();
+    }
+    game.selected = hero;
+    game.style = style === 'scarf' ? 'scarf' : 'paws';
+    const q = game.quest;
+    if (index === 4) {
+      if (q.chapter !== 'firewood') game.chapter('firewood');
+      else game.home();
+    } else {
+      if (q.chapter !== 'rescue') game.chapter('rescue');
+      if (index === 3 && q.rescued) game.regroup({ x: 126.5, z: 56 });
+      else if (index === 0 || game.lastCamp < 0) game.home();
+      else game.retry();
+    }
+    game.events.length = 0;
+    cameraYaw = game.player.yaw + Math.PI;
+    cameraPitch = 0.38;
+    cameraInitialized = false;
+    save();
+    return { t0: game.time, ko0: game.ko, free };
+  },
+  play: resume,
+  // Results screen: stop the battle under it.
+  halt() {
+    closeOverlays();
+    save();
+  },
+  leaveBattle() {
+    if (replay) {
+      replay = false;
+      game.reload(readStored());
+      afterReload();
+    } else {
+      save();
+      // The menus film the friends at the cottage (where they stand isn't part of the save).
+      game.home();
+      game.events.length = 0;
+    }
+    closeOverlays();
+  },
+  previewStyle(style) {
+    game.style = style === 'scarf' ? 'scarf' : 'paws';
+  },
+  banner,
+});
+front.show('title');
 async function boot() {
   try {
     renderer = new THREE.WebGLRenderer({
@@ -1982,8 +2178,8 @@ async function boot() {
     $('other-game').hidden = !note;
     ready = true;
     $('play').disabled = false;
-    $('play').textContent = saved ? 'Continue adventure' : 'Enter the valley';
-    updateChapterButton();
+    $('play').textContent = 'Continue battle';
+    front.setReady();
     requestAnimationFrame(frame);
     if (new URLSearchParams(location.search).has('test'))
       window.snowdayTest = {
@@ -1997,6 +2193,7 @@ async function boot() {
         resume,
         retry,
         foeViews,
+        front,
         padBindings: () => ({ ...padBindings }),
         // Deterministic stepping for screenshots: runs the simulation and the animation at a fixed
         // frame rate (the browser's own frame loop keeps running too).
@@ -2021,7 +2218,7 @@ async function boot() {
     console.error(error);
     $('error').hidden = false;
     $('error').textContent = `The valley could not open: ${error.message}. Reload to try again.`;
-    $('play').textContent = 'Unable to start';
+    $('play').textContent = $('fx-start').textContent = 'Unable to start';
   }
 }
 boot();

@@ -38,6 +38,20 @@ function rec(area, check, ok, note = '') {
     return { c, p };
   }
   const shot = (p, n) => p.screenshot({ path: out + n + '.png' });
+  // The 3D game opens on its title screen (Claude update 13): Press Start, Story Mode, the next
+  // battle, Begin battle on the hero select, then Begin battle on the briefing.
+  async function enter3d(p, tap = false) {
+    const act = (sel) => (tap ? p.tap(sel) : p.click(sel));
+    await p.waitForFunction(() => !document.querySelector('#fx-start').disabled, null, {
+      timeout: 180000,
+    });
+    await act('#fx-start');
+    await act('#fx-main-list [data-go="story"]');
+    await act('.fx-battle:has(.fx-chip.next)');
+    await act('#fx-hero-opts .fx-go');
+    await act('#fx-begin');
+    await p.waitForFunction(() => !snowdayTest.game.paused, null, { timeout: 60000 });
+  }
   const hold = async (p, key, ms) => {
     await p.keyboard.down(key);
     await p.waitForTimeout(ms);
@@ -167,7 +181,8 @@ function rec(area, check, ok, note = '') {
       `${((Date.now() - t0) / 1000).toFixed(1)}s`
     );
     await shot(p, '3d-01-menu');
-    await p.click('#play');
+    rec('3d', 'opens on the title screen', await p.isVisible('#fx-title'));
+    await enter3d(p);
     await p.waitForTimeout(1500);
     await shot(p, '3d-02-enter');
     // software GL here runs ~1-3 fps, so waits are frame/state based rather than wall-clock
@@ -350,14 +365,14 @@ function rec(area, check, ok, note = '') {
       timeout: 180000,
     });
     const s = await p.evaluate(() => ({
-      btn: document.querySelector('#play').textContent,
+      next: snowdayTest.front.nextBattle(),
       cookies: snowdayTest.game.cookies,
       clue: snowdayTest.game.quest.clues[0],
     }));
     rec(
       '3d',
-      'save survives reload',
-      s.cookies === 2 && s.clue === true && s.btn === 'Continue adventure',
+      'save survives reload (story continues with battle 2)',
+      s.cookies === 2 && s.clue === true && s.next === 1,
       JSON.stringify(s)
     );
     await p.evaluate((q) => {
@@ -376,7 +391,9 @@ function rec(area, check, ok, note = '') {
       };
       navigator.getGamepads = () => [window.__pad];
     });
-    await p.click('#play');
+    await enter3d(p);
+    // The next battle starts by the cleared camp; the controller checks below run at the cottage.
+    await p.evaluate(() => snowdayTest.game.home());
     await frames(2);
     await idle();
     const press = async (i) => {
@@ -493,7 +510,7 @@ function rec(area, check, ok, note = '') {
     );
     await idle();
     await p.reload();
-    await p.waitForFunction(() => !document.querySelector('#play').disabled, null, {
+    await p.waitForFunction(() => !document.querySelector('#fx-start').disabled, null, {
       timeout: 180000,
     });
     rec(
@@ -507,9 +524,16 @@ function rec(area, check, ok, note = '') {
       (await p.textContent('#pad-help')).includes('RT jump'),
       await p.textContent('#pad-help')
     );
-    await p.evaluate(() => {
-      document.querySelector('#pad-settings').open = true;
-    });
+    // Controller buttons are also in the title screen's Options page.
+    await p.click('#fx-start');
+    await p.click('#fx-main-list [data-go="options"]');
+    await p.click('#fx-options-list #pad-settings summary');
+    rec(
+      '3d remap',
+      'Options page holds the controller buttons',
+      await p.isVisible('#fx-options-list #pad-reset')
+    );
+    await shot(p, '3d-17-options');
     await p.click('#pad-reset');
     rec(
       '3d remap',
@@ -538,6 +562,9 @@ function rec(area, check, ok, note = '') {
       };
       navigator.getGamepads = () => [window.__pad];
     });
+    await p.keyboard.press('Escape');
+    await enter3d(p);
+    await press(9);
     await p.evaluate(() => document.querySelector('#play').focus());
     await frames(2);
     await press(13);
@@ -553,11 +580,17 @@ function rec(area, check, ok, note = '') {
     await shot(p, '3d-10-pad-disconnect-pause');
     await p.evaluate(() => {
       const g = snowdayTest.game;
+      g.quest.clues = [true, true, true];
+      g.bosses = [true, true, true, true];
       g.quest.rescued = true;
       g.quest.home = true;
-      document.querySelector('#firewood').disabled = false;
     });
-    await p.click('#firewood');
+    await p.click('#to-story');
+    await frames(2);
+    await shot(p, '3d-11a-story-select');
+    await p.click('.fx-battle:has(.fx-chip.next)');
+    await p.click('#fx-hero-opts .fx-go');
+    await p.click('#fx-begin');
     await frames(3);
     rec(
       '3d',
@@ -588,7 +621,7 @@ function rec(area, check, ok, note = '') {
       timeout: 180000,
     });
     await shot(p, '3d-12-phone-menu');
-    await p.tap('#play');
+    await enter3d(p, true);
     await p.waitForTimeout(1500);
     await shot(p, '3d-13-phone-play');
     rec('3d', 'phone portrait: touch controls shown', await p.isVisible('#stick'));
@@ -609,7 +642,7 @@ function rec(area, check, ok, note = '') {
       timeout: 180000,
     });
     await shot(p, '3d-14-landscape-menu');
-    await p.tap('#play');
+    await enter3d(p, true);
     await p.waitForTimeout(1500);
     await shot(p, '3d-15-landscape-play');
     const ov = await p.evaluate(() => {
@@ -632,7 +665,7 @@ function rec(area, check, ok, note = '') {
       e.value = 'low';
       e.dispatchEvent(new Event('change'));
     });
-    await p.click('#play');
+    await enter3d(p);
     const gt = async (s) => {
       const t = await p.evaluate(() => snowdayTest.game.time);
       await p.waitForFunction((x) => snowdayTest.game.time > x || snowdayTest.game.paused, t + s, {
@@ -866,7 +899,7 @@ function rec(area, check, ok, note = '') {
       e.value = 'low';
       e.dispatchEvent(new Event('change'));
     });
-    await p.tap('#play');
+    await enter3d(p, true);
     await p.evaluate(() => {
       const g = snowdayTest.game,
         w = snowdayTest.world,
@@ -918,7 +951,7 @@ function rec(area, check, ok, note = '') {
       e.value = 'low';
       e.dispatchEvent(new Event('change'));
     });
-    await p.tap('#play');
+    await enter3d(p, true);
     await p.evaluate(() => {
       const g = snowdayTest.game,
         w = snowdayTest.world,

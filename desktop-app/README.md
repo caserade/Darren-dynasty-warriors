@@ -17,8 +17,9 @@ sound and controller settings remain in `%APPDATA%\Darren's Snowday Search`. Do 
 delete that save folder when replacing the app. Old downloaded game files in its
 `game-updates` subfolder are ignored and left untouched. No credential setup is needed.
 
-The start screen selects Pixel or 3D (1/2, mouse or controller). Ctrl+H returns to it,
-Ctrl+1/Ctrl+2 switch games, and F11 toggles full screen. Test > Open save folder remains.
+The app opens on the 3D game's title screen; its main menu has Story Mode, Free Mode, Heroes,
+Options and the Pixel Adventure. Ctrl+H returns to the title screen, Ctrl+1 opens the pixel game,
+Ctrl+2 the old two-game chooser, and F11 toggles full screen. Test > Open save folder remains.
 The EXE is unsigned, so Windows SmartScreen may show a warning on a new computer.
 
 ## Build
