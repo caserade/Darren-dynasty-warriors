@@ -43,16 +43,30 @@ const D_ARMS = (l, r) => ({
 // Knees (studio pass 4): Darren's legs gained a knee joint. Any pose that lowers the hips bends
 // both knees just enough to keep the feet on the ground (thigh forward, shin back, foot flat), and a
 // leg swung forward folds a little at the knee. A pose that sets shinL/shinR itself is left alone.
-const LEG = 0.39;
+// Claude update 12: a leg the pose already swings forward or back has its foot off the ground
+// by that much, so it only crouches for the drop that is left (it used to crouch for the whole
+// drop on top of the swing, which folded lunging legs up past 150 degrees), and the knee never
+// folds past KNEE_MAX; anim.mjs plantFeet() lifts any foot still left in the ground.
+const LEG = 0.39,
+  KNEE_MAX = 85;
 function dKnees(pose) {
   const drop = Math.max(0, -(pose.hips?.p?.[1] ?? 0)),
-    crouch = drop > 0 ? (2 * Math.acos(Math.max(0.2, 1 - drop / LEG)) * 180) / PI : 0;
+    hipPitch = (Array.isArray(pose.hips) ? pose.hips : pose.hips?.r)?.[0] ?? 0;
   let out = { ...pose };
   for (const s of ['L', 'R']) {
     if (pose['shin' + s]) continue;
     const leg = pose['leg' + s],
-      swing = Math.max(0, -((Array.isArray(leg) ? leg : leg?.r)?.[0] ?? 0)),
-      flex = Math.min(85, crouch + swing * 0.55);
+      pitch = (Array.isArray(leg) ? leg : leg?.r)?.[0] ?? 0,
+      swing = Math.max(0, -pitch),
+      // How much higher a straight leg at this angle holds its foot than a leg hanging down.
+      tilt = Math.min(80, Math.abs(pitch + hipPitch)),
+      left = Math.max(0, drop - LEG * (1 - cos((tilt * PI) / 180))),
+      fold = swing * 0.55,
+      crouch = Math.min(
+        KNEE_MAX - Math.min(KNEE_MAX, fold),
+        left > 0 ? (2 * Math.acos(Math.max(0.2, 1 - left / LEG)) * 180) / PI : 0
+      ),
+      flex = crouch + fold;
     if (flex < 0.5) continue;
     out['shin' + s] = [flex, 0, 0];
     out = mix(out, {
