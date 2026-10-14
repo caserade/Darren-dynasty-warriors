@@ -540,3 +540,9 @@ That product decision is left for confirmation; this maintenance patch does not 
 
 Limits: no full manual playthrough, physical controller/phone tests, FPS/balance
 benchmark, or fresh run of tests/browser-qa.cjs. Artist limitations in prior notes remain.
+
+CODEX INSTALLATION FOLLOW-UP - 2026-10-14
+The user approved retaining the updater and integrating/installing the verified update.
+Added two updater checks for restart with interrupted partial/unactivated staging folders:
+last activated game remains selected, abandoned stages are removed, save sentinel retained.
+Final full npm test passed on Windows; no runtime changes or dependency version changes.

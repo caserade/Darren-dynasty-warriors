@@ -184,6 +184,20 @@ const srv = http.createServer((req, res) => {
   );
   rec('after a failed update a restart keeps the good game', make().build() === 250);
 
+  // Simulate disk state after the process stops during a download, then after the
+  // stage was renamed but before current.json was committed. Neither may replace b250.
+  write(path.join(dataDir, 'Local Storage'), { 'save-sentinel': 'existing progress' });
+  write(path.join(dataDir, 'updates', 'b310.partial'), { 'index.html': 'unfinished' });
+  write(path.join(dataDir, 'updates', 'b320'), { 'index.html': 'not activated' });
+  up = make();
+  rec('interrupted stages keep the last activated game after restart', up.build() === 250);
+  rec(
+    'interrupted stages are discarded without touching saves',
+    !fs.existsSync(path.join(dataDir, 'updates', 'b310.partial')) &&
+      !fs.existsSync(path.join(dataDir, 'updates', 'b320')) &&
+      read(path.join(dataDir, 'Local Storage'), 'save-sentinel') === 'existing progress'
+  );
+
   const evil = publish(400, base);
   evil.files['../../escaped.txt'] = evil.files['game.js'];
   fs.writeFileSync(path.join(server, 'latest.json'), JSON.stringify(evil));
