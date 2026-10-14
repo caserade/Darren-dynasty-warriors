@@ -10,10 +10,12 @@ Both games share sound, difficulty, a few controller buttons and story progress 
 
 ## Play
 
-- Windows desktop app: unzip `Darren-Snowday-Windows.zip` and double-click
-  `Darren Snowday.exe` (no Node or Python needed). The zip is too big for GitHub, so it is
-  not in this repository: make it with Node.js 22.12 or newer (`cd desktop-app`, `npm install`,
-  `npm run build:win`; it lands in `desktop-app/out/`), or use the copy kept with the project files.
+- Windows desktop app: download `Darren-Snowday-Windows.zip` from
+  [GitHub Releases](https://github.com/caserade/Darren-dynasty-warriors/releases/latest),
+  extract it into a new folder and double-click `Darren Snowday.exe` (no Node or Python needed).
+  Version 1.9.0 includes the in-game updater; see [desktop app instructions](desktop-app/README.md).
+  To build from source with Node.js 22.12 or newer, run `cd desktop-app`, `npm ci`, then
+  `npm run build:win`; the ZIP lands in `desktop-app/out/`.
 - Windows: double-click `PLAY-3D.cmd` or `PLAY-PIXEL.cmd`.
 - Mac: double-click `PLAY-3D.command` or `PLAY-PIXEL.command` (the first time, right-click and
   choose Open).
@@ -23,7 +25,7 @@ Read `START-HERE.txt` for controls, phone play and the full history of the proje
 
 ## Develop
 
-- `npm install` once, then `npm test` runs the simulation and regression checks (installs
+- `npm ci` once, then `npm test` runs the simulation and regression checks (installs
   `@napi-rs/canvas` 0.1.100).
 - `node tests/browser-qa.cjs` drives both games in a real browser while `npm start` is running
   (needs Playwright).
