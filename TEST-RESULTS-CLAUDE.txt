@@ -1,3 +1,30 @@
+TEST RESULTS · CLAUDE UPDATE 15 (DARREN'S HORN ATTACHED + FULL CHECK · 3D) · 2026-10-14
+All runs below were made in a Linux container on branch claude/darren-horn-full-check-kuwrbx
+(main after PR #14), with headless Chromium using software WebGL (SwiftShader). Earlier results
+further down are history, not verification of this branch.
+
+npm test (node 22.22): all pass, before the change (on main) and after it. tools/verify-scene.cjs
+  is a native Canvas stand-in, not a browser.
+tools/darren-model.mjs rebuilds dist/3d/assets/darren.glb byte for byte (checked twice).
+tools/review/horn-check.cjs (new), 46 clips x 3 samples: horn's open bottom ring outside the
+  skin 9 of 24 points in every frame -> 0 of 24 in every frame; biggest distance from the skin
+  where the horn comes out 7.3 cm -> 2.5 cm (2.5 cm = the spacing of the horn's rings, not a gap;
+  see project files darren-horn/ for pictures).
+tools/review/mesh-check.mjs: Darren's numbers unchanged apart from the horn sitting deeper in the
+  skull (deepest point 27 -> 45 mm under the skin, by design). The horn's 24 open edges are its
+  bottom, now always buried.
+tests/browser-qa.cjs (server: node desktop-server.cjs): 64 of 64 in 4 runs; 63 of 64 in 2 earlier
+  runs, where "meeting Sergeant Spudsworth opens his dialogue and the boss bar" failed (the
+  dialogue was open but the boss bar was not). It could not be made to fail again, alone or with
+  two runs at once, so the cause is not known. This branch changes only the horn's shape, which
+  the check does not touch. Worth watching.
+Every-move browser check (project files qa/moves-qa.cjs): 16 of 16. The script was updated to go
+  through the new title screen and menus (it still clicked the old Play button and could not
+  start).
+
+LIMITS
+- Not run on a real Windows PC, GPU, controller or phone.
+
 TEST RESULTS · CLAUDE UPDATE 14 (WINDOWS APP UPDATES ITSELF FROM GITHUB) · 2026-10-13
 All runs below were made in a Linux container on branch claude/launcher-updates-ekmrfu (main
 after PR #12), with headless Chromium using software WebGL (SwiftShader). GitHub itself was not
