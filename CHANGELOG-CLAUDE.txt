@@ -837,3 +837,32 @@ Based on main 0a0a9c78 (Claude update 14).
 - Desktop smoke tests keep normal Windows sandbox/GPU behavior and refuse to run
   against any save profile other than the temporary test profile.
 - No gameplay, art, save schema, updater behavior, installation or shortcut changes.
+
+CLAUDE UPDATE 15 · DARREN'S HORN ATTACHED PROPERLY + FULL CHECK (3D) · 2026-10-14
+Asked: "Check everything and fix and check darrens head horn. is anything off or not connected?"
+
+WHAT WAS WRONG
+- The horn (added in update 8) was built as level rings starting at one height on top of the
+  head. The skull slopes down toward the forehead, so the front of the horn's base hung in the
+  air: from the side you could see a gap of up to 7 cm between the horn's front edge and his
+  forehead, and 9 of the 24 points of the horn's open bottom ring were outside the skin. It was
+  the same in every pose (the horn and the skull under it both follow the head bone), so this
+  was a model problem, not an animation one.
+
+FIX (tools/darren-model.mjs, rebuilt dist/3d/assets/darren.glb)
+- The lower part of the horn now follows the skull's slope, fading back to the old shape by
+  40% of its height, so the horn grows out of the head and its front edge runs down onto the
+  forehead like the approved design. The bottom ring is always kept 4 cm under the skin.
+- The skull height is read from the finished head mesh (new skull() next to crown()).
+- New review tool tools/review/horn-check.cjs measures it at rest and over every clip.
+- Results: bottom ring outside the skin 9 of 24 -> 0 of 24, in every sampled frame of every
+  clip. Biggest gap where the horn leaves the skin 7.3 cm -> 2.5 cm, and the 2.5 cm is the ring
+  spacing of the measurement, not a visible gap. Pictures: project files darren-horn/.
+- Nothing else on Darren changed: same skeleton, weights, scarf and the horn still moves 100%
+  with the head bone.
+
+FULL CHECK
+- All automated tests, the browser play-through and the every-move check were run on this
+  branch (see TEST-RESULTS-CLAUDE.txt). The Darren mesh check finds no new problems; the other
+  heroes' known items (open edges on Tormund's shield parts and Bucky's mallet, both flat
+  pieces built that way) are unchanged and not visible in play.

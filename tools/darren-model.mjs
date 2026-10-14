@@ -459,10 +459,27 @@ function flattenCrest(prim) {
     pos.setElement(i, q);
     p.splice(0, 3, ...q);
   });
-  return { crown, redUV: uv.getElement(best, []) };
+  // The skull's height at any (x, z) on the crown, read from the finished mesh (Claude update
+  // 15): the inverse-distance blend of the top-surface points within 4 cm.
+  const top2 = top.P.filter((p, i) => top.shell[i] === body && p[1] > 1.35 && Math.abs(p[0]) < 0.3);
+  const skull = (x, z) => {
+    const near = top2.filter((p) => Math.hypot(p[0] - x, p[2] - z) < 0.04);
+    if (!near.length) return crown(x, z);
+    const hi = Math.max(...near.map((p) => p[1]));
+    let s = 0,
+      w = 0;
+    for (const p of near) {
+      if (p[1] < hi - 0.04) continue;
+      const k = 1 / ((p[0] - x) ** 2 + (p[2] - z) ** 2 + 1e-5);
+      s += k * p[1];
+      w += k;
+    }
+    return s / w;
+  };
+  return { crown, skull, redUV: uv.getElement(best, []) };
 }
 // A curved horn: rings of an ellipse that narrows toward the tip and sweeps back as it rises.
-function hornPrimitive(crown, redUV, material) {
+function hornPrimitive(crown, skull, redUV, material) {
   const RINGS = 16,
     SEG = 24,
     zc = 0.06,
@@ -471,6 +488,7 @@ function hornPrimitive(crown, redUV, material) {
     S = 0.3,
     W = 0.085,
     L = 0.23,
+    ROOT = 0.4,
     P = [],
     N = [],
     index = [];
@@ -491,12 +509,16 @@ function hornPrimitive(crown, redUV, material) {
       const a = (s / SEG) * Math.PI * 2,
         // A fuller leading edge and a thinner trailing edge, like the design's fin.
         lz = Math.sin(a) > 0 ? l : l * 0.75;
-      P.push(
-        c
-          .clone()
-          .addScaledVector(ex, Math.cos(a) * w)
-          .addScaledVector(ez, Math.sin(a) * lz)
-      );
+      const v = c
+        .clone()
+        .addScaledVector(ex, Math.cos(a) * w)
+        .addScaledVector(ez, Math.sin(a) * lz);
+      // Rooted in the skull (Claude update 15): the lower rings follow the skull's slope instead
+      // of sitting level, so the horn's front edge no longer hangs in the air over the forehead
+      // (it floated up to 7 cm above it) and the open bottom ring stays buried under the skin.
+      v.y += (skull(v.x, v.z) - skull(0, zc)) * (1 - smoothstep(0, ROOT, t));
+      if (r === 0) v.y = Math.min(v.y, skull(v.x, v.z) - 0.04);
+      P.push(v);
     }
   }
   const tip = centre(1);
@@ -1384,12 +1406,12 @@ const mainMesh = root.listMeshes().find((m) => m.getName() === 'Darren_Game'),
   main = mainMesh.listPrimitives()[0];
 rebindAll();
 reskinBody(main);
-const { crown, redUV } = flattenCrest(main);
+const { crown, skull, redUV } = flattenCrest(main);
 smoothNormals(main);
 clearance(main);
 const hornMesh = doc
   .createMesh('Darren_Horn')
-  .addPrimitive(hornPrimitive(crown, redUV, main.getMaterial()));
+  .addPrimitive(hornPrimitive(crown, skull, redUV, main.getMaterial()));
 const hornNode = doc.createNode('Darren horn').setMesh(hornMesh).setSkin(skin);
 nodeByName('Darren_Rig').addChild(hornNode);
 await buildScarf(main);
