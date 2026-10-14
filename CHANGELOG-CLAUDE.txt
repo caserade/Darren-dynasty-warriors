@@ -863,6 +863,9 @@ FIX (tools/darren-model.mjs, rebuilt dist/3d/assets/darren.glb)
 
 FULL CHECK
 - All automated tests, the browser play-through and the every-move check were run on this
-  branch (see TEST-RESULTS-CLAUDE.txt). The Darren mesh check finds no new problems; the other
+  branch (see TEST-RESULTS-CLAUDE.txt). One browser check (the boss bar showing when Sergeant
+  Spudsworth says hello) failed in 2 of 6 runs and could not be made to fail again; noted there.
+- The every-move check in project files (qa/moves-qa.cjs) still clicked the old Play button from
+  before the new menus; it now goes through the title screen like tests/browser-qa.cjs. The Darren mesh check finds no new problems; the other
   heroes' known items (open edges on Tormund's shield parts and Bucky's mallet, both flat
   pieces built that way) are unchanged and not visible in play.
