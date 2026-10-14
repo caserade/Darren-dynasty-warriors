@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="theme-color" content="#152a3a" />
+    <title>Snowday · The Three Friends</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="style.css" />
+    <script type="importmap">
+      { "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/" } }
+    </script>
+  </head>
+  <body>
+    <canvas id="view" aria-label="Snowday 3D game"></canvas>
+    <div id="hud" hidden>
+      <div id="party" aria-label="Choose character">
+        <button data-cast="0">
+          <small>1</small><i class="red"></i>Darren<em class="hp"><b></b></em></button
+        ><button data-cast="1">
+          <small>2</small><i class="gold"></i>Tormund<em class="hp"><b></b></em></button
+        ><button data-cast="2">
+          <small>3</small><i class="blue"></i>Bucky<em class="hp"><b></b></em>
+        </button>
+      </div>
+      <div id="quest">
+        <small>THE SNOWBELL VALLEY</small><strong id="objective"></strong
+        ><span id="distance"></span>
+      </div>
+      <div id="bossbox" hidden>
+        <strong id="bossname"></strong>
+        <div class="meter boss"><i id="bossbar"></i></div>
+        <span id="bosshint"></span>
+      </div>
+      <div id="kochip">
+        <strong id="kocount">0</strong> <small>K.O.</small><span id="combo"></span>
+      </div>
+      <div id="banner" aria-live="polite"><strong></strong><span></span></div>
+      <div id="hurtflash"></div>
+      <div id="floaters"></div>
+      <div id="top-actions">
+        <button id="fullscreen" aria-label="Toggle full screen">⛶</button
+        ><button id="pause" aria-label="Pause game">Ⅱ</button>
+      </div>
+      <div id="vitals">
+        <strong id="name">Darren</strong><b id="hpnum"></b>
+        <div class="meter hp" aria-label="Health"><i id="health"></i></div>
+        <div class="meter" aria-label="Energy"><i id="energy"></i></div>
+        <div class="meter special" aria-label="Special"><i id="musou"></i></div>
+        <small id="style" hidden></small>
+        <small id="kit"></small> <small id="belly"></small>
+        <div id="chargebox" hidden>
+          <div class="meter charge"><i id="chargebar"></i></div>
+          <b id="chargelabel">Gathering power</b>
+        </div>
+      </div>
+      <div id="interaction" hidden><kbd>E</kbd> <span>Interact</span></div>
+      <div id="toast" role="status" aria-live="polite"></div>
+      <div id="practice">
+        <small>PRACTICE POSTS</small><strong><span id="hits">0</span> hits</strong
+        ><span>Try a combo or hold your charge</span>
+      </div>
+      <div id="controls">
+        <span><kbd>WASD</kbd> Move</span><span><kbd>J</kbd> Combo</span
+        ><span><kbd>Hold K</kbd> Charge / release</span><span><kbd>Space</kbd> Jump</span
+        ><span><kbd>Shift</kbd> Dodge</span><span><kbd>L</kbd> Special</span
+        ><span id="style-key"><kbd>Q</kbd> Paws / Scarf</span
+        ><span><kbd>Drag / Z X</kbd> Camera</span>
+      </div>
+      <canvas id="minimap" width="220" height="164" aria-label="Valley map"></canvas>
+      <div id="touch">
+        <div id="stick" aria-label="Movement joystick"><i></i></div>
+        <div class="touch-actions">
+          <button id="touch-interact">Talk / gather</button><button id="touch-jump">Jump</button
+          ><button id="touch-dodge">Dodge</button><button id="touch-attack">Combo</button
+          ><button id="touch-charge">Hold charge</button><button id="touch-special">Special</button
+          ><button id="touch-style">Paws / Scarf</button>
+        </div>
+      </div>
+    </div>
+    <section id="menu" class="overlay" hidden>
+      <div class="panel">
+        <div class="eyebrow">PAUSED · DARREN · TORMUND · BUCKY</div>
+        <h1>Snowday<span>The Three Friends</span></h1>
+        <p id="menu-copy">
+          Explore the snowy valley, bring Ruffy home, and gather firewood with your friends.
+        </p>
+        <p id="other-game" class="other-game" hidden></p>
+        <div class="rule"></div>
+        <button id="play" class="primary" disabled>Preparing the valley…</button
+        ><button id="return-home" hidden>Return to the cottage</button
+        ><button id="to-story">Story select</button><button id="to-title">Title screen</button>
+        <div class="settings">
+          <label>Sound <input id="sound" type="checkbox" checked /></label
+          ><label
+            >Mode
+            <select id="mode">
+              <option value="adventure">Adventure</option>
+              <option value="cozy">Cozy</option>
+            </select></label
+          ><label
+            >Detail
+            <select id="quality">
+              <option value="high">High</option>
+              <option value="low">Low</option>
+            </select></label
+          >
+        </div>
+        <p class="help">
+          WASD / left stick to move · tap J for a combo string<br />K right after a combo hit for
+          its finisher · hold K from standing to charge<br />J in the air or after a sprint for jump
+          and dash attacks<br />L special when the gold meter is full · Q swaps Darren between Bare
+          Paws and the Polka Scarf<br />Space jump · Shift dodge (Tormund standing still: shield
+          parry) · E interact<br />1–3 switch hero · Drag / right stick look<br />Cookies heal the
+          party · every 3 makes Darren hit harder
+        </p>
+        <p class="help" id="pad-help"></p>
+        <details id="pad-settings">
+          <summary>Controller buttons</summary>
+          <p id="pad-status" role="status">
+            Connect a controller and press any button. Pick an action below, then press the button
+            you want for it.
+          </p>
+          <div class="binds">
+            <button data-bind="combo">Combo <b></b></button
+            ><button data-bind="charge">Hold charge <b></b></button
+            ><button data-bind="jump">Jump <b></b></button
+            ><button data-bind="dodge">Dodge <b></b></button
+            ><button data-bind="interact">Talk / gather <b></b></button
+            ><button data-bind="special">Special <b></b></button
+            ><button data-bind="style">Paws / Scarf <b></b></button
+            ><button data-bind="switch">Next hero <b></b></button
+            ><button data-bind="pause">Pause <b></b></button>
+          </div>
+          <button id="pad-reset">Restore standard buttons</button
+          ><small class="note"
+            >Start / Options always pauses. D-pad ↑↓ moves through this menu and A selects.</small
+          >
+        </details>
+        <small class="note"
+          >Clear the three camps, beat their bosses and the Bramble Baron, and bring Ruffy home.
+          Cozy mode softens every hit.</small
+        ><a href="../index.html">Open the pixel adventure</a>
+      </div>
+    </section>
+    <section id="front" aria-label="Game menus">
+      <div class="fx-shade"></div>
+      <div id="fx-title" class="fx-page">
+        <div class="fx-logo">
+          <small class="fx-eyebrow">DARREN · TORMUND · BUCKY</small>
+          <h1><span>Darren’s</span>Snowday Search</h1>
+          <div class="fx-sub"><i></i><em>The Three Friends</em><i></i></div>
+        </div>
+        <button id="fx-start" class="fx-press" disabled>Preparing the valley…</button>
+        <p id="error" role="alert" hidden></p>
+      </div>
+      <div id="fx-main" class="fx-page" hidden>
+        <header class="fx-head">
+          <small>MAIN MENU</small>
+          <h2>Snowday Search</h2>
+        </header>
+        <nav id="fx-main-list" class="fx-list" aria-label="Main menu"></nav>
+        <div class="fx-note">
+          <p id="fx-main-note"></p>
+          <small id="fx-main-other"></small>
+        </div>
+      </div>
+      <div id="fx-story" class="fx-page" hidden>
+        <header class="fx-head">
+          <small id="fx-story-kind">STORY MODE</small>
+          <h2>Choose a battle</h2>
+        </header>
+        <div class="fx-story">
+          <ol id="fx-story-list" class="fx-battles" aria-label="Battles"></ol>
+          <article class="fx-card fx-sel">
+            <canvas id="fx-map" width="440" height="318" aria-label="Valley map"></canvas>
+            <h3 id="fx-sel-name"></h3>
+            <small id="fx-sel-place" class="fx-place"></small>
+            <p id="fx-sel-text"></p>
+            <dl>
+              <dt>Enemy commander</dt>
+              <dd id="fx-sel-foe"></dd>
+              <dt>Victory</dt>
+              <dd><ul id="fx-sel-goals"></ul></dd>
+            </dl>
+            <small id="fx-sel-record" class="fx-record"></small>
+          </article>
+        </div>
+      </div>
+      <div id="fx-heroes" class="fx-page" hidden>
+        <header class="fx-head">
+          <small id="fx-hero-kind">CHOOSE YOUR HERO</small>
+          <h2 id="fx-hero-battle"></h2>
+        </header>
+        <div class="fx-heroes">
+          <div class="fx-hero-side">
+            <div id="fx-hero-row" class="fx-hero-row" aria-label="Heroes"></div>
+            <div id="fx-hero-opts" class="fx-list fx-opts"></div>
+          </div>
+          <article class="fx-card fx-hero-info">
+            <small id="fx-hi-title" class="fx-place"></small>
+            <h3 id="fx-hi-name"></h3>
+            <p id="fx-hi-about"></p>
+            <ul id="fx-hi-stars" class="fx-stars"></ul>
+            <dl>
+              <dt>Weapon</dt>
+              <dd id="fx-hi-weapon"></dd>
+              <dt>Special</dt>
+              <dd id="fx-hi-special"></dd>
+            </dl>
+          </article>
+        </div>
+      </div>
+      <div id="fx-options" class="fx-page" hidden>
+        <header class="fx-head">
+          <small>OPTIONS</small>
+          <h2>Settings</h2>
+        </header>
+        <div id="fx-options-list" class="fx-list fx-opts fx-wide"></div>
+      </div>
+      <div id="fx-update" class="fx-page" hidden>
+        <article class="fx-scroll fx-upd">
+          <small id="fx-upd-kind" class="fx-eyebrow">GAME UPDATE</small>
+          <h2 id="fx-upd-head"></h2>
+          <p id="fx-upd-text" aria-live="polite"></p>
+          <div id="fx-upd-bar" class="fx-upd-bar" hidden><i></i></div>
+          <dl class="fx-upd-facts">
+            <dt>Your game</dt>
+            <dd id="fx-upd-have"></dd>
+            <dt id="fx-upd-new-label">New version</dt>
+            <dd id="fx-upd-new"></dd>
+          </dl>
+          <div id="fx-upd-actions" class="fx-list fx-res-actions"></div>
+        </article>
+      </div>
+      <div id="fx-brief" class="fx-page" hidden>
+        <article class="fx-scroll">
+          <small id="fx-brief-kind" class="fx-eyebrow"></small>
+          <h2 id="fx-brief-name"></h2>
+          <p id="fx-brief-text"></p>
+          <div class="fx-brief-cols">
+            <div>
+              <small>Victory</small>
+              <ul id="fx-brief-goals"></ul>
+            </div>
+            <div>
+              <small>Enemy commander</small><b id="fx-brief-foe"></b> <small>Your hero</small
+              ><b id="fx-brief-hero"></b> <small>Difficulty</small><b id="fx-brief-mode"></b>
+            </div>
+          </div>
+          <button id="fx-begin" class="fx-item fx-go" type="button">Begin battle</button>
+        </article>
+      </div>
+      <div id="fx-results" class="fx-page" hidden>
+        <article class="fx-scroll fx-res">
+          <small id="fx-res-kind" class="fx-eyebrow">VICTORY</small>
+          <h2 id="fx-res-name"></h2>
+          <div class="fx-res-body">
+            <ul id="fx-res-stats" class="fx-res-stats"></ul>
+            <div class="fx-res-rank">
+              <small>Rank</small><b id="fx-res-rank" class="fx-stamp"></b>
+            </div>
+          </div>
+          <div id="fx-res-actions" class="fx-list fx-res-actions"></div>
+        </article>
+      </div>
+      <button id="fx-upd-note" class="fx-upd-note" type="button" hidden></button>
+      <footer class="fx-bar">
+        <button id="fx-back" type="button">‹ Back</button><span id="fx-help"></span>
+      </footer>
+    </section>
+    <section id="defeat" class="overlay" hidden>
+      <div class="panel">
+        <small class="eyebrow">SNOWDAY STORIES</small>
+        <h2>A little rest. Another try.</h2>
+        <p id="defeat-copy">
+          Darren, Tormund and Bucky warm their paws. Ruffy still needs them. Cleared camps, clues
+          and cookies are saved.
+        </p>
+        <button id="retry" class="primary">Try again</button
+        ><button id="defeat-home">Return to the cottage</button>
+      </div>
+    </section>
+    <section id="dialogue" class="overlay" hidden>
+      <div class="dialogue panel">
+        <small>SNOWDAY STORIES</small>
+        <p id="dialogue-copy"></p>
+        <button id="dialogue-close" class="primary">Continue <span>↵</span></button>
+      </div>
+    </section>
+    <script src="../shared-save.js?v=1"></script>
+    <script type="module" src="game.mjs"></script>
+  </body>
+</html>
