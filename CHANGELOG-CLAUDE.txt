@@ -869,3 +869,22 @@ FULL CHECK
   before the new menus; it now goes through the title screen like tests/browser-qa.cjs. The Darren mesh check finds no new problems; the other
   heroes' known items (open edges on Tormund's shield parts and Bucky's mallet, both flat
   pieces built that way) are unchanged and not visible in play.
+
+CLAUDE UPDATE 16 · BOSS BAR MISSING BEHIND SPUDSWORTH'S HELLO (3D) · 2026-10-18
+Found during the final check before copying the games to michael's PC.
+
+WHAT WAS WRONG
+- Sometimes, when a boss said hello, his dialogue opened but the boss health bar at the top
+  stayed hidden until the dialogue was closed. This is the browser check that failed 2 of 6 runs
+  in update 15 with no known cause; it failed 3 of 6 on main this time.
+- Cause: a hero's weapon trail (dist/3d/trail.mjs) threw an error when a swing started on a
+  paused frame. The boss's hello pauses the game, so a swing started in that same frame had no
+  trail sample yet, and drawing it read past the end of an empty list. The error stopped the
+  rest of that frame, including the part that shows the boss bar, and it repeated every frame
+  until the dialogue closed. Each failed run logged "Cannot read properties of undefined
+  (reading '0')" at WeaponTrail.update.
+
+FIX
+- A trail with no sample yet stays hidden and draws nothing. One check in trail.mjs.
+- New test tests/weapon-trail.mjs (in npm test) makes a trail draw on a paused first frame; it
+  fails with the same error on main and passes with the fix.

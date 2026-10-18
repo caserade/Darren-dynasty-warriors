@@ -1,3 +1,27 @@
+TEST RESULTS · CLAUDE UPDATE 16 (BOSS BAR / WEAPON TRAIL FIX + FINAL CHECK · 3D) · 2026-10-18
+All runs below were made in a Linux container on branch claude/project-thread-e9f1fj (main after
+PR #15), with headless Chromium using software WebGL (SwiftShader). Earlier results further down
+are history, not verification of this branch.
+
+On main before the fix:
+  npm test (node 22.22): all pass. tools/verify-scene.cjs is a native Canvas stand-in, not a
+    browser.
+  tests/browser-qa.cjs (server: node desktop-server.cjs): 64 of 64 in 3 runs, 63 of 64 in 3
+    runs. Each failure was "meeting Sergeant Spudsworth opens his dialogue and the boss bar",
+    and each failed run, and only those, logged a page error at WeaponTrail.update
+    (dist/3d/trail.mjs:77). A trimmed copy of the 3D fight section, 12 runs, failed once with
+    the same error.
+  Windows app build (npm run build:win in desktop-app/): built; the first attempt stopped on a
+    file-safety check and the next two attempts built cleanly, cause not found.
+With the fix:
+  npm test: all pass, including the new tests/weapon-trail.mjs (4 checks; it fails on main).
+  tests/browser-qa.cjs: 64 of 64 in 6 of 6 runs, no page errors.
+  Trimmed 3D fight section: 12 of 12 runs pass, no page errors.
+  tests/desktop-app.cjs (Electron from the checkout, under xvfb): all pass.
+
+LIMITS
+- Not run on a real Windows PC, GPU, controller or phone.
+
 TEST RESULTS · CLAUDE UPDATE 15 (DARREN'S HORN ATTACHED + FULL CHECK · 3D) · 2026-10-14
 All runs below were made in a Linux container on branch claude/darren-horn-full-check-kuwrbx
 (main after PR #14), with headless Chromium using software WebGL (SwiftShader). Earlier results
