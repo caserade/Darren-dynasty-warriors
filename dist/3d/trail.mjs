@@ -72,6 +72,11 @@ export class WeaponTrail {
     const pos = this.mesh.geometry.attributes.position,
       al = this.mesh.geometry.attributes.alpha,
       n = this.pts.length;
+    // A swing that starts on a paused frame (dt 0) has no sample yet: nothing to draw.
+    if (n === 0) {
+      this.mesh.visible = false;
+      return;
+    }
     for (let i = 0; i < N; i++) {
       const p = this.pts[Math.min(i, n - 1)];
       pos.setXYZ(i * 2, p[0].x, p[0].y, p[0].z);
