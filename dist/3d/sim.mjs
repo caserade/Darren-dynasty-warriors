@@ -73,6 +73,9 @@ function seeded(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+// Blocking (update 17) takes this share off every blow, and slows the guarding hero to a walk.
+export const BLOCK_CUT = 0.25;
+const GUARD_SPEED = 0.38;
 const angleDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 export class World {
   constructor(data) {
@@ -140,6 +143,32 @@ export class World {
       } else if (this.step(a.x, a.z, a.x + x, a.z, 0.34, air)) a.x += x;
       else if (this.step(a.x, a.z, a.x, a.z + z, 0.34, air)) a.z += z;
     }
+  }
+  // On a cliff face: some step a walker could take from here climbs or drops too much (update 17).
+  steep(x, z, h = 0.15) {
+    const y = this.height(x, z);
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * TAU;
+      if (Math.abs(this.height(x + Math.sin(a) * h, z + Math.cos(a) * h) - y) > h * 1.4 + 0.12)
+        return true;
+    }
+    return false;
+  }
+  // Slips a walker pinned on a cliff face (landed there from a jump, or pushed) down the slope.
+  slide(a, dt) {
+    if (a.air > 0 || !this.steep(a.x, a.z)) return false;
+    const h = 0.15,
+      gx = this.height(a.x + h, a.z) - this.height(a.x - h, a.z),
+      gz = this.height(a.x, a.z + h) - this.height(a.x, a.z - h),
+      n = Math.hypot(gx, gz);
+    if (n < 1e-6) return false;
+    const x = a.x - (gx / n) * 6 * dt,
+      z = a.z - (gz / n) * 6 * dt;
+    if (!this.clear(x, z)) return false;
+    a.x = x;
+    a.z = z;
+    a.y = this.height(x, z);
+    return true;
   }
   safe(x, z) {
     if (this.clear(x, z)) return { x, z };
@@ -246,8 +275,36 @@ export class World {
     let best = id;
     for (const j of this.nav[id] || [])
       if (field[j] >= 0 && (field[best] < 0 || field[j] < field[best])) best = j;
-    const p = this.center(best);
-    return Math.atan2(p.x - a.x, p.z - a.z);
+    // Standing in a cell whose centre is blocked (a bridge rail, a post: update 17), so it has no
+    // paths of its own: head for the best-placed cell around it that can be walked toward.
+    if (field[best] < 0) {
+      const cx = id % this.nx,
+        cz = Math.floor(id / this.nx);
+      for (let dz = -1; dz <= 1; dz++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const x = cx + dx,
+            z = cz + dz,
+            j = x + z * this.nx;
+          if (x < 0 || z < 0 || x >= this.nx || z >= this.nz || field[j] < 0) continue;
+          if (field[best] >= 0 && field[j] >= field[best]) continue;
+          const q = this.center(j),
+            t = Math.atan2(q.x - a.x, q.z - a.z);
+          if (this.step(a.x, a.z, a.x + Math.sin(t) * 0.15, a.z + Math.cos(t) * 0.15)) best = j;
+        }
+    }
+    const p = this.center(best),
+      ang = Math.atan2(p.x - a.x, p.z - a.z);
+    // The paths link cell centres, so from the slope at a cell's edge the way to the next
+    // centre can be a cliff (update 17). Then take the nearest direction that can be walked,
+    // so friends and foes edge round instead of pushing into the rock face for ever.
+    // (Tested over a short and a full step, as walkers move in steps of up to 0.15 m.)
+    const ok = (t) =>
+      [0.06, 0.15].every((r) => this.step(a.x, a.z, a.x + Math.sin(t) * r, a.z + Math.cos(t) * r));
+    if (ok(ang)) return ang;
+    for (let k = 1; k <= 8; k++)
+      for (const s of [1, -1])
+        if (ok(ang + s * k * (Math.PI / 8))) return ang + s * k * (Math.PI / 8);
+    return ang;
   }
 }
 export class Game {
@@ -264,6 +321,8 @@ export class Game {
     this.mode = 'adventure';
     this.style = 'paws';
     this.input = { x: 0, z: 0 };
+    // Held block button (update 17): the hero on screen guards whenever they are free to.
+    this.blocking = false;
     this.targets = [
       { x: 23, z: 50.5 },
       { x: 25, z: 52 },
@@ -302,6 +361,8 @@ export class Game {
         sprint: 0,
         buffer: null,
         airAttacked: false,
+        guarding: false,
+        guardT: 0,
       };
     });
     this.quest = {
@@ -430,6 +491,7 @@ export class Game {
   }
   setPause(value) {
     this.paused = value;
+    this.blocking = false;
     this.cancelCharge();
     this.emit('pause', { paused: value });
   }
@@ -839,6 +901,12 @@ export class Game {
     this.emit('jump', { actor: this.selected });
     return true;
   }
+  // Hold to block (update 17): while the button is down and the hero isn't busy, every blow they
+  // take does 25% less damage and can't knock them down or stagger them.
+  block(on = true) {
+    this.blocking = !!on;
+    return this.blocking;
+  }
   dodge() {
     const a = this.player,
       inp = this.input;
@@ -1226,6 +1294,31 @@ export class Game {
       return false;
     }
     damage = Math.max(1, Math.round(damage * (this.mode === 'cozy' ? 0.55 : 1)));
+    if (a.guarding) {
+      const full = damage;
+      damage = Math.max(1, Math.round(full * (1 - BLOCK_CUT)));
+      a.hp -= damage;
+      a.inv = 0.45;
+      a.guardT = 0;
+      a.kx += Math.sin(angle) * 3;
+      a.kz += Math.cos(angle) * 3;
+      // Turning to face the blow keeps the guard up the way the hero is being hit from.
+      a.yaw = angle + Math.PI;
+      a.yaw = Math.atan2(Math.sin(a.yaw), Math.cos(a.yaw));
+      this.stats.blocked = (this.stats.blocked || 0) + 1;
+      this.stats.saved = (this.stats.saved || 0) + full - damage;
+      this.emit('block', {
+        damage,
+        saved: full - damage,
+        actor: this.selected,
+        x: a.x,
+        z: a.z,
+        y: a.y + 1.3,
+        angle,
+      });
+      if (a.hp <= 0) this.heroDown(a);
+      return true;
+    }
     a.hp -= damage;
     a.inv = 0.7;
     a.kx += Math.sin(angle) * 6;
@@ -1247,21 +1340,24 @@ export class Game {
       a.charge = 0;
     }
     this.emit('hurt', { damage, actor: this.selected, x: a.x, z: a.z, y: a.y + 1.6, angle });
-    if (a.hp <= 0) {
-      a.hp = 0;
-      a.down = true;
-      const next = [1, 2].map((k) => (this.selected + k) % 3).find((i) => !this.actors[i].down);
-      if (next !== undefined) {
-        const name = a.name;
-        this.forceSwitch(next);
-        this.emit('down', { name, next: this.player.name });
-      } else {
-        this.defeated = true;
-        this.foeShots = [];
-        this.emit('defeat');
-      }
-    }
+    if (a.hp <= 0) this.heroDown(a);
     return true;
+  }
+  // The hero on screen is out of health: the next one able steps in, or the battle is lost.
+  heroDown(a) {
+    a.hp = 0;
+    a.down = true;
+    a.guarding = false;
+    const next = [1, 2].map((k) => (this.selected + k) % 3).find((i) => !this.actors[i].down);
+    if (next !== undefined) {
+      const name = a.name;
+      this.forceSwitch(next);
+      this.emit('down', { name, next: this.player.name });
+    } else {
+      this.defeated = true;
+      this.foeShots = [];
+      this.emit('defeat');
+    }
   }
   gainCookie() {
     const before = this.belly;
@@ -1457,7 +1553,11 @@ export class Game {
       a.yaw += clamp(diff, -rate * dt, rate * dt);
       a.yaw = Math.atan2(Math.sin(a.yaw), Math.cos(a.yaw));
     }
-    let speed = kit.speed * (a.charging ? 0.2 : a.action ? 0.12 : 1),
+    // Guarding: on the ground and not busy with a move, a charge or getting up.
+    a.guarding = this.blocking && a.air <= 0 && !a.action && !a.charging && !a.down;
+    for (const b of this.actors) if (b !== a) b.guarding = false;
+    a.guardT = a.guarding ? a.guardT + dt : 0;
+    let speed = kit.speed * (a.charging ? 0.2 : a.action ? 0.12 : a.guarding ? GUARD_SPEED : 1),
       tx = dx * speed,
       tz = dz * speed,
       accel = n > 0.05 ? (a.air > 0 ? 6 : 13) : a.air > 0 ? 2 : 16;
@@ -1570,6 +1670,13 @@ export class Game {
           a.z - Math.cos(a.yaw) * 2.8 - Math.sin(a.yaw) * side * 1.8
         );
       goal.y = this.world.height(goal.x, goal.z);
+      // A friend who has been left far behind for a while (lost on the paths) catches up out of
+      // sight: they step in just behind the hero (update 17).
+      b.lost = dist > 30 ? (b.lost || 0) + dt : 0;
+      if (b.lost > 4 && Math.abs(goal.y - a.y) < 1.2) {
+        Object.assign(b, goal, { lost: 0, speed: 0, moving: false });
+        continue;
+      }
       const near = dist < 5 && this.world.visible(b, goal),
         remaining = near ? Math.hypot(goal.x - b.x, goal.z - b.z) : dist;
       if (remaining > 0.3 && this.navField) {
@@ -1589,6 +1696,16 @@ export class Game {
       } else b.speed = 0;
       b.y = this.world.height(b.x, b.z);
       b.animation = b.moving ? 'Run' : 'Idle';
+    }
+    // Anyone pinned on a cliff face (trying to move, not getting anywhere) slips down it.
+    for (const b of this.actors) {
+      const want = b === a ? n > 0.05 : Math.hypot(a.x - b.x, a.z - b.z) > 3,
+        moved = Math.hypot(b.x - (b.px ?? b.x), b.z - (b.pz ?? b.z));
+      b.pinned =
+        want && moved < 0.004 && !b.down && this.world.steep(b.x, b.z) ? (b.pinned || 0) + dt : 0;
+      if (b.pinned > 0.25) this.world.slide(b, dt);
+      b.px = b.x;
+      b.pz = b.z;
     }
     // Keep friends from standing inside the hero or each other (models are ~1.5 m wide).
     for (let i = 0; i < 3; i++) {
@@ -1720,6 +1837,18 @@ export class Game {
         b.moving = true;
         b.animation = 'Run';
         b.y = this.world.height(b.x, b.z);
+        continue;
+      }
+      // Out of the danger zone but close to a boss winding up: friends raise their guard and
+      // wait for the blow to pass (only a look: friends never take damage).
+      const threat = this.enemies.find(
+        (e) => e.boss && !e.dead && e.state === 'wind' && Math.hypot(e.x - b.x, e.z - b.z) < 8
+      );
+      if (threat) {
+        b.guarding = true;
+        b.yaw = Math.atan2(threat.x - b.x, threat.z - b.z);
+        b.moving = false;
+        b.speed = 0;
         continue;
       }
       let target = null,
@@ -1903,6 +2032,20 @@ export class Game {
         } else e.air = e.y - g;
         continue;
       }
+      // A grunt right under a ledge the hero stands on can't reach them (the paths are flat
+      // cells, so it thinks it has arrived) and can't be hit: after a few seconds it goes back to
+      // where it came from and finds another way round.
+      if (!e.boss) {
+        e.stranded = d < 8 && Math.abs(a.y - e.y) >= 1.2 ? (e.stranded || 0) + dt : 0;
+        if (e.stranded > 4) {
+          const home = e.guard || e.home,
+            p = this.world.safe(home.x, home.z);
+          Object.assign(e, p, { y: this.world.height(p.x, p.z), state: 'idle', st: 0 });
+          e.stranded = 0;
+          e.cd = Math.max(e.cd, 1);
+          continue;
+        }
+      }
       if (e.boss) this.updateBoss(e, dt, dx, dz, d);
       else if (e.state === 'down') {
         e.st -= dt;
@@ -2080,6 +2223,10 @@ export class Game {
       }
       e.y = this.world.height(e.x, e.z);
     }
+    // Every foe on its feet stands on the ground: the circling, backing-off and fleeing moves end
+    // their turn early, and pushes from other foes come after a foe's own turn, so set it here.
+    for (const e of this.enemies)
+      if (!e.dead && !(e.air > 0) && e.state !== 'air') e.y = this.world.height(e.x, e.z);
     this.enemies = this.enemies.filter(
       (e) => !(e.dead && e.fly.t > (e.boss ? 1.6 : 0.9)) && !e.gone
     );

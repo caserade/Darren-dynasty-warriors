@@ -10,6 +10,19 @@ function test(name, body) {
   assert(result, name);
   console.log('PASS', name);
 }
+// Block (update 17): held G / LT / Block button takes 25% off a blow and keeps the combo.
+test(
+  'Holding block takes 25% off a blow and keeps the combo',
+  `P.inv=0;P.combo=6;P.comboT=2;blockHeld=true;hurtPlayer(20,0);const kept=P.hp===85&&P.combo===6;blockHeld=false;P.inv=0;hurtPlayer(20,0);return kept&&P.hp===65&&P.combo===0;`
+);
+test(
+  'No guard during a dodge, an attack, or with block let go',
+  `blockHeld=true;P.dash=.2;const a=guarding();P.dash=0;pressAttack();const b=guarding();P.atk=null;chargeHeld=false;brawlHeld=false;const c2=guarding();blockHeld=false;return !a&&!b&&c2&&!guarding();`
+);
+test(
+  'Blocking slows Darren to a walk',
+  `P.x=1300;P.y=620;keys.KeyD=true;for(let i=0;i<20;i++)update(.02);const free=Math.hypot(P.vx,P.vy);blockHeld=true;for(let i=0;i<20;i++)update(.02);const guard=Math.hypot(P.vx,P.vy);keys.KeyD=false;blockHeld=false;return guard<free*0.5;`
+);
 test(
   'Held attack recovers after a heavy hit',
   `pressAttack();hurtPlayer(16,0);for(let i=0;i<25;i++)update(.04);return brawlHeld&&!!P.atk;`

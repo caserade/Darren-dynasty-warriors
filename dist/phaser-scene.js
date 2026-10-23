@@ -574,6 +574,28 @@ class SnowdayScene extends Phaser.Scene {
         c.arc(q.x, q.y, 12, -Math.PI / 2, -Math.PI / 2 + TAU * clamp(chargeTime / 0.8, 0, 1));
         c.stroke();
       }
+      // Held block (update 17): a frosty shield arc in front of Darren, flaring when it takes a hit.
+      if (playing && guarding()) {
+        const flare = clamp((P.blockT || 0) / 0.25, 0, 1),
+          pts = [];
+        for (let i = 0; i <= 16; i++) {
+          const a = P.dir - 1.1 + (i / 16) * 2.2;
+          pts.push(
+            isoPoint(
+              P.x + Math.cos(a) * 46,
+              P.y + Math.sin(a) * 46,
+              44 + Math.sin((i / 16) * Math.PI) * 14
+            )
+          );
+        }
+        c.globalAlpha = 0.55 + 0.4 * flare;
+        c.lineWidth = 5 + 4 * flare;
+        c.strokeStyle = flare > 0 ? '#ffffff' : '#bfe6ff';
+        c.beginPath();
+        pts.forEach((q, i) => (i ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y)));
+        c.stroke();
+        c.globalAlpha = 1;
+      }
       for (const p of parts) {
         const q = isoPoint(p.x, p.y, 12),
           a = clamp(p.life / (p.max || 1), 0, 1);
@@ -609,7 +631,7 @@ class SnowdayScene extends Phaser.Scene {
         c.lineWidth = 4;
         c.strokeStyle = '#263d55';
         c.strokeText(String(f.v), q.x, q.y);
-        c.fillStyle = f.heal ? '#b5f4b5' : f.player ? '#ffb2ac' : '#fff6ce';
+        c.fillStyle = f.heal ? '#b5f4b5' : f.block ? '#bfe6ff' : f.player ? '#ffb2ac' : '#fff6ce';
         c.fillText(String(f.v), q.x, q.y);
       }
       c.globalAlpha = 1;

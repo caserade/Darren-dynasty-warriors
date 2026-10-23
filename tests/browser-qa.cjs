@@ -84,6 +84,32 @@ function rec(area, check, ok, note = '') {
     await p.keyboard.press('KeyJ');
     await p.waitForTimeout(600);
     await shot(p, 'pixel-05-moved-attacked');
+    // Block (update 17): holding G guards and lights the Block button; a blow costs 25% less.
+    // (after the punch combo above has finished: a move in progress drops the guard)
+    await p.waitForFunction(() => !P.atk && !P.roll && P.dash <= 0, null, { timeout: 20000 });
+    await p.keyboard.down('KeyG');
+    // the dock is refreshed every third frame
+    await p
+      .waitForFunction(() => document.querySelector('#aBlock').classList.contains('ready'), null, {
+        timeout: 5000,
+      })
+      .catch(() => {});
+    const pixelBlock = await p.evaluate(() => {
+      const on = guarding() && document.querySelector('#aBlock').classList.contains('ready');
+      P.inv = 0;
+      const hp = P.hp;
+      hurtPlayer(20, 0);
+      return { on, lost: hp - P.hp };
+    });
+    await p.keyboard.up('KeyG');
+    await p.waitForTimeout(200);
+    rec(
+      'pixel',
+      'holding G blocks: 20 damage becomes 15 and the Block button lights',
+      pixelBlock.on && pixelBlock.lost === 15 && !(await p.evaluate(() => guarding())),
+      JSON.stringify(pixelBlock)
+    );
+    await shot(p, 'pixel-05b-block');
     await p.keyboard.press('KeyP');
     await p.waitForTimeout(800);
     const paused = await p.isVisible('#sPause');
@@ -238,6 +264,22 @@ function rec(area, check, ok, note = '') {
       `moved ${Math.hypot(p1.x - p0.x, p1.z - p0.z).toFixed(1)} m in 1.5 game-seconds`
     );
     await shot(p, '3d-03-moved');
+    await idle();
+    await p.keyboard.down('KeyF');
+    await frames(3);
+    const kb = await p.evaluate(() => ({
+      guarding: snowdayTest.game.player.guarding,
+      chip: !document.querySelector('#guard').hidden,
+    }));
+    await shot(p, '3d-03b-block');
+    await p.keyboard.up('KeyF');
+    await frames(3);
+    rec(
+      '3d',
+      'holding F blocks and shows Guard up on the hero card; letting go drops it',
+      kb.guarding && kb.chip && !(await p.evaluate(() => snowdayTest.game.player.guarding)),
+      JSON.stringify(kb)
+    );
     await idle();
     await p.keyboard.press('KeyJ');
     await frames(2);
@@ -406,8 +448,37 @@ function rec(area, check, ok, note = '') {
       }, i);
       await frames(2);
     };
-    await press(4);
-    rec('3d', 'gamepad LB cycles hero', (await pos()).sel === 1);
+    await press(15);
+    rec('3d', 'gamepad D-pad right cycles hero', (await pos()).sel === 1);
+    // Block (update 17): holding LB guards, letting go drops it, and a blow costs 25% less.
+    await p.evaluate(() => {
+      __pad.buttons[4] = { pressed: true, value: 1 };
+    });
+    await frames(3);
+    const guard = await p.evaluate(() => {
+      const g = snowdayTest.game,
+        a = g.player,
+        hp = a.hp;
+      a.inv = 0;
+      g.hurtHero(20, 0);
+      return { guarding: a.guarding, lost: hp - a.hp, down: a.action?.name || null };
+    });
+    rec(
+      '3d',
+      'holding LB blocks: 20 damage becomes 15, no knockdown',
+      guard.guarding && guard.lost === 15 && guard.down === null,
+      JSON.stringify(guard)
+    );
+    await p.evaluate(() => {
+      __pad.buttons[4] = { pressed: false, value: 0 };
+    });
+    await frames(3);
+    rec(
+      '3d',
+      'letting go of LB drops the guard',
+      !(await p.evaluate(() => snowdayTest.game.player.guarding))
+    );
+    await p.evaluate(() => (snowdayTest.game.player.hp = 100));
     const q0 = await pos();
     await p.evaluate(() => {
       __pad.axes[1] = -1;
@@ -544,11 +615,12 @@ function rec(area, check, ok, note = '') {
           dodge: 1,
           combo: 2,
           charge: 3,
-          switch: 4,
+          block: 4,
           interact: 5,
           style: 6,
           special: 7,
           pause: 9,
+          switch: 15,
         })
     );
     await p.evaluate(() => {
@@ -627,6 +699,22 @@ function rec(area, check, ok, note = '') {
     await p.waitForTimeout(1500);
     await shot(p, '3d-13-phone-play');
     rec('3d', 'phone portrait: touch controls shown', await p.isVisible('#stick'));
+    const tb = await p.locator('#touch-block').boundingBox();
+    await p.dispatchEvent('#touch-block', 'pointerdown', { pointerId: 7, isPrimary: true });
+    await p.waitForTimeout(600);
+    const touchGuard = await p.evaluate(() => snowdayTest.game.player.guarding);
+    await p.dispatchEvent('#touch-block', 'pointerup', { pointerId: 7, isPrimary: true });
+    await p.waitForTimeout(600);
+    rec(
+      '3d',
+      'phone portrait: Block button on screen and holds the guard',
+      !!tb &&
+        tb.x >= 0 &&
+        tb.x + tb.width <= 412 &&
+        touchGuard &&
+        !(await p.evaluate(() => snowdayTest.game.player.guarding)),
+      JSON.stringify(tb)
+    );
     await c.close();
   }
   {

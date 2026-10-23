@@ -3976,6 +3976,96 @@ function darrenScarf() {
 // tip forward and the tail, which hangs off the hips, used to swing straight up and drag his back
 // into a sheet. The tail's lift above level (hips plus each tail bone, degrees) is held between
 // a low drag and a modest rise, so it stays out behind him as a counterweight. Rolls are left alone.
+// ======================= GUARD (update 17) =======================
+// Held block, one looping clip per hero, square to the front so anim.mjs can also lay its upper
+// body over the walk (Animator.overlay). A slow breath keeps it alive while held.
+function darrenGuard() {
+  const pose = (b) => ({
+    hips: { p: [0, -0.06 - 0.005 * b, -0.02] },
+    spine: [12 + 1.5 * b, 0, 0],
+    head: [4 - b, 0, 0],
+    legL: [-14, 0, 8],
+    legR: [10, 0, -8],
+    footL: [10, 0, 0],
+    footR: [-4, 0, 0],
+    // Forearms crossed in front of the chest and chin, left over right, paws up.
+    ...D_ARMS(
+      [
+        [0.2, -0.1, 0.97],
+        [-0.6, 0.58, 0.55],
+      ],
+      [
+        [-0.15, -0.05, 0.99],
+        [0.62, 0.42, 0.66],
+      ]
+    ),
+    // Wings swing forward to shelter his sides.
+    wingL: { aim: [0.8, 0.3 + 0.02 * b, 0.5] },
+    wingR: { aim: [-0.8, 0.3 + 0.02 * b, 0.5] },
+    wingtipL: [0, 0, 12],
+    wingtipR: [0, 0, -12],
+    tail1: [12, 0, 0],
+    tail2: [8, 0, 0],
+  });
+  return {
+    Guard: {
+      dur: 1.4,
+      loop: true,
+      keys: [
+        [0, pose(0)],
+        [0.7, pose(1)],
+      ],
+    },
+  };
+}
+// Authored like his other clips with the shield on his right paw, then mirrored with them.
+function tormundGuard() {
+  const pose = (b) =>
+    TG({
+      ...crouch(0.32 + 0.02 * b, 0.75, 10),
+      hips: { r: [5, 0, 0], p: [0, -0.07 - 0.004 * b, -0.02] },
+      spine: [4, 0, 0],
+      chest: [5 + b, 0, 0],
+      head: [-8, 0, 0],
+      // Shield square in front, face forward, at chin height; sword held back and low, ready.
+      ...TSh([-0.3, -0.45, 0.84], [0.32, 0.12, 0.94], [0, 0.05, 1]),
+      ...TSw([0.55, -0.6, -0.1], [0.25, -0.35, 0.9], [0.15, 0.55, 0.8]),
+      tail1: [8, 0, 0],
+    });
+  return {
+    Guard: {
+      dur: 1.4,
+      loop: true,
+      keys: [
+        [0, pose(0)],
+        [0.7, pose(1)],
+      ],
+    },
+  };
+}
+// Bucky holds the mallet's handle across his chest in both paws, braced on wide feet.
+function buckyGuard() {
+  const pose = (b) =>
+    BGd({
+      ...crouch(0.3 + 0.02 * b, 0.5, 14),
+      hips: { p: [0, -0.06 - 0.004 * b, -0.01] },
+      spine: [8 + b, 0, 0],
+      chest: [4, 0, 0],
+      head: [-10, 0, 0],
+      ...BM([0.3, -0.4, 0.85], [-0.45, 0.35, 0.82], [-0.96, 0.25, 0.05]),
+      tail1: [10, 0, 0],
+    });
+  return {
+    Guard: {
+      dur: 1.4,
+      loop: true,
+      keys: [
+        [0, pose(0)],
+        [0.7, pose(1)],
+      ],
+    },
+  };
+}
 const TAIL_LIFT = [
   ['tail1', -12, 18],
   ['tail2', -16, 26],
@@ -4018,16 +4108,17 @@ function mirrorClips(specs) {
 export const LIBRARY = {
   Darren: {
     base: D_STANCE,
-    clips: () => withKnees({ ...darrenLocomotion(), ...darrenPaws(), ...darrenScarf() }),
+    clips: () =>
+      withKnees({ ...darrenLocomotion(), ...darrenPaws(), ...darrenScarf(), ...darrenGuard() }),
   },
   // Mirrored: sword in his right paw, shield on his left, as in the design (studio pass 4).
   Tormund: {
     base: mirror(T_BASE),
-    clips: () => mirrorClips({ ...tormundLocomotion(), ...tormundSword() }),
+    clips: () => mirrorClips({ ...tormundLocomotion(), ...tormundSword(), ...tormundGuard() }),
   },
   Bucky: {
     base: B_BASE,
-    clips: () => withTailBalance({ ...buckyLocomotion(), ...buckyMallet() }),
+    clips: () => withTailBalance({ ...buckyLocomotion(), ...buckyMallet(), ...buckyGuard() }),
   },
 };
 

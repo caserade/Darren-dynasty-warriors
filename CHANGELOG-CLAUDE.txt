@@ -888,3 +888,113 @@ FIX
 - A trail with no sample yet stays hidden and draws nothing. One check in trail.mjs.
 - New test tests/weapon-trail.mjs (in npm test) makes a trail draw on a paused first frame; it
   fails with the same error on main and passes with the fix.
+
+CLAUDE UPDATE 17 · FULL GAME UPDATE: 30 PASSES, BLOCKING, NEW ENEMIES AND BOSSES · 2026-10-23
+Asked: "a full update well thought out and organized, 30 passes and full fix on things and
+characters. Even a way to block cutting damage in 25% down."
+
+BLOCKING (passes 1-6)
+1. 3D rule (dist/3d/sim.mjs block(), hurtHero): while block is held and the hero is on the
+   ground and not busy (no move, charge, jump or knockdown), every blow does 25% less damage
+   (BLOCK_CUT, rounded, never under 1; Cozy mode's softening stacks), can't knock the hero down
+   or stagger them, doesn't break the combo, and turns the hero to face it. Guarding slows the
+   hero to 38% speed. Attacking, dodging or jumping drops the guard; it comes back if still held.
+   Pausing lets go of it. Tormund's parry (dodge from a standstill) still works from the guard.
+2. Guard poses (dist/3d/clips.mjs Guard for each hero): Darren crosses his forearms in front of
+   his chest and chin with his wings sheltering his sides; Tormund raises the shield square in
+   front at chin height, sword held back and low; Bucky holds the mallet's handle across his
+   chest in both paws. Standing still the whole body takes the pose; walking, dist/3d/anim.mjs
+   Animator.overlay() lays the guard over the upper body and the legs keep walking.
+3. 3D feedback: a cold blue ring and steel sparks where the blow lands (on Tormund's shield
+   itself), a dull knock, "-15 BLOCK" in blue instead of the red number and flash, a light
+   camera nudge, and "Guard up" on the hero card while held.
+4. 3D controls: hold F, hold LB / L1, or hold the new Block touch button. Next hero moved from
+   LB to D-pad right (musou games guard on LB). Saved controller setups from before this update
+   that still have Next hero on LB are moved over automatically. Block is remappable and is in
+   the pause help, the controls bar and the controller help line.
+5. Pixel game (dist/game.js, controls.js, phaser-scene.js): the same 25% block. Hold G, hold LT
+   / L2 (LT + D-pad still zooms), the BLOCK touch button or the Block button on the ability bar,
+   which lights while guarding. A frosty shield arc shows in front of Darren and flares on a hit,
+   with a wooden knock sound, controller rumble and a blue "-15 BLOCK". Slows him to a walk.
+6. Teaching and results: the first boss warning of a visit shows how to block (with the key,
+   button or touch wording that fits), until the player has blocked once. The results screen
+   now counts blocked damage in Health lost (it would have been left out) and adds a "Blocked:
+   N hits · N saved" line when there were any.
+
+ENEMIES AND BOSSES REBUILT (passes 7-14, new dist/3d/foes.mjs)
+The grunts and bosses were plain shapes since update 2. They are now characters with faces,
+angry brows, hands and feet, and limbs on joints that walk, wind up, strike and flinch from what
+the simulation says they are doing. Sizes and hit boxes are unchanged.
+7. Sergeant Spudsworth: a lumpy potato in an army helmet with a badge and chin strap, bristling
+   moustache that twitches when he shouts, belt and brass buckle, sergeant stripes, boots and
+   gloved fists. Slam raises both fists overhead; swipe draws one back and sweeps it.
+8. Madame Tumbleweed: a real ball of bent twigs that rolls, under a wide pink sun hat with a rose
+   and fluttering ribbon; her lashed eyes, lipstick and blush stay upright while the ball rolls.
+9. Colonel Cluck: officer's cap with a gold badge, comb, wattle, a beak that opens when she
+   squawks, medals, tail feathers, three-toed legs; flaps hard for the egg barrage.
+10. The Bramble Baron: a towering thorn bush in a top hat with a rose, monocle on a chain,
+    glowing purple eyes, a grin of pale thorn teeth, a purple cape, and long vine arms ending in
+    thorny clubs that rise for his slam and spread for his thorn burst.
+11. Gopher: cheeks, buck teeth, whiskers, pink ears, arms and feet, stubby tail.
+12. Crow: two-part beak, crest, tail fan, jointed wings with feather tips, legs and toes.
+13. Hay bale: straw tufts all over, twine bands, little feet and straw arms, scowl.
+14. Animation for all of them: walk cycles, wind-up and strike poses per attack, flinching when
+    hit, limbs flung when knocked out. Same-colour parts are merged into one mesh per joint so a
+    crowd stays cheap to draw, and those merged meshes are freed when a foe leaves.
+
+BUGS FOUND BY A ROBOT PLAYER (passes 15-20)
+A robot played the whole adventure and Firewood for Mom with 10 different random seeds,
+checking every frame for heroes or foes inside walls or under the ground, broken numbers, a
+friend left far behind, a guard during a move, and getting stuck. What it found, now fixed:
+15. Foes sank into hills or floated over dips: grunts circling their turn, backing off from a
+    charge or fleeing skipped the line that stands them on the ground, and pushes from other foes
+    came after their own turn. Every foe on its feet is now put on the ground at the end of each
+    frame (up to 38 cm under the snow before).
+16. A grunt right under a ledge the hero stood on could neither reach nor be reached and waited
+    there for ever (the paths are flat cells, so it thought it had arrived). After 4 seconds it now
+    goes back to where it came from and finds another way.
+17. Cells beside the Bramble Keep bridge rail had no paths at all (their centre is blocked by the
+    rail post), so friends, foes and the robot walking there went nowhere. They now head for the
+    best walkable cell around them.
+18. From the slope at a cell's edge the way to the next cell can be a rock face; walkers pushed
+    into it for ever. They now take the nearest direction that can be walked.
+19. A hero or friend who landed half-way down a cliff from a jump could be pinned there; anyone
+    trying to move but not getting anywhere on a cliff face now slips down it.
+20. A friend lost more than 30 m behind for 4 seconds now steps in just behind the hero, out of
+    sight, instead of trailing far behind. After these fixes 10 of 10 robot runs finish the
+    rescue and 5 of 5 also finish Firewood, with nothing logged (before them, runs stalled on
+    the bridge and below Bramble Keep, and friends trailed up to 55 m behind).
+
+HEROES, FEEL AND SCREENS (passes 21-26)
+21. Friends raise their guard and face the boss while it winds up next to them (they never take
+    damage; it shows the new poses and reads the danger).
+22. Controller rumble in the 3D game, like the pixel game's: hits, heavy hits, blocks, being hurt,
+    slams and specials. Off with reduced motion, never more than every 65 ms.
+23. The controls bar under the 3D game wrapped off its row and ran under the map and the hero
+    card on narrower screens; it now wraps into two neat rows between them.
+24. The hero card's chips ("Packed snowball", the belly stage) split across two lines into two
+    broken pieces; each now stays one chip. On a phone held sideways the chips are a little
+    slimmer so the card stays above the joystick, and the "Guard up" chip is left off there (the
+    Block button is under the thumb). The touch Block buttons in both games keep working when a
+    browser refuses to lock the finger to the button.
+25. The guard poses were checked with the body-overlap tool (tools/review/collide.cjs): Darren's
+    Guard has no part in his head or face (726 vertex-frames of arms against the tummy, which is
+    how crossed arms rest); renders of all three in project files full-update/.
+26. The 3D special test placed its crowd on a slope; with foes now standing on the real ground
+    some were out of reach, so the test moved to the flat ground by the cottage.
+
+CHECKS AND NOTES (passes 27-30)
+27. New tests: 6 block and path checks in tests/three-d.mjs, 3 block checks in tests/gameplay.cjs,
+    and tests/browser-qa.cjs now holds F, LB, G and the touch Block button in a real browser.
+28. tests/browser-qa.cjs updated for Next hero on D-pad right and the new standard buttons.
+29. CONTROLLER-PLAY.txt has a Block section; THREE-D-RELEASE.txt's control list is current.
+30. CHANGELOG-CLAUDE.txt and TEST-RESULTS-CLAUDE.txt (this file and that one).
+
+NOT CHANGED
+- Saves: no new save fields, old saves load. Balance and damage numbers are as before except the
+  block. The Windows app itself is unchanged: this goes out as a game update.
+
+STILL FOR AN ARTIST
+- Darren's wings still brush the back of his head in fast spins (a model shape, measured again:
+  the wing roots sit at the nape). Hero textures, fingers and the other items listed in earlier
+  updates are unchanged. The new enemies are built in code, not sculpted.

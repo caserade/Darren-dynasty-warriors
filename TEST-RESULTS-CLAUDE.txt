@@ -1,3 +1,30 @@
+TEST RESULTS · CLAUDE UPDATE 17 (FULL GAME UPDATE: BLOCKING, NEW ENEMIES, PATH FIXES) · 2026-10-23
+All runs below were made in a Linux container on branch claude/project-thread-2fvgj1 (main after
+PR #16), with headless Chromium using software WebGL (SwiftShader). Earlier results further down
+are history, not verification of this branch.
+
+npm test (node 22.22): all pass, including tests/three-d.mjs (52 checks, 6 new: block cuts 25%,
+  no knockdown while guarding, guard drops during a move, friends guard a boss wind-up, the
+  bridge-rail and cliff path cases, a lost friend catching up) and tests/gameplay.cjs (3 new
+  pixel block checks).
+tests/browser-qa.cjs (server: node desktop-server.cjs): 69 of 69, no page errors. It now holds F,
+  LB, G, the pixel Block dock button and the 3D touch Block button in a real browser. Two real
+  problems it caught on the way, both fixed: the 3D touch Block button stopped working for good
+  if the browser refused to capture the finger, and on a sideways phone the hero card overlapped
+  the joystick by 3.5 px after the chip change.
+Robot player (project files full-update/robot-player.mjs): before the path fixes runs stalled at
+  the Bramble Keep bridge and below the keep, foes sat up to 38 cm under the snow and friends
+  trailed up to 55 m behind; after them 10 of 10 seeds finish the rescue and 5 of 5 finish
+  Firewood for Mom with nothing logged.
+Body overlap (tools/review/collide.cjs, Darren only): the Guard pose puts nothing into his head or
+  face; 726 vertex-frames of forearm against tummy, which is how crossed arms rest.
+Renders of the guard poses and the new enemies and bosses: project files full-update/.
+
+LIMITS
+- Not run on a real Windows PC, GPU, controller or phone. Controller rumble and the LB / LT block
+  were tested with a simulated pad only. The Windows app was not rebuilt (unchanged; this ships
+  as a game update).
+
 TEST RESULTS · CLAUDE UPDATE 16 (BOSS BAR / WEAPON TRAIL FIX + FINAL CHECK · 3D) · 2026-10-18
 All runs below were made in a Linux container on branch claude/project-thread-e9f1fj (main after
 PR #15), with headless Chromium using software WebGL (SwiftShader). Earlier results further down

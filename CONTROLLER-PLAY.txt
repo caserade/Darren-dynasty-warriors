@@ -23,3 +23,21 @@ Verification: tests/controllers.cjs, gameplay.cjs, firewood.cjs, phone.cjs and
 native Canvas verify-scene.cjs passed. Controller tests simulate standard
 pads and Phaser axes; they do not certify real Android/iPhone controllers or
 browser compatibility. No physical phone/controller test was available.
+
+BLOCK (UPDATE 17)
+
+Both games now have a held block. While it is held every blow does 25% less
+damage, and a blocked blow can't knock the hero down, stagger them or break
+the combo. Blocking slows the hero to a walk; attacking, dodging or jumping
+drops the guard, and it comes back if the button is still held.
+
+3D game: hold F, hold LB / L1, or hold the Block touch button. Next hero moved
+from LB to D-pad right. A controller set up before this update that still has
+Next hero on LB is moved over automatically (unless D-pad right was in use).
+Block can be remapped in Options > Controller buttons like everything else.
+
+Pixel game: hold G, hold LT / L2, or hold the BLOCK touch button (or the Block
+button on the ability bar). LT with the D-pad still zooms. Block can be
+remapped in Pause > Controller.
+
+Tested with simulated controllers only, like everything above.

@@ -659,6 +659,14 @@ kbd {
   background: var(--snow);
   font-size: 12px;
 }
+#tBlock {
+  right: 176px;
+  bottom: calc(140px + env(safe-area-inset-bottom, 0px));
+  width: 56px;
+  height: 56px;
+  background: #cfe9f7;
+  font-size: 11px;
+}
 #tMu {
   right: 30px;
   bottom: calc(238px + env(safe-area-inset-bottom, 0px));

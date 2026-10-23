@@ -166,6 +166,13 @@ button i {
   background: #18364abf;
   padding: 4px 7px;
   border-radius: 5px;
+  /* Each label stays one whole chip instead of breaking across two lines (update 17). */
+  display: inline-block;
+  white-space: nowrap;
+  margin-top: 5px;
+}
+#vitals small[hidden] {
+  display: none;
 }
 .charge {
   height: 11px;
@@ -200,13 +207,19 @@ kbd {
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 14px;
   white-space: nowrap;
   font-size: 12px;
   background: #142b3de3;
   border: 1px solid #94abb32c;
-  padding: 14px 20px;
+  padding: 10px 16px;
   border-radius: 10px;
+  /* Stays clear of the hero card on the left and the map on the right (update 17). */
+  width: max-content;
+  max-width: calc(100% - 520px);
+  box-sizing: border-box;
 }
 #toast {
   position: absolute;
@@ -601,6 +614,9 @@ h1 span {
   .touch-device #vitals small {
     font-size: 11px;
     white-space: nowrap;
+    /* whole chips stack one per line here; keep the card above the joystick */
+    margin-top: 3px;
+    padding: 3px 6px;
   }
   #quest {
     top: 12px;
@@ -837,6 +853,10 @@ h1 span {
 .float.heal {
   color: #9cf0a0;
 }
+.float.block {
+  color: #bfe3ff;
+  font-size: 16px;
+}
 #defeat h2 {
   font-size: 30px;
   margin: 14px 0 8px;
@@ -934,7 +954,8 @@ h1 span {
     display: inline;
     margin: 3px 0 0;
   }
-  .touch-device #belly {
+  .touch-device #belly,
+  .touch-device #vitals #guard {
     display: none;
   }
   .touch-device #vitals .meter {
@@ -961,6 +982,12 @@ h1 span {
     box-shadow: 0 0 2px #f6d23a;
   }
 }
+/* Lit while the hero holds block (update 17). */
+#vitals #guard {
+  color: #bfe3ff;
+  border: 1px solid #bfe3ff88;
+}
+
 #vitals #style:not([hidden]) {
   display: inline-block;
   margin-top: 5px;
@@ -974,6 +1001,10 @@ h1 span {
 .touch-actions #touch-special.ready {
   opacity: 1;
   box-shadow: 0 0 10px #f6d23a;
+}
+.touch-actions #touch-block {
+  background: #3c6f8fd9;
+  color: white;
 }
 .touch-actions #touch-style {
   background: #b94f7ad9;

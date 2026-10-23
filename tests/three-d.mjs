@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { World, Game, CAST, GRUNTS, BOSSES, BELLY, MOVE_WIND } from '../dist/3d/sim.mjs';
+import { World, Game, CAST, GRUNTS, BOSSES, BELLY, MOVE_WIND, BLOCK_CUT } from '../dist/3d/sim.mjs';
 const data = JSON.parse(fs.readFileSync(new URL('../dist/3d/world.json', import.meta.url)));
 const world = new World(data);
 world.prepareNav();
@@ -104,16 +104,17 @@ test('Jump attack in the air, dash attack after a sprint', () => {
 });
 test('Special needs a full meter that fills from hits, keeps Darren untouchable and clears a crowd', () => {
   const g = fresh();
-  place(g, 40, 52);
+  // Flat ground by home, so every grunt the special throws stays within reach.
+  place(g, 16.5, 56);
   for (const a of g.actors) if (a !== g.player) Object.assign(a, { x: 10, z: 10 });
   assert(!g.special());
-  const e = foe(g, 'gopher', 40, 53.6);
+  const e = foe(g, 'gopher', 16.5, 57.6);
   e.hp = e.max = 500;
   assert(g.attack());
   tick(g, 0.5);
   assert(g.player.mus > 0);
   e.hp = 0.1;
-  for (let k = 0; k < 6; k++) foe(g, 'gopher', 40 + Math.sin(k) * 2.4, 52 + Math.cos(k) * 2.4);
+  for (let k = 0; k < 6; k++) foe(g, 'gopher', 16.5 + Math.sin(k) * 2.4, 56 + Math.cos(k) * 2.4);
   g.player.mus = 100;
   assert(g.special());
   assert.equal(g.player.action.name, 'PawSpecial');
@@ -1025,5 +1026,143 @@ test('Firewood started before the 3D rescue can switch back without losing rescu
   const back = new Game(world, saved, { seed: 1 });
   assert.equal(back.quest.chapter, 'firewood');
   assert.equal(back.quest.home, false);
+});
+// Block (update 17): held, it takes 25% off every blow and keeps the hero on their feet.
+test('Holding block cuts damage by 25%, prevents knockdowns and keeps the combo', () => {
+  assert.equal(BLOCK_CUT, 0.25);
+  for (const hero of [0, 1, 2]) {
+    const open = fresh(),
+      guard = fresh();
+    for (const g of [open, guard]) {
+      g.switchTo(hero);
+      tick(g, 0.5);
+      place(g, 30, 52);
+      g.player.inv = 0;
+    }
+    guard.block(true);
+    tick(guard, 0.1);
+    assert(guard.player.guarding, CAST[hero] + ' guards');
+    guard.combo = 7;
+    guard.comboTime = 2;
+    open.hurtHero(20, 0);
+    guard.hurtHero(20, 0);
+    assert.equal(100 - open.player.hp, 20);
+    assert.equal(100 - guard.player.hp, 15, CAST[hero] + ' takes 15 instead of 20');
+    assert.equal(open.player.action?.name, 'Knockdown');
+    assert.equal(guard.player.action, null, 'no knockdown through the guard');
+    assert.equal(guard.combo, 7, 'a blocked blow keeps the combo going');
+    assert(guard.events.some((e) => e.type === 'block' && e.damage === 15 && e.saved === 5));
+    assert(!guard.events.some((e) => e.type === 'hurt'));
+  }
+  // Rounds like every other hit and never drops below 1; cozy mode stacks with it.
+  const g = fresh();
+  place(g, 30, 52);
+  g.block(true);
+  tick(g, 0.1);
+  g.player.inv = 0;
+  g.hurtHero(2, 0);
+  assert.equal(g.player.hp, 98, 'a 2 damage hit still costs 2 after rounding (1.5 rounds up)');
+  g.player.inv = 0;
+  g.hurtHero(1, 0);
+  assert.equal(g.player.hp, 97, 'never less than 1');
+  const cozy = fresh();
+  cozy.setMode('cozy');
+  place(cozy, 30, 52);
+  cozy.block(true);
+  tick(cozy, 0.1);
+  cozy.player.inv = 0;
+  cozy.hurtHero(20, 0);
+  assert.equal(cozy.player.hp, 100 - Math.round(Math.round(20 * 0.55) * 0.75));
+});
+test('Block drops while attacking, in the air, on pause and on release; guarding walks slowly', () => {
+  const g = fresh();
+  place(g, 30, 52, Math.PI / 2);
+  g.block(true);
+  tick(g, 0.1);
+  assert(g.player.guarding);
+  const x0 = g.player.x;
+  tick(g, 1, { x: 1, z: 0 });
+  const guardSpeed = g.player.x - x0;
+  assert(g.player.guarding, 'still guarding on the move');
+  g.block(false);
+  tick(g, 0.1);
+  assert(!g.player.guarding);
+  const x1 = g.player.x;
+  tick(g, 1, { x: 1, z: 0 });
+  assert(guardSpeed < (g.player.x - x1) * 0.5, 'walking in guard is well under half speed');
+  g.block(true);
+  g.player.cooldown = 0;
+  assert(g.attack(), 'attacking straight out of the guard');
+  tick(g, 1 / 60);
+  assert(!g.player.guarding, 'no guard during a move');
+  tick(g, 2);
+  assert(g.player.guarding, 'guard comes back once the move ends while still held');
+  g.player.cooldown = 0;
+  g.jump();
+  tick(g, 0.1);
+  assert(!g.player.guarding, 'no guard in the air');
+  tick(g, 1.5);
+  g.setPause(true);
+  g.setPause(false);
+  tick(g, 0.1);
+  assert(!g.player.guarding, 'pausing lets go of the block');
+});
+test('A blocked blow that empties the bar still hands over to the next hero', () => {
+  const g = fresh();
+  place(g, 30, 52);
+  g.block(true);
+  tick(g, 0.1);
+  g.player.hp = 3;
+  g.player.inv = 0;
+  g.hurtHero(20, 0);
+  assert(g.actors[0].down);
+  assert.equal(g.selected, 1);
+  assert(!g.actors[0].guarding);
+});
+test('Friends raise their guard while a boss winds up next to them', () => {
+  const g = fresh();
+  place(g, 30, 52);
+  const b = g.makeFoe('spud', 34, 52, true);
+  g.enemies.push(b);
+  Object.assign(g.actors[1], { x: 28.5, z: 56, y: world.height(28.5, 56) });
+  b.active = true;
+  b.state = 'wind';
+  b.move = 'slam';
+  b.st = b.windMax = 5;
+  tick(g, 0.1);
+  assert(g.actors[1].guarding, 'Tormund guards');
+  b.state = 'idle';
+  tick(g, 0.1);
+  assert(!g.actors[1].guarding, 'and lowers it after');
+});
+// Path fixes (update 17) found by a robot playing the whole adventure over and over.
+test('Paths: no dead end beside the bridge rail; a hero pinned on a cliff face slips off it', () => {
+  const o = { x: 129.6, z: 53.2 },
+    f = world.field(o.x, o.z);
+  const a = { x: 116, z: 48.9, air: 0 };
+  let moved = 0;
+  for (let i = 0; i < 120; i++) {
+    const ang = world.direction(a, o, f),
+      x0 = a.x,
+      z0 = a.z;
+    world.move(a, Math.sin(ang) * 0.09, Math.cos(ang) * 0.09);
+    moved += Math.hypot(a.x - x0, a.z - z0);
+  }
+  assert(moved > 5, `walks on from the bridge (moved ${moved.toFixed(2)} m)`);
+  // Landed half-way down the cliff below Bramble Keep: walking on gets them off it.
+  const g = fresh();
+  place(g, 116, 58.1);
+  for (let i = 0; i < 240; i++) {
+    const ang = world.direction(g.player, o, f);
+    g.update(1 / 60, { x: Math.sin(ang), z: Math.cos(ang) });
+  }
+  assert(Math.hypot(g.player.x - 116, g.player.z - 58.1) > 3, 'off the cliff face');
+});
+test('A friend lost far behind catches up just behind the hero', () => {
+  const g = fresh();
+  place(g, 30, 52);
+  Object.assign(g.actors[2], { x: 110, z: 61.6, y: world.height(110, 61.6) });
+  tick(g, 4.5);
+  assert(Math.hypot(g.actors[2].x - g.player.x, g.actors[2].z - g.player.z) < 6);
 });
 console.log(`${passes} 3D simulation checks passed.`);
