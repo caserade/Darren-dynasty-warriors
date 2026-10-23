@@ -7,6 +7,7 @@ import { ScarfRibbon } from './ribbon.mjs';
 import { WeaponTrail } from './trail.mjs';
 import { addMetalShine } from './look.mjs';
 import { createFront } from './front.mjs';
+import { buildFoe, animateFoe } from './foes.mjs';
 
 const $ = (id) => document.getElementById(id),
   canvas = $('view'),
@@ -528,6 +529,25 @@ function menuFocus(step) {
   const i = items.indexOf(document.activeElement);
   items[(i + step + items.length) % items.length].focus();
 }
+// Controller rumble (update 17), like the pixel game's: only with a controller in use, never more
+// often than every 65 ms, and off when the system asks for reduced motion.
+let rumbleAt = 0,
+  blockTipShown = false;
+function rumble(strength, ms) {
+  if (!padPresent || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (performance.now() - rumbleAt < 65) return;
+  rumbleAt = performance.now();
+  try {
+    const pad = Array.from(navigator.getGamepads?.() || []).find((p) => p?.connected);
+    pad?.vibrationActuator
+      ?.playEffect('dual-rumble', {
+        duration: ms,
+        weakMagnitude: strength,
+        strongMagnitude: strength * 0.45,
+      })
+      .catch(() => {});
+  } catch {}
+}
 function padInput(dt) {
   const pad = Array.from(navigator.getGamepads?.() || []).find((p) => p?.connected);
   if (!pad) {
@@ -957,6 +977,7 @@ function events() {
     if (e.type === 'throw') tone(380, 0.2);
     if (e.type === 'hitstop') {
       hitstop = Math.max(hitstop, e.t);
+      rumble(e.heavy ? 0.35 : 0.12, e.heavy ? 90 : 40);
       // Bucky's heavy blows thump the camera.
       if (e.actor === 2 && e.heavy) shake = Math.max(shake, 0.22);
     }
@@ -987,6 +1008,7 @@ function events() {
         );
       tone(310, 0.1, 0.05);
       tone(930, 0.08, 0.025);
+      rumble(0.3, 80);
       shake = Math.max(shake, 0.12);
       floater(e.x, e.y + 0.4, e.z, `-${e.damage} BLOCK`, 'block');
     }
@@ -994,6 +1016,7 @@ function events() {
       banner(e.name, 'SPECIAL');
       tone(196, 0.5, 0.06);
       shake = Math.max(shake, 0.25);
+      rumble(0.5, 260);
     }
     if (e.type === 'style') {
       toast(`Darren: ${e.name}`);
@@ -1012,6 +1035,7 @@ function events() {
     if (e.type === 'hurt') {
       if (heroes[e.actor]) heroes[e.actor].hurt = e.angle ?? null;
       tone(140, 0.22, 0.06);
+      rumble(e.damage >= 14 ? 0.8 : 0.55, e.damage >= 14 ? 180 : 120);
       hurtFlash();
       shake = 0.3;
       floater(e.x, e.y + 0.4, e.z, '-' + e.damage, 'ouch');
@@ -1020,8 +1044,21 @@ function events() {
       ring({ ...e, color: 0xffffff });
       tone(70, 0.35, 0.07);
       shake = Math.max(shake, 0.2);
+      rumble(0.4, 150);
     }
-    if (e.type === 'tell') tone(240, 0.1, 0.03);
+    if (e.type === 'tell') {
+      tone(240, 0.1, 0.03);
+      // The first boss warning of a visit, until the player has blocked once: how to block.
+      if (e.boss && !blockTipShown && !game.stats.blocked) {
+        blockTipShown = true;
+        const how = document.body.classList.contains('touch-device')
+          ? 'Hold the Block button'
+          : padPresent
+            ? `Hold ${buttonName(padBindings.block).split(' / ')[0]}`
+            : 'Hold F';
+        toast(`${how} to block: 25% less damage and no knockdowns.`);
+      }
+    }
     if (e.type === 'ko') tone(e.boss ? 120 : 520, 0.12, 0.03);
     if (e.type === 'orb') {
       tone(990, 0.14);
@@ -1057,7 +1094,8 @@ function events() {
     }
   }
 }
-// ---- Enemies, bosses, pickups and boss warnings (Claude update 2). Built from simple shapes, like the practice posts. ----
+// ---- Enemies, bosses, pickups and boss warnings (Claude update 2). The enemies and bosses themselves
+// are built in foes.mjs (update 17); pickups and shots are simple shapes, like the practice posts. ----
 const GEO = {
   sphere: new THREE.SphereGeometry(1, 14, 10),
   half: new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2),
@@ -1074,162 +1112,6 @@ function part(parent, geo, color, x = 0, y = 0, z = 0, sx = 1, sy = sx, sz = sx)
   m.scale.set(sx, sy, sz);
   return m;
 }
-function eyes(parent, y, z, spread, size = 0.07) {
-  for (const s of [-1, 1]) {
-    part(parent, 'sphere', 0xffffff, s * spread, y, z, size * 1.5);
-    part(parent, 'sphere', 0x1d2329, s * spread, y, z + size * 0.9, size * 0.8);
-  }
-}
-const FOE_ART = {
-  gopher(b) {
-    part(b, 'sphere', 0xa8743f, 0, 0.5, 0, 0.42, 0.5, 0.4);
-    part(b, 'sphere', 0xe0c08f, 0, 0.45, 0.22, 0.3, 0.36, 0.2);
-    part(b, 'sphere', 0xa8743f, 0, 1, 0.08, 0.3);
-    for (const s of [-1, 1]) {
-      part(b, 'sphere', 0x7d5430, s * 0.2, 1.24, 0, 0.09);
-      part(b, 'sphere', 0x7d5430, s * 0.2, 0.1, 0.12, 0.12, 0.08, 0.16);
-    }
-    eyes(b, 1.07, 0.3, 0.11, 0.05);
-    part(b, 'sphere', 0xd77a7a, 0, 0.98, 0.37, 0.06);
-    part(b, 'box', 0xffffff, 0, 0.86, 0.36, 0.1, 0.08, 0.03);
-  },
-  crow(b, o) {
-    b.position.y = 0.6;
-    part(b, 'sphere', 0x2c2f3d, 0, 0.4, 0, 0.3, 0.28, 0.45);
-    part(b, 'sphere', 0x2c2f3d, 0, 0.65, 0.35, 0.2);
-    const beak = part(b, 'cone', 0xf0a63a, 0, 0.62, 0.6, 0.07, 0.22, 0.07);
-    beak.rotation.x = Math.PI / 2;
-    eyes(b, 0.72, 0.5, 0.09, 0.04);
-    part(b, 'box', 0x23252f, 0, 0.42, -0.5, 0.25, 0.04, 0.3);
-    o.wings = [-1, 1].map((s) => {
-      const w = new THREE.Group();
-      b.add(w);
-      w.position.set(s * 0.25, 0.48, 0);
-      part(w, 'box', 0x23252f, s * 0.32, 0, 0, 0.6, 0.04, 0.32);
-      return w;
-    });
-  },
-  bale(b) {
-    part(b, 'cyl', 0xd8b45a, 0, 0.55, 0, 0.6, 1.1, 0.6);
-    for (const y of [0.3, 0.8]) {
-      const t = part(b, 'torus', 0x9c6b2f, 0, y, 0, 0.61);
-      t.rotation.x = Math.PI / 2;
-    }
-    for (let i = 0; i < 5; i++) {
-      const c = part(
-        b,
-        'cone',
-        0xe9cf7f,
-        Math.sin(i * 1.3) * 0.3,
-        1.18,
-        Math.cos(i * 1.3) * 0.3,
-        0.08,
-        0.25,
-        0.08
-      );
-      c.rotation.z = Math.sin(i) * 0.4;
-    }
-    eyes(b, 0.62, 0.57, 0.17, 0.08);
-    part(b, 'box', 0x5a3a1a, -0.17, 0.78, 0.6, 0.18, 0.04, 0.03).rotation.z = -0.4;
-    part(b, 'box', 0x5a3a1a, 0.17, 0.78, 0.6, 0.18, 0.04, 0.03).rotation.z = 0.4;
-  },
-  spud(b) {
-    part(b, 'sphere', 0xc49a5e, 0, 1.3, 0, 1.05, 1.3, 0.95);
-    for (let i = 0; i < 7; i++)
-      part(
-        b,
-        'sphere',
-        0x8e6a3d,
-        Math.sin(i * 2.4) * 0.75,
-        0.8 + i * 0.18,
-        Math.cos(i * 2.4) * 0.65,
-        0.09
-      );
-    part(b, 'half', 0x5f7a3c, 0, 2.3, 0, 0.85, 0.6, 0.85);
-    const brim = part(b, 'cyl', 0x4f6832, 0, 2.3, 0.1, 0.95, 0.06, 0.95);
-    brim.rotation.x = 0.08;
-    eyes(b, 1.8, 0.82, 0.28, 0.12);
-    for (const s of [-1, 1]) {
-      part(b, 'sphere', 0x4b3320, s * 0.2, 1.5, 0.9, 0.24, 0.08, 0.1);
-      part(b, 'sphere', 0xc49a5e, s * 1.05, 1.1, 0.1, 0.22, 0.32, 0.22);
-      part(b, 'sphere', 0x7d5430, s * 0.45, 0.08, 0.15, 0.3, 0.12, 0.42);
-    }
-  },
-  weed(b, o) {
-    const ball = new THREE.Group();
-    b.add(ball);
-    ball.position.y = 1.35;
-    o.spin = ball;
-    for (let k = 0; k < 2; k++) {
-      const w = mesh(GEO.ico, 0xc9a35a, ball);
-      w.material.wireframe = true;
-      w.scale.setScalar(1.3 - k * 0.18);
-      w.rotation.set(k * 0.7, k * 1.1, 0);
-    }
-    const core = mesh(GEO.sphere, 0x9d7b3f, ball);
-    core.scale.setScalar(0.85);
-    core.material.transparent = true;
-    core.material.opacity = 0.55;
-    part(b, 'cyl', 0xd96a8a, 0, 2.85, 0, 0.42, 0.45, 0.42);
-    part(b, 'cyl', 0xd96a8a, 0, 2.64, 0, 0.75, 0.05, 0.75);
-    part(b, 'sphere', 0xffe08a, 0.38, 2.8, 0.2, 0.12);
-    eyes(b, 1.65, 1.15, 0.3, 0.12);
-  },
-  cluck(b) {
-    part(b, 'sphere', 0xf3efe6, 0, 1.2, 0, 1.05, 1, 1.25);
-    part(b, 'sphere', 0xf3efe6, 0, 2.25, 0.55, 0.6);
-    for (let i = 0; i < 3; i++)
-      part(b, 'sphere', 0xd8392b, 0, 2.85 + Math.sin(i) * 0.05, 0.3 + i * 0.25, 0.17);
-    const beak = part(b, 'cone', 0xf2b630, 0, 2.2, 1.2, 0.16, 0.4, 0.16);
-    beak.rotation.x = Math.PI / 2;
-    part(b, 'sphere', 0xd8392b, 0, 1.9, 1.05, 0.12, 0.2, 0.1);
-    eyes(b, 2.4, 1.05, 0.24, 0.09);
-    part(b, 'cyl', 0x4e6a3a, 0, 2.82, 0.5, 0.45, 0.22, 0.45);
-    part(b, 'box', 0x3f5a2e, 0, 2.75, 0.95, 0.55, 0.05, 0.35);
-    for (const s of [-1, 1]) {
-      part(b, 'sphere', 0xe4ddd0, s * 1, 1.25, -0.1, 0.25, 0.55, 0.75);
-      part(b, 'cyl', 0xe39a2a, s * 0.4, 0.2, 0, 0.07, 0.5, 0.07);
-    }
-    for (let i = 0; i < 3; i++) {
-      const f = part(b, 'sphere', 0xe8e2d6, (i - 1) * 0.25, 1.8, -1.15, 0.15, 0.45, 0.15);
-      f.rotation.x = -0.5;
-    }
-  },
-  baron(b, o) {
-    part(b, 'sphere', 0x24401f, 0, 2.1, 0, 1.4);
-    for (let i = 0; i < 11; i++) {
-      const a = (i / 11) * Math.PI * 2;
-      part(
-        b,
-        'sphere',
-        i % 2 ? 0x2f5a2a : 0x3e6b33,
-        Math.cos(a) * 1.2,
-        2.2 + Math.sin(a) * 1.2,
-        Math.sin(a * 2) * 0.4,
-        0.85 + (i % 3) * 0.12
-      );
-    }
-    for (let i = 0; i < 22; i++) {
-      const a = i * 2.4,
-        y = 1 + (((i * 7) % 11) / 11) * 2.6,
-        r = 1.55,
-        t = part(b, 'cone', 0x6d4a2b, Math.sin(a) * r, y, Math.cos(a) * r, 0.12, 0.5, 0.12);
-      t.lookAt(Math.sin(a) * 9, y, Math.cos(a) * 9);
-      t.rotateX(Math.PI / 2);
-    }
-    for (let i = 0; i < 7; i++) {
-      const a = (i / 7) * Math.PI * 2,
-        c = part(b, 'cone', 0x5b3c22, Math.sin(a) * 0.6, 3.6, Math.cos(a) * 0.6, 0.12, 0.55, 0.12);
-      c.rotation.z = Math.sin(a) * 0.3;
-    }
-    o.glow = [-1, 1].map((s) => {
-      const e = part(b, 'sphere', 0xc86bff, s * 0.45, 2.6, 1.3, 0.16);
-      e.material.emissive.setHex(0x8a2fd0);
-      return e;
-    });
-    for (const s of [-1, 1]) part(b, 'sphere', 0x2b4a24, s * 0.8, 0.35, 0, 0.45, 0.35, 0.6);
-  },
-};
 const foeViews = new Map(),
   pickupViews = new Map(),
   thornPool = [],
@@ -1241,7 +1123,7 @@ function foeView(e) {
   root.add(body);
   scene.add(root);
   const o = { root, body, mats: [] };
-  FOE_ART[e.type](body, o);
+  buildFoe(e.type, body, o);
   body.traverse((m) => {
     if (m.isMesh) {
       o.mats.push(m.material);
@@ -1278,6 +1160,7 @@ function foeView(e) {
 function dropView(o) {
   scene.remove(o.root);
   for (const m of o.mats) m.dispose();
+  o.body.traverse((m) => m.userData.baked && m.geometry.dispose());
   if (o.bar)
     o.bar.traverse((m) => {
       if (m.isMesh) m.material.dispose();
@@ -1374,7 +1257,8 @@ function updateFoes(dt) {
       o.body.scale.set(1 / Math.sqrt(sy), sy, 1 / Math.sqrt(sy));
       o.body.rotation.x = tilt;
     }
-    if (o.wings) o.wings.forEach((w, i) => (w.rotation.z = (i ? -1 : 1) * Math.sin(t * 14) * 0.6));
+    const lean = animateFoe(e, o, dt);
+    if (!e.dead) o.body.rotation.x += lean;
     if (o.spin)
       o.spin.rotation.x +=
         dt * (e.state === 'charge' || e.state === 'dash' ? 14 : e.moving ? 5 : 1);

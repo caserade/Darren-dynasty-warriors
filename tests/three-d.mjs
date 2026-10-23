@@ -104,16 +104,17 @@ test('Jump attack in the air, dash attack after a sprint', () => {
 });
 test('Special needs a full meter that fills from hits, keeps Darren untouchable and clears a crowd', () => {
   const g = fresh();
-  place(g, 40, 52);
+  // Flat ground by home, so every grunt the special throws stays within reach.
+  place(g, 16.5, 56);
   for (const a of g.actors) if (a !== g.player) Object.assign(a, { x: 10, z: 10 });
   assert(!g.special());
-  const e = foe(g, 'gopher', 40, 53.6);
+  const e = foe(g, 'gopher', 16.5, 57.6);
   e.hp = e.max = 500;
   assert(g.attack());
   tick(g, 0.5);
   assert(g.player.mus > 0);
   e.hp = 0.1;
-  for (let k = 0; k < 6; k++) foe(g, 'gopher', 40 + Math.sin(k) * 2.4, 52 + Math.cos(k) * 2.4);
+  for (let k = 0; k < 6; k++) foe(g, 'gopher', 16.5 + Math.sin(k) * 2.4, 56 + Math.cos(k) * 2.4);
   g.player.mus = 100;
   assert(g.special());
   assert.equal(g.player.action.name, 'PawSpecial');
@@ -1117,5 +1118,21 @@ test('A blocked blow that empties the bar still hands over to the next hero', ()
   assert(g.actors[0].down);
   assert.equal(g.selected, 1);
   assert(!g.actors[0].guarding);
+});
+test('Friends raise their guard while a boss winds up next to them', () => {
+  const g = fresh();
+  place(g, 30, 52);
+  const b = g.makeFoe('spud', 34, 52, true);
+  g.enemies.push(b);
+  Object.assign(g.actors[1], { x: 28.5, z: 56, y: world.height(28.5, 56) });
+  b.active = true;
+  b.state = 'wind';
+  b.move = 'slam';
+  b.st = b.windMax = 5;
+  tick(g, 0.1);
+  assert(g.actors[1].guarding, 'Tormund guards');
+  b.state = 'idle';
+  tick(g, 0.1);
+  assert(!g.actors[1].guarding, 'and lowers it after');
 });
 console.log(`${passes} 3D simulation checks passed.`);

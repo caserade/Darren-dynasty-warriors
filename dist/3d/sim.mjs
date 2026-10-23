@@ -1768,6 +1768,18 @@ export class Game {
         b.y = this.world.height(b.x, b.z);
         continue;
       }
+      // Out of the danger zone but close to a boss winding up: friends raise their guard and
+      // wait for the blow to pass (only a look: friends never take damage).
+      const threat = this.enemies.find(
+        (e) => e.boss && !e.dead && e.state === 'wind' && Math.hypot(e.x - b.x, e.z - b.z) < 8
+      );
+      if (threat) {
+        b.guarding = true;
+        b.yaw = Math.atan2(threat.x - b.x, threat.z - b.z);
+        b.moving = false;
+        b.speed = 0;
+        continue;
+      }
       let target = null,
         best = Infinity;
       for (const e of this.enemies) {
@@ -1949,6 +1961,20 @@ export class Game {
         } else e.air = e.y - g;
         continue;
       }
+      // A grunt right under a ledge the hero stands on can't reach them (the paths are flat
+      // cells, so it thinks it has arrived) and can't be hit: after a few seconds it goes back to
+      // where it came from and finds another way round.
+      if (!e.boss) {
+        e.stranded = d < 8 && Math.abs(a.y - e.y) >= 1.2 ? (e.stranded || 0) + dt : 0;
+        if (e.stranded > 4) {
+          const home = e.guard || e.home,
+            p = this.world.safe(home.x, home.z);
+          Object.assign(e, p, { y: this.world.height(p.x, p.z), state: 'idle', st: 0 });
+          e.stranded = 0;
+          e.cd = Math.max(e.cd, 1);
+          continue;
+        }
+      }
       if (e.boss) this.updateBoss(e, dt, dx, dz, d);
       else if (e.state === 'down') {
         e.st -= dt;
@@ -2126,6 +2152,10 @@ export class Game {
       }
       e.y = this.world.height(e.x, e.z);
     }
+    // Every foe on its feet stands on the ground: the circling, backing-off and fleeing moves end
+    // their turn early, and pushes from other foes come after a foe's own turn, so set it here.
+    for (const e of this.enemies)
+      if (!e.dead && !(e.air > 0) && e.state !== 'air') e.y = this.world.height(e.x, e.z);
     this.enemies = this.enemies.filter(
       (e) => !(e.dead && e.fly.t > (e.boss ? 1.6 : 0.9)) && !e.gone
     );

@@ -707,6 +707,8 @@ export function createFront(api) {
     run.until = b.id === 'baron' && !free ? (q) => q.home : (q) => battleWon(b, q);
     run.combo = 0;
     run.hurt = 0;
+    run.blocks = 0;
+    run.saved = 0;
     close();
     api.play();
     api.banner(b.name.replace(/^Battle of /, '').toUpperCase(), 'BATTLE START · ' + b.goals[0]);
@@ -740,6 +742,15 @@ export function createFront(api) {
         ['K.O. count', r.ko, newBest('ko')],
         ['Longest combo', `${r.combo} hits`, newBest('combo')],
         ['Health lost', r.hurt, false],
+        ...(run.blocks
+          ? [
+              [
+                'Blocked',
+                `${run.blocks} hit${run.blocks === 1 ? '' : 's'} · ${run.saved} saved`,
+                false,
+              ],
+            ]
+          : []),
       ].map(([label, val, best], k) =>
         h(
           'li',
@@ -915,7 +926,12 @@ export function createFront(api) {
     if (!g.paused && run.until(g.quest)) finish();
   }
   function event(e) {
-    if (run && e.type === 'hurt' && e.damage) run.hurt += e.damage;
+    if (run && (e.type === 'hurt' || e.type === 'block') && e.damage) run.hurt += e.damage;
+    // Blocks (update 17) count toward the health lost, and what they saved goes on the results.
+    if (run && e.type === 'block') {
+      run.blocks++;
+      run.saved += e.saved || 0;
+    }
   }
   function close() {
     if (page && pages[page]) pages[page].hidden = true;

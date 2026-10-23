@@ -166,6 +166,10 @@ button i {
   background: #18364abf;
   padding: 4px 7px;
   border-radius: 5px;
+  /* Each label stays one whole chip instead of breaking across two lines (update 17). */
+  display: inline-block;
+  white-space: nowrap;
+  margin-top: 5px;
 }
 .charge {
   height: 11px;
@@ -200,13 +204,19 @@ kbd {
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 14px;
   white-space: nowrap;
   font-size: 12px;
   background: #142b3de3;
   border: 1px solid #94abb32c;
-  padding: 14px 20px;
+  padding: 10px 16px;
   border-radius: 10px;
+  /* Stays clear of the hero card on the left and the map on the right (update 17). */
+  width: max-content;
+  max-width: calc(100% - 520px);
+  box-sizing: border-box;
 }
 #toast {
   position: absolute;

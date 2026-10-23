@@ -406,8 +406,37 @@ function rec(area, check, ok, note = '') {
       }, i);
       await frames(2);
     };
-    await press(4);
-    rec('3d', 'gamepad LB cycles hero', (await pos()).sel === 1);
+    await press(15);
+    rec('3d', 'gamepad D-pad right cycles hero', (await pos()).sel === 1);
+    // Block (update 17): holding LB guards, letting go drops it, and a blow costs 25% less.
+    await p.evaluate(() => {
+      __pad.buttons[4] = { pressed: true, value: 1 };
+    });
+    await frames(3);
+    const guard = await p.evaluate(() => {
+      const g = snowdayTest.game,
+        a = g.player,
+        hp = a.hp;
+      a.inv = 0;
+      g.hurtHero(20, 0);
+      return { guarding: a.guarding, lost: hp - a.hp, down: a.action?.name || null };
+    });
+    rec(
+      '3d',
+      'holding LB blocks: 20 damage becomes 15, no knockdown',
+      guard.guarding && guard.lost === 15 && guard.down === null,
+      JSON.stringify(guard)
+    );
+    await p.evaluate(() => {
+      __pad.buttons[4] = { pressed: false, value: 0 };
+    });
+    await frames(3);
+    rec(
+      '3d',
+      'letting go of LB drops the guard',
+      !(await p.evaluate(() => snowdayTest.game.player.guarding))
+    );
+    await p.evaluate(() => (snowdayTest.game.player.hp = 100));
     const q0 = await pos();
     await p.evaluate(() => {
       __pad.axes[1] = -1;
@@ -544,11 +573,12 @@ function rec(area, check, ok, note = '') {
           dodge: 1,
           combo: 2,
           charge: 3,
-          switch: 4,
+          block: 4,
           interact: 5,
           style: 6,
           special: 7,
           pause: 9,
+          switch: 15,
         })
     );
     await p.evaluate(() => {
