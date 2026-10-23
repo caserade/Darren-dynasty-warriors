@@ -337,8 +337,7 @@ function pollControllers(scene, dt) {
       // LT zooms with the D-pad when nothing else uses it; Block (update 17) shares it, so
       // holding Block still lets the D-pad zoom instead of walking.
       const zoom =
-        buttons[6] &&
-        !Object.keys(padBindings).some((k) => k !== 'block' && padBindings[k] === 6);
+        buttons[6] && !Object.keys(padBindings).some((k) => k !== 'block' && padBindings[k] === 6);
       blockHeld = !!buttons[padBindings.block];
       padMove.x = left.x + (zoom ? 0 : (buttons[15] ? 1 : 0) - (buttons[14] ? 1 : 0));
       padMove.y = left.y + (zoom ? 0 : (buttons[13] ? 1 : 0) - (buttons[12] ? 1 : 0));

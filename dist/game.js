@@ -1161,7 +1161,9 @@ if (isTouch) document.body.classList.add('touch');
     e.preventDefault();
     if (state === 'play' && !paused && !dialogOpen) {
       blockHeld = true;
-      block.setPointerCapture(e.pointerId);
+      try {
+        block.setPointerCapture(e.pointerId);
+      } catch {}
     }
   });
   for (const type of ['pointerup', 'pointercancel', 'lostpointercapture'])
@@ -3826,6 +3828,13 @@ function updateNewHud() {
   $('#tMu').setAttribute('aria-label', 'Blizzard: ' + Math.floor(P.mus) + ' of 100 snow');
   $('#aRoll').disabled = !P.roll && rollCd > 0;
   $('#aDash').disabled = P.dashCd > 0;
+  // Block (update 17) lights up while the guard is up.
+  const guard = guarding();
+  $('#aBlock').classList.toggle('ready', guard);
+  $('#blockHint').textContent = guard
+    ? 'guarding • 25% less'
+    : (inputMode === 'gamepad' ? 'hold ' + buttonName(padBindings.block) : 'hold G') +
+      ' • 25% less';
   $('#aBurst').disabled = P.mus < 100;
   $('#aBurst').hidden = P.mus < 100;
   $('#aBurst').classList.toggle('ready', P.mus >= 100);
@@ -3890,6 +3899,19 @@ bindCharge('#tAtk');
 bindCharge('#game');
 $('#aRoll').onclick = pressRoll;
 $('#aDash').onclick = pressDash;
+// The dock's Block button guards while it is held down, like the touch button.
+$('#aBlock').onpointerdown = (e) => {
+  if (state === 'play' && !paused && !dialogOpen) {
+    blockHeld = true;
+    try {
+      $('#aBlock').setPointerCapture(e.pointerId);
+    } catch {}
+  }
+};
+$('#aBlock').onpointerup =
+  $('#aBlock').onpointercancel =
+  $('#aBlock').onlostpointercapture =
+    () => (blockHeld = false);
 $('#aBurst').onclick = pressMusou;
 $('#continueRun').hidden = !checkpoint || checkpoint.complete;
 $('#continueRun').onclick = continueGame;

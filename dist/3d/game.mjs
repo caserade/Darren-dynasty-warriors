@@ -296,8 +296,11 @@ blockButton.onpointerdown = (e) => {
   e.preventDefault();
   if (blockPointer !== null || game?.paused) return;
   blockPointer = e.pointerId;
-  blockButton.setPointerCapture(e.pointerId);
   game.block(true);
+  // capture can fail (the pointer already gone); the guard still holds until the finger lifts
+  try {
+    blockButton.setPointerCapture(e.pointerId);
+  } catch {}
 };
 blockButton.onpointerup =
   blockButton.onpointercancel =
@@ -1791,6 +1794,7 @@ function hud() {
   $('musou').style.width = (a.mus || 0) + '%';
   $('musou').parentElement.classList.toggle('full', (a.mus || 0) >= 100);
   $('style').hidden = game.selected !== 0;
+  $('guard').hidden = !game.player.guarding;
   $('style').textContent = game.selected === 0 ? game.moveset().name : '';
   $('style-key').hidden = $('touch-style').hidden = game.selected !== 0;
   $('touch-special').classList.toggle('ready', (a.mus || 0) >= 100);

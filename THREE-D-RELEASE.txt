@@ -17,9 +17,11 @@ Included
 Controls
 WASD / arrows: move. Drag or Z/X: orbit camera. Wheel: zoom. C: center camera.
 1/2/3: choose Darren/Tormund/Bucky. J: combo. Hold K, then release: charge attack.
-Space: jump. Shift: dodge. E: interact. Escape: pause.
+Space: jump. Shift: dodge. Hold F: block. E: interact. L: special. Q: Darren's style.
+Escape: pause.
 Gamepad: left stick move, right stick camera, X combo, Y hold/release charge,
-A jump, B dodge, RB interact, LB cycle hero, Start pause.
+A jump, B dodge, hold LB block, RB interact, LT Darren's style, RT special,
+D-pad right next hero, Start pause. (Update 17 moved next hero from LB to D-pad right.)
 Touch: left joystick plus independent action buttons. Drag the view to orbit.
 Return to the cottage from Pause if you need to regroup. Progress saves at interactions, cookies and pause.
 
