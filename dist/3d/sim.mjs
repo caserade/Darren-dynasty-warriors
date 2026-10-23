@@ -144,6 +144,32 @@ export class World {
       else if (this.step(a.x, a.z, a.x, a.z + z, 0.34, air)) a.z += z;
     }
   }
+  // On a cliff face: some step a walker could take from here climbs or drops too much (update 17).
+  steep(x, z, h = 0.15) {
+    const y = this.height(x, z);
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * TAU;
+      if (Math.abs(this.height(x + Math.sin(a) * h, z + Math.cos(a) * h) - y) > h * 1.4 + 0.12)
+        return true;
+    }
+    return false;
+  }
+  // Slips a walker pinned on a cliff face (landed there from a jump, or pushed) down the slope.
+  slide(a, dt) {
+    if (a.air > 0 || !this.steep(a.x, a.z)) return false;
+    const h = 0.15,
+      gx = this.height(a.x + h, a.z) - this.height(a.x - h, a.z),
+      gz = this.height(a.x, a.z + h) - this.height(a.x, a.z - h),
+      n = Math.hypot(gx, gz);
+    if (n < 1e-6) return false;
+    const x = a.x - (gx / n) * 6 * dt,
+      z = a.z - (gz / n) * 6 * dt;
+    if (!this.clear(x, z)) return false;
+    a.x = x;
+    a.z = z;
+    a.y = this.height(x, z);
+    return true;
+  }
   safe(x, z) {
     if (this.clear(x, z)) return { x, z };
     for (let r = 0.5; r < 12; r += 0.5)
@@ -249,8 +275,36 @@ export class World {
     let best = id;
     for (const j of this.nav[id] || [])
       if (field[j] >= 0 && (field[best] < 0 || field[j] < field[best])) best = j;
-    const p = this.center(best);
-    return Math.atan2(p.x - a.x, p.z - a.z);
+    // Standing in a cell whose centre is blocked (a bridge rail, a post: update 17), so it has no
+    // paths of its own: head for the best-placed cell around it that can be walked toward.
+    if (field[best] < 0) {
+      const cx = id % this.nx,
+        cz = Math.floor(id / this.nx);
+      for (let dz = -1; dz <= 1; dz++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const x = cx + dx,
+            z = cz + dz,
+            j = x + z * this.nx;
+          if (x < 0 || z < 0 || x >= this.nx || z >= this.nz || field[j] < 0) continue;
+          if (field[best] >= 0 && field[j] >= field[best]) continue;
+          const q = this.center(j),
+            t = Math.atan2(q.x - a.x, q.z - a.z);
+          if (this.step(a.x, a.z, a.x + Math.sin(t) * 0.15, a.z + Math.cos(t) * 0.15)) best = j;
+        }
+    }
+    const p = this.center(best),
+      ang = Math.atan2(p.x - a.x, p.z - a.z);
+    // The paths link cell centres, so from the slope at a cell's edge the way to the next
+    // centre can be a cliff (update 17). Then take the nearest direction that can be walked,
+    // so friends and foes edge round instead of pushing into the rock face for ever.
+    // (Tested over a short and a full step, as walkers move in steps of up to 0.15 m.)
+    const ok = (t) =>
+      [0.06, 0.15].every((r) => this.step(a.x, a.z, a.x + Math.sin(t) * r, a.z + Math.cos(t) * r));
+    if (ok(ang)) return ang;
+    for (let k = 1; k <= 8; k++)
+      for (const s of [1, -1])
+        if (ok(ang + s * k * (Math.PI / 8))) return ang + s * k * (Math.PI / 8);
+    return ang;
   }
 }
 export class Game {
@@ -1616,6 +1670,13 @@ export class Game {
           a.z - Math.cos(a.yaw) * 2.8 - Math.sin(a.yaw) * side * 1.8
         );
       goal.y = this.world.height(goal.x, goal.z);
+      // A friend who has been left far behind for a while (lost on the paths) catches up out of
+      // sight: they step in just behind the hero (update 17).
+      b.lost = dist > 30 ? (b.lost || 0) + dt : 0;
+      if (b.lost > 4 && Math.abs(goal.y - a.y) < 1.2) {
+        Object.assign(b, goal, { lost: 0, speed: 0, moving: false });
+        continue;
+      }
       const near = dist < 5 && this.world.visible(b, goal),
         remaining = near ? Math.hypot(goal.x - b.x, goal.z - b.z) : dist;
       if (remaining > 0.3 && this.navField) {
@@ -1635,6 +1696,16 @@ export class Game {
       } else b.speed = 0;
       b.y = this.world.height(b.x, b.z);
       b.animation = b.moving ? 'Run' : 'Idle';
+    }
+    // Anyone pinned on a cliff face (trying to move, not getting anywhere) slips down it.
+    for (const b of this.actors) {
+      const want = b === a ? n > 0.05 : Math.hypot(a.x - b.x, a.z - b.z) > 3,
+        moved = Math.hypot(b.x - (b.px ?? b.x), b.z - (b.pz ?? b.z));
+      b.pinned =
+        want && moved < 0.004 && !b.down && this.world.steep(b.x, b.z) ? (b.pinned || 0) + dt : 0;
+      if (b.pinned > 0.25) this.world.slide(b, dt);
+      b.px = b.x;
+      b.pz = b.z;
     }
     // Keep friends from standing inside the hero or each other (models are ~1.5 m wide).
     for (let i = 0; i < 3; i++) {

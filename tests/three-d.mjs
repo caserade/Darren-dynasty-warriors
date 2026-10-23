@@ -1135,4 +1135,34 @@ test('Friends raise their guard while a boss winds up next to them', () => {
   tick(g, 0.1);
   assert(!g.actors[1].guarding, 'and lowers it after');
 });
+// Path fixes (update 17) found by a robot playing the whole adventure over and over.
+test('Paths: no dead end beside the bridge rail; a hero pinned on a cliff face slips off it', () => {
+  const o = { x: 129.6, z: 53.2 },
+    f = world.field(o.x, o.z);
+  const a = { x: 116, z: 48.9, air: 0 };
+  let moved = 0;
+  for (let i = 0; i < 120; i++) {
+    const ang = world.direction(a, o, f),
+      x0 = a.x,
+      z0 = a.z;
+    world.move(a, Math.sin(ang) * 0.09, Math.cos(ang) * 0.09);
+    moved += Math.hypot(a.x - x0, a.z - z0);
+  }
+  assert(moved > 5, `walks on from the bridge (moved ${moved.toFixed(2)} m)`);
+  // Landed half-way down the cliff below Bramble Keep: walking on gets them off it.
+  const g = fresh();
+  place(g, 116, 58.1);
+  for (let i = 0; i < 240; i++) {
+    const ang = world.direction(g.player, o, f);
+    g.update(1 / 60, { x: Math.sin(ang), z: Math.cos(ang) });
+  }
+  assert(Math.hypot(g.player.x - 116, g.player.z - 58.1) > 3, 'off the cliff face');
+});
+test('A friend lost far behind catches up just behind the hero', () => {
+  const g = fresh();
+  place(g, 30, 52);
+  Object.assign(g.actors[2], { x: 110, z: 61.6, y: world.height(110, 61.6) });
+  tick(g, 4.5);
+  assert(Math.hypot(g.actors[2].x - g.player.x, g.actors[2].z - g.player.z) < 6);
+});
 console.log(`${passes} 3D simulation checks passed.`);
