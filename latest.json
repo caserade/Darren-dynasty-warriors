@@ -1,0 +1,229 @@
+{
+ "format": 1,
+ "build": 1792772821,
+ "commit": "fa0184a",
+ "notes": "Full game update: 30 passes, blocking, new enemies and bosses",
+ "minApp": "1.9.0",
+ "files": {
+  "3d/anim.mjs": {
+   "size": 41802,
+   "sha256": "de0d2b371e5a8c57b2438b8647da122947ed1267b4878f7f17e82f49fce86d28"
+  },
+  "3d/assets/bucky.glb": {
+   "size": 2021664,
+   "sha256": "dff5e5c7de6b02c187b909fec0766291656b3c7d6316ba9811f1ffbae332355d"
+  },
+  "3d/assets/darren.glb": {
+   "size": 799336,
+   "sha256": "53b42e757729d912f429d9c0bfa3db91782738bfb4dca507179419b2f5c29c16"
+  },
+  "3d/assets/terrain.glb": {
+   "size": 1349972,
+   "sha256": "0cdb2b91994c14310ed5cdb2022f2bc33ab61c20720749aef6ab527a3053cb66"
+  },
+  "3d/assets/tormund.glb": {
+   "size": 2956320,
+   "sha256": "763fbfec4ae17ca000c2455b77d25c5283d3a3598c641e4274cacc084863741a"
+  },
+  "3d/clips.mjs": {
+   "size": 129816,
+   "sha256": "e6517934931334a13ac91bf93f8766a5bdb133f94b2f17a114b2cfb1276941fd"
+  },
+  "3d/foes.mjs": {
+   "size": 24576,
+   "sha256": "2553397c110e585d7afe67336f7ad07010f76deacd3f9a13285e60215a530766"
+  },
+  "3d/front.mjs": {
+   "size": 33910,
+   "sha256": "8413289d544ce7c0b18b28569910cf2238dc9f56b109fdcd53da2cb1c85b2618"
+  },
+  "3d/game.mjs": {
+   "size": 73089,
+   "sha256": "f5c5c24291ffba796d1e74ee60402c72361d54b45b1a39df3c6b2fa0b4c37768"
+  },
+  "3d/index.html": {
+   "size": 13201,
+   "sha256": "ece5513e811804aadc17acb2ad2ee233a9f60d65c1fd246f83096d86af5ea580"
+  },
+  "3d/look.mjs": {
+   "size": 2734,
+   "sha256": "6d82e4f834b29e7d6add9691d4b1fdf1020b980b9287b3134b099725f4375fa8"
+  },
+  "3d/moves.mjs": {
+   "size": 13862,
+   "sha256": "94670f0a71afc7a49932672d792aea2c49770b98fea98ab95bebc890c8147bd3"
+  },
+  "3d/ribbon.mjs": {
+   "size": 9151,
+   "sha256": "b58f3caa557b6b5961a3f206098aa25d3dfb11c28a9db28c6acd255aea7c056d"
+  },
+  "3d/sim.mjs": {
+   "size": 83005,
+   "sha256": "9aa2f0153e60e796b32b72d392f5b9d7c52c654f940c17bb352a852491ef1e06"
+  },
+  "3d/story.mjs": {
+   "size": 8904,
+   "sha256": "a2569a152bf081a465605eb84320765b71860389b48754e79237059222b63b7f"
+  },
+  "3d/style.css": {
+   "size": 35770,
+   "sha256": "a29512fa59416522897d3c4070c5be72af2470e486cb5ffc4906cee36143f03b"
+  },
+  "3d/trail.mjs": {
+   "size": 3960,
+   "sha256": "45bac1dfc51225d8db68cf1183e84d03f0b78bd93705bd71e3f03df136a76ece"
+  },
+  "3d/vendor/LICENSE": {
+   "size": 1081,
+   "sha256": "8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc"
+  },
+  "3d/vendor/loaders/GLTFLoader.js": {
+   "size": 117570,
+   "sha256": "131c0f78c01d19368ae495caa65b3adaa10487810a36a05bb5901b769a35ac16"
+  },
+  "3d/vendor/three.core.js": {
+   "size": 1458113,
+   "sha256": "9edde002b066a9a05676a6127f67735b62baf399bdea529f2f7e31657da769e6"
+  },
+  "3d/vendor/three.module.js": {
+   "size": 662772,
+   "sha256": "9052042d676cb0fdc1ddfefe193053f34b7ac0513a616fdac4535d49987812ea"
+  },
+  "3d/vendor/utils/BufferGeometryUtils.js": {
+   "size": 37712,
+   "sha256": "9fb63427ce6641fa14fd0baff9cc4d1b5f9c3d85fd084bf2e90e803c44ec1797"
+  },
+  "3d/vendor/utils/SkeletonUtils.js": {
+   "size": 11535,
+   "sha256": "b1632a703206c3d830de9fcbe515696770d04b71a15ee6b50afa6d2c3298c86f"
+  },
+  "3d/world.json": {
+   "size": 392620,
+   "sha256": "969d25ee432e2a07d658a312c1d6b773da2e1dfd5bf793d8eb98550c3f105d6f"
+  },
+  "assets/bucky-actions.png": {
+   "size": 1911103,
+   "sha256": "aeada0ae6a7f4837f2726bc459e12b9fcff1c8288bebebfd36cf6f6069206a34"
+  },
+  "assets/bucky-atlas.png": {
+   "size": 588160,
+   "sha256": "283442de4af79d599e3985e770a55352ec3ecabf2bc597ff7b2a1fde36d432d0"
+  },
+  "assets/bucky-turnaround.png": {
+   "size": 2465477,
+   "sha256": "c5f510b02ae1cf410f4f1d966f700ef01c5ed23d2c83effa8fb89ab53462fd4a"
+  },
+  "assets/darren-isometric.js": {
+   "size": 2390809,
+   "sha256": "d742c3eb12400ddad6987f5188cfe69f68b5b3980c744be85df0b3c7a927a08c"
+  },
+  "assets/darren-isometric.png": {
+   "size": 1796470,
+   "sha256": "978f3676f2f45e9b5996742809cc2ce464022d72eed4669c19e594a7719e7769"
+  },
+  "assets/darren-reference.png": {
+   "size": 2663476,
+   "sha256": "76b4803183d9deb23704034547b3eb358f761e11f431012536c08d5df12a1cbb"
+  },
+  "assets/darren-weight-storybook.png": {
+   "size": 2367746,
+   "sha256": "8aabf2cfcdca99fa507d9bdbf1c94d29e8f12c40d79ce030f55e4e8510509f71"
+  },
+  "assets/firewood-atlas.png": {
+   "size": 739202,
+   "sha256": "25b0f8bc9a3a00d0b6220a6853619745975739447d40d6b546f26c44eaae6f9e"
+  },
+  "assets/storybook-scenery.js": {
+   "size": 2417746,
+   "sha256": "365552558cce5dc6ad6735f991fa7a0da619a569ab3cd4a9cd5154c10c0c8c03"
+  },
+  "assets/tormund-actions-rear.png": {
+   "size": 1340564,
+   "sha256": "fe22be0f1ca2940e2b3992f5728824358ab3844ff726e890c9c08c9a0f01870d"
+  },
+  "assets/tormund-actions.png": {
+   "size": 1728568,
+   "sha256": "db2b8f8cc20907da431f6e7d9dec782994128db35c31b6b7db07bb03fc73db11"
+  },
+  "assets/tormund-atlas.png": {
+   "size": 483280,
+   "sha256": "ee3499eb79cc2acee2112c94852a02102e97b0c668aef57b55ae2cb76b1a54ce"
+  },
+  "assets/tormund-turnaround.png": {
+   "size": 2672712,
+   "sha256": "1052a302e9ab8d2040070fe130c5765cf28e2479424f1da26b3e8ffa6b93f6e9"
+  },
+  "base.css": {
+   "size": 26708,
+   "sha256": "22586d2c52f8a5092c8e0afb2c69b82e8c5bc8cd8b1591e0003aaab7acdaabab"
+  },
+  "controls.js": {
+   "size": 16413,
+   "sha256": "4f00998f02f69b7dd81b71ee37983d4a17db3b0dfa3cf50cc54aea01dbd233e3"
+  },
+  "darren-art.js": {
+   "size": 9623,
+   "sha256": "8b3c104c707b6b1435b03ca1292632c6bc4db6ec5b98cb930bfe47997dbdbb7f"
+  },
+  "firewood.js": {
+   "size": 20882,
+   "sha256": "8635a1f3cb10b66102864c5d466f2bebdecb604ba2ed87dca5bc19316d42f56f"
+  },
+  "game.js": {
+   "size": 111850,
+   "sha256": "dab01f703c06c4cc960aadc77b5023522740a7b731cc645c7e2c487ef5149129"
+  },
+  "hud-clean.css": {
+   "size": 13839,
+   "sha256": "cf2d49d1fc8f7d27f1a5aafaccf11d63ff124f41691dcce6dd35797a4743bca9"
+  },
+  "index.html": {
+   "size": 22141,
+   "sha256": "f8697ff01e1357aae6656d33377a362335e1308fd92634e7f8c1f92b633833da"
+  },
+  "isometric-world.js": {
+   "size": 28512,
+   "sha256": "0cfeb657e2b67d9261e74ede2328a68b35f6e006909eed4839182227c4d980d0"
+  },
+  "phaser-scene.js": {
+   "size": 26337,
+   "sha256": "63f64badc092371026848c89c46ceaac2b7a7bc6878613ff055fb5b043f30261"
+  },
+  "phone.js": {
+   "size": 2935,
+   "sha256": "c0745a3b1b06ad8eaa751a9a4853cbd113fdc4d9db7de298fac2d7b278fb86a2"
+  },
+  "pixel-art.js": {
+   "size": 17555,
+   "sha256": "58893077f34267ac50d4ff453b8d9ce63ebb57aa501f9770b5139b663badb699"
+  },
+  "pixel.css": {
+   "size": 6337,
+   "sha256": "b879048ae8031df22c5948cb20772b5694bf6f58820c0e9ea38d3794d7316f8f"
+  },
+  "shared-save.js": {
+   "size": 4693,
+   "sha256": "6766d98c4c8328096173b4cc85b8222f884e8dc27a3c93de7a036557f393cec6"
+  },
+  "storybook.css": {
+   "size": 3024,
+   "sha256": "4f1d7c9f17165f94db497b1d17c6b34975bd414873ede079ae0f6305fd57cb52"
+  },
+  "storybook.js": {
+   "size": 2668,
+   "sha256": "65aebe35075cdd362dd9c2fdb2131e84f7a94670604dbb6896bad922839486a1"
+  },
+  "vendor/PHASER-LICENSE.md": {
+   "size": 1100,
+   "sha256": "c3123cd25de4eccf1fd5a5a0a6fc872299116d1dbbb48b00f2554a4c35220a65"
+  },
+  "vendor/phaser-3.90.0.min.js": {
+   "size": 1196122,
+   "sha256": "e92ddef111ba42e92d316979c732311757093688ea1810591cb7aa2858eba7a7"
+  }
+ },
+ "app": {
+  "version": "1.9.0",
+  "url": "https://github.com/caserade/darren-dynasty-warriors/releases/tag/app-v1.9.0"
+ }
+}

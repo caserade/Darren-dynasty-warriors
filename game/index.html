@@ -1,0 +1,515 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Darren’s Snowday Search · Storybook</title>
+    <meta charset="utf8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta
+      name="description"
+      content="Darren’s private isometric paws-and-snow adventure. Search the snowy prairie for Ruffy."
+    />
+    <link rel="stylesheet" href="base.css" />
+    <link rel="stylesheet" href="pixel.css" />
+    <link rel="stylesheet" href="storybook.css?v=7" />
+    <link rel="stylesheet" href="hud-clean.css?v=13" />
+  </head>
+  <body>
+    <div id="game" aria-label="Darren’s isometric snow adventure"></div>
+
+    <div id="hud" hidden>
+      <div class="status">
+        <div class="bars">
+          <div class="meterLabel"><span>♥ HEALTH</span><b id="hpValue">100 / 100</b></div>
+          <div
+            class="bar health"
+            id="hpBar"
+            role="progressbar"
+            aria-label="Darren health"
+            aria-valuemin="0"
+            aria-valuemax="100"
+          >
+            <i id="hpLag"></i><i id="hpFill"></i>
+          </div>
+          <div class="meterLabel snowLabel">
+            <span>✦ SNOW POWER</span><b id="snowValue">0 / 100</b>
+          </div>
+          <div
+            class="bar"
+            id="muBar"
+            role="progressbar"
+            aria-label="Snow power"
+            aria-valuemin="0"
+            aria-valuemax="100"
+          >
+            <i id="muFill" style="width: 0%"></i>
+          </div>
+        </div>
+      </div>
+      <div id="obj"><small>THE SEARCH FOR RUFFY</small><strong id="objText"></strong></div>
+      <div id="bossBox" hidden>
+        <div id="bossName"></div>
+        <div class="bar" id="bossMeter" role="progressbar" aria-label="Officer health">
+          <i id="bossFill"></i>
+        </div>
+        <small id="bossValue"></small>
+      </div>
+
+      <div id="hudBtns">
+        <button id="styleToggle" aria-label="Switch combat style">Paws ⇄ Snow</button
+        ><button
+          id="quickFullscreen"
+          class="fullscreenButton"
+          aria-label="Full screen"
+          title="Full screen"
+        >
+          ⛶</button
+        ><button id="pauseBtn" aria-label="Pause, map and settings" title="Pause, map and settings">
+          II
+        </button>
+      </div>
+      <div id="combo"><b id="comboN">0</b><span>HITS</span></div>
+
+      <div id="abilityDock">
+        <button id="aThrow"><span>❄</span><b>Snowball</b><small>J / hold to charge</small></button>
+        <button id="aRoll">
+          <span>◉</span><b>Snow roll</b><small id="rollHint">K • ready</small>
+        </button>
+        <button id="aDash">
+          <span>➜</span><b>Dodge</b><small id="dashHint">Space • ready</small>
+        </button>
+        <button id="aBlock">
+          <span>⛨</span><b>Block</b><small id="blockHint">hold G • 25% less</small>
+        </button>
+        <button id="aBurst" hidden>
+          <span>✦</span><b>Blizzard</b><small id="burstHint">L • build snow</small>
+        </button>
+      </div>
+    </div>
+
+    <div id="touch" hidden>
+      <div id="stick"><div id="knob"></div></div>
+      <button class="tb" id="tMu" hidden>BURST</button><button class="tb" id="tRoll">ROLL</button>
+      <button class="tb" id="tDash">DODGE</button><button class="tb" id="tBlock">BLOCK</button>
+      <button class="tb" id="tAtk">SNOW</button>
+    </div>
+
+    <div id="banner"></div>
+    <div id="dialog" hidden>
+      <div class="who"></div>
+      <p></p>
+      <small>Tap here / J / controller A to continue</small>
+    </div>
+
+    <div class="screen" id="sTitle">
+      <div class="panel">
+        <div class="titleGrid">
+          <div style="display: grid; gap: 16px; min-width: 0">
+            <h1 class="logo">Darren's <em>Snowday Search</em></h1>
+            <p class="tag">
+              First snow of the year. Ruffy saw a jackrabbit, slipped his leash, and vanished into
+              the white prairie. The Bramble Baron's goons hold every hill, armed with rubber
+              chickens, pool noodles and baguettes. Darren is going in anyway.
+            </p>
+            <p>
+              <a
+                href="3d/"
+                style="
+                  display: inline-block;
+                  padding: 12px 18px;
+                  border-radius: 12px;
+                  background: #18394b;
+                  color: #ffe1a0;
+                  font-weight: 700;
+                  text-decoration: none;
+                "
+                >Play the 3D valley · Darren, Tormund &amp; Bucky →</a
+              >
+            </p>
+            <div class="startButtons">
+              <button class="go" id="toSelect">Start the search ❄</button
+              ><button class="secondary" id="continueRun" hidden>Continue from camp</button>
+            </div>
+            <button class="secondary openWeightBook">See Darren’s four sizes</button>
+            <p id="otherGameNote" class="otherGameNote" hidden></p>
+            <div class="chapterButtons">
+              <button class="secondary" id="startFirewood">Chapter 2 · Firewood for Mom</button
+              ><button class="secondary" id="continueFirewood" hidden>
+                Continue firewood trip
+              </button>
+            </div>
+            <details class="controllerPanel">
+              <summary>Play with a controller</summary>
+              <p id="titleControllerStatus" role="status"></p>
+              <p>
+                Pair your controller in your phone’s Bluetooth settings, open this game in your
+                browser, then press and release a button. Tap the screen once to enable sound.
+              </p>
+              <p>
+                Left stick moves · right stick aims · X / □ or RT / R2 attacks · A / × dodges · B /
+                ○ rolls · Y / △ uses Blizzard · View / Share changes combat style · LB / RB turns
+                the camera. Hold LT and D-pad up/down to zoom.
+              </p>
+              <p>
+                Menus: stick or D-pad moves, A / × selects, B / ○ goes back, Start / Options pauses
+                or resumes. Right stick scrolls long menus and artwork. Remap combat controls in
+                Pause. Both chapters use the same controls.
+              </p>
+            </details>
+            <p class="phoneTip">
+              Phone play: turn sideways for more room. Left thumb moves; right thumb attacks. Tap
+              dialogue to continue.
+            </p>
+            <button class="secondary fullscreenButton" hidden>Full screen</button>
+            <p class="fullscreenStatus" role="status"></p>
+            <div class="chapterTag">A STORYBOOK SNOWDAY · CHAPTER ONE</div>
+            <p class="note">
+              Sound on. Your private snowday adventure. Original synthesized music. Fan-made
+              prototype.
+            </p>
+          </div>
+          <div class="poster">
+            <h3>LOST</h3>
+            <canvas id="posterCv" width="400" height="300"></canvas>
+            <dl>
+              <dt>Name</dt>
+              <dd>Ruffy</dd>
+              <dt>Size</dt>
+              <dd>Fits in a scarf</dd>
+              <dt>Collar</dt>
+              <dd>Red, with a little bell</dd>
+              <dt>Likes</dt>
+              <dd>Squeaky bones, Darren</dd>
+            </dl>
+            <p>If found, please howl loudly.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen" id="sSelect" hidden>
+      <div class="panel">
+        <h2 class="pick">Choose your snowday</h2>
+        <div class="cards">
+          <button class="card" id="pickScarf">
+            <canvas id="pvScarf" width="480" height="300"></canvas>
+            <h3>Snowday Adventure</h3>
+            <p>
+              Punch, kick and tail-sweep through snowy hilltop camps. Switch to Darren’s snowball
+              powers and unleash a blizzard to bring Ruffy home.
+            </p>
+            <div class="stats">
+              <span>Enemy damage</span><strong>Standard</strong><span>Cookie healing</span
+              ><strong>22 health</strong>
+            </div>
+            <div class="musou">Signature special: Scarf-Star Blizzard</div>
+          </button>
+          <button class="card" id="pickPaws">
+            <canvas id="pvPaws" width="480" height="300"></canvas>
+            <h3>Cozy Explorer</h3>
+            <p>
+              The same story, unarmed combos and snow powers, with gentler enemy damage and stronger
+              healing. A welcoming first test for Darren and you.
+            </p>
+            <div class="stats">
+              <span>Enemy damage</span><strong>About half</strong><span>Cookie healing</span
+              ><strong>32 health</strong>
+            </div>
+            <div class="musou">Signature special: Scarf-Star Blizzard</div>
+          </button>
+        </div>
+        <div class="controls">
+          <span><kbd>WASD</kbd> / <kbd>←↑↓→</kbd> move</span>
+          <span><kbd>J</kbd> or <kbd>Z</kbd> attack (tap or hold)</span>
+          <span
+            ><kbd>Space</kbd> or <kbd>X</kbd> dodge · hold <kbd>G</kbd> block (25% less
+            damage)</span
+          >
+          <span
+            ><kbd>F</kbd> style · <kbd>K</kbd> sweep / roll · <kbd>L</kbd> blizzard at 100
+            snow</span
+          >
+          <span><kbd>P</kbd> pause</span
+          ><span
+            >Controller: left stick move · right stick aim · X / RT attack · A dodge · B sweep /
+            roll · View style · Y blizzard · hold LT block · LB / RB camera</span
+          >
+        </div>
+      </div>
+    </div>
+
+    <div class="screen" id="sPause" hidden>
+      <div class="panel end" style="justify-items: start">
+        <div class="screenFitActions">
+          <button class="secondary fullscreenButton">Full screen</button
+          ><button id="fitPhoneScreen" class="secondary">Fit my screen</button>
+        </div>
+        <p id="screenFitStatus" role="status"></p>
+        <p class="fullscreenStatus" role="status"></p>
+        <h2>Snowbreak</h2>
+        <p>Take a breath. Your friends can wait.</p>
+        <button class="go" id="resume">Keep searching</button>
+        <div class="pauseOverview">
+          <section class="pauseInfo pauseMap">
+            <h3>Your map</h3>
+            <canvas
+              id="mini"
+              width="300"
+              height="216"
+              aria-label="Map: red is Darren, camp circles turn gold when cleared"
+            ></canvas>
+            <div id="cluePips" aria-label="Clues found"></div>
+            <div id="cameraTools">
+              <button id="camLeft" aria-label="Rotate camera left">↶</button><span>Camera</span
+              ><button id="camRight" aria-label="Rotate camera right">↷</button
+              ><button id="zoomOut" aria-label="Zoom out">−</button
+              ><button id="zoomIn" aria-label="Zoom in">+</button>
+            </div>
+          </section>
+          <section class="pauseInfo pauseStats">
+            <div class="pauseIdentity">
+              <div class="portrait"><canvas id="face" width="108" height="108"></canvas></div>
+              <div class="nameRow">Darren <small id="wName">Polka Scarf</small></div>
+            </div>
+            <div id="ko"><span>✦ K.O.</span><b id="koN">0</b></div>
+            <div id="sizeChip">❄ <span id="sizeText">Little adventurer · 0/3 cookies</span></div>
+            <div id="rosterChip">♜ <span id="rosterText">Tormund • not met yet</span></div>
+            <div id="saveNote" role="status"></div>
+          </section>
+        </div>
+        <details class="pauseInfo">
+          <summary>Controls &amp; camera shortcuts</summary>
+          <div id="quickHelp">WASD move · B/N rotate · Q/E zoom · P pause</div>
+          <div id="muHint"></div>
+        </details>
+        <details class="pauseInfo">
+          <summary>Combat styles &amp; companion</summary>
+          <p>
+            F or the Paws ⇄ Snow button changes style. With Bare Paws, tap or hold J for jab → cross
+            → kick → tail sweep. K performs a wide tail sweep. Controller View changes style. Darren
+            carries no weapon.
+          </p>
+          <p>
+            In Snowball style: Hold J or the Snowball button for a packed shot. K starts a growing
+            ball; steer with movement and press K again to launch. Space dodges. L spends 100 Snow
+            on a blizzard.
+          </p>
+          <p id="rosterDetails">
+            Tormund joins after your first camp. He uses his sword; Darren keeps his own snowball
+            powers.
+          </p>
+        </details>
+        <details class="pauseInfo">
+          <summary>Darren’s size &amp; appearance</summary>
+          <p>
+            Every three cookies gives Darren a slightly rounder belly and +2 kick, +4 tail-sweep and
+            +5 snow-roll damage, up to three stages. His speed stays quick. Bigger sizes add softer
+            belly and scarf follow-through to attacks. Size saves with your camp checkpoint.
+            Scarf-free Darren has a smooth, featureless cartoon body. Gentle breathing and belly
+            wobble adapt to his size.
+          </p>
+          <div class="lookOptions">
+            <label><input type="checkbox" id="growthEnabled" checked /> Cookie size changes</label
+            ><label><input type="checkbox" id="wearScarf" checked /> Wear yellow scarf</label
+            ><label
+              ><input type="checkbox" id="softMotion" checked /> Breathing &amp; belly wobble</label
+            >
+          </div>
+          <button class="secondary smallButton openWeightBook">Open Darren’s size sketchbook</button
+          ><button class="secondary smallButton" id="resetSize">Reset Darren’s size</button>
+        </details>
+        <details class="controllerPanel pauseInfo">
+          <summary>Controller settings · phone, tablet &amp; PC</summary>
+          <p id="controllerStatus" role="status"></p>
+          <p>
+            Use a browser-supported Bluetooth or USB controller. Left stick moves; right stick aims.
+            In menus, A / × confirms, B / ○ goes back, and Start / Options resumes, regardless of
+            combat bindings. Right stick scrolls. Start always pauses during gameplay, including
+            dialogue. D-pad or left stick navigates. Standard Xbox and PlayStation button positions
+            are supported; use the buttons below to remap your controller.
+          </p>
+          <div class="bindingGrid">
+            <button class="binding" data-bind="throw">throw</button
+            ><button class="binding" data-bind="roll">roll</button
+            ><button class="binding" data-bind="dodge">dodge</button
+            ><button class="binding" data-bind="special">special</button
+            ><button class="binding" data-bind="left">left</button
+            ><button class="binding" data-bind="right">right</button
+            ><button class="binding" data-bind="pause">pause</button
+            ><button class="binding" data-bind="style">style</button
+            ><button class="binding" data-bind="block">block</button
+            ><button id="resetBindings" class="binding">Restore defaults</button>
+          </div>
+        </details>
+        <details class="modelReference">
+          <summary>Darren’s character reference</summary>
+          <p>
+            Based on your model sheet: red body and hands, dark-red toe caps, single crest, pink
+            wings and a smooth chest. You can show or hide his yellow scarf above.
+          </p>
+          <img
+            alt="Darren Shoyru model sheet supplied by you"
+            loading="lazy"
+            src="assets/darren-reference.png"
+          />
+        </details>
+        <details class="pauseInfo">
+          <summary>Tormund &amp; Bucky’s artwork and moves</summary>
+          <p>
+            Tormund follows with his sword and shield. Bucky uses a wooden mallet and carries the
+            firewood. Both defend Darren automatically when enemies come close.
+          </p>
+          <div class="castStudy">
+            <h3>Tormund · sword &amp; shield</h3>
+            <img
+              src="assets/tormund-turnaround.png"
+              loading="lazy"
+              alt="Tormund’s storybook turnaround, equipment and isometric views"
+            />
+            <h3>Bucky · blue Grarrl</h3>
+            <img
+              src="assets/bucky-turnaround.png"
+              loading="lazy"
+              alt="Bucky’s storybook turnaround and expressions"
+            />
+            <h3>Walking, combat &amp; carrying</h3>
+            <img
+              src="assets/tormund-actions.png"
+              loading="lazy"
+              alt="Tormund walking, sword wind-up, strike, recovery, carrying and celebration"
+            /><img
+              src="assets/tormund-actions-rear.png"
+              loading="lazy"
+              alt="Tormund’s matching rear-facing walking, combat and carrying poses"
+            /><img
+              src="assets/bucky-actions.png"
+              loading="lazy"
+              alt="Bucky walking, mallet wind-up, strike, recovery, carrying and celebration"
+            />
+          </div>
+        </details>
+        <details class="pauseInfo">
+          <summary>Phone play</summary>
+          <p>
+            Drag the left circle to move. Hold COMBO for punches, kicks and a tail sweep. Switch to
+            Snow, hold SNOW to pack a snowball, then release to throw. DODGE avoids attacks; SWEEP /
+            ROLL uses your other move. Blizzard appears when Snow power is full.
+          </p>
+          <p>
+            Turn the phone sideways for a wider view. Map and camera controls are here in Pause.
+            Your checkpoints are saved in this browser on this device.
+          </p>
+          <button class="secondary fullscreenButton" hidden>Full screen</button>
+          <p class="fullscreenStatus" role="status"></p>
+        </details>
+        <div class="pauseAudio">
+          <button id="muteBtn" aria-label="Mute music">♪</button
+          ><label class="volumeLabel"
+            >Music volume <input id="volume" type="range" min="0" max="100" value="55"
+          /></label>
+        </div>
+        <p class="note">
+          Progress saves at cleared camps and gathered wood piles. Continue restores health and
+          keeps your completed objectives.
+        </p>
+      </div>
+    </div>
+
+    <div class="screen" id="sEnd" hidden>
+      <div class="panel end">
+        <h2 id="endTitle"></h2>
+        <p id="endText"></p>
+        <div class="endStats">
+          <div><span>K.O.s</span><b id="stKo">0</b></div>
+          <div><span>Best combo</span><b id="stCombo">0</b></div>
+          <div><span>Time</span><b id="stTime">0:00</b></div>
+          <div><span>Style</span><b id="stStyle" style="font-size: 18px">Scarf</b></div>
+        </div>
+        <button class="secondary" id="endContinue" hidden>Continue from saved camp</button
+        ><button class="go" id="nextChapter" hidden>Next · Firewood for Mom</button
+        ><button class="go" id="again">Play again</button>
+      </div>
+    </div>
+
+    <dialog id="weightBook" aria-labelledby="weightBookTitle">
+      <h2 id="weightBookTitle">Darren’s size sketchbook</h2>
+      <p>
+        Four cozy sizes, the same quick feet. Every three cookies adds one level, up to level 3.
+        These animated previews show his actual in-game form.
+      </p>
+      <div class="weightGrid">
+        <article class="weightCard">
+          <canvas
+            id="weightPreview0"
+            width="288"
+            height="320"
+            aria-label="Darren size level 0"
+          ></canvas>
+          <h3>0 · Little adventurer</h3>
+          <p>0 cookies</p>
+          <p>Starting size</p>
+        </article>
+        <article class="weightCard">
+          <canvas
+            id="weightPreview1"
+            width="288"
+            height="320"
+            aria-label="Darren size level 1"
+          ></canvas>
+          <h3>1 · Cozy belly</h3>
+          <p>3 cookies</p>
+          <p>+2 kick · +4 sweep · +5 roll</p>
+        </article>
+        <article class="weightCard">
+          <canvas
+            id="weightPreview2"
+            width="288"
+            height="320"
+            aria-label="Darren size level 2"
+          ></canvas>
+          <h3>2 · Round & ready</h3>
+          <p>6 cookies</p>
+          <p>+4 kick · +8 sweep · +10 roll</p>
+        </article>
+        <article class="weightCard">
+          <canvas
+            id="weightPreview3"
+            width="288"
+            height="320"
+            aria-label="Darren size level 3"
+          ></canvas>
+          <h3>3 · Snowball sturdy</h3>
+          <p>9+ cookies</p>
+          <p>+6 kick · +12 sweep · +15 roll</p>
+        </article>
+      </div>
+      <details class="weightStudy">
+        <summary>See the painted character study</summary>
+        <img
+          src="assets/darren-weight-storybook.png"
+          alt="Painted concept of Darren’s four increasingly round size levels"
+          loading="lazy"
+        />
+      </details>
+      <p>
+        Previewing a size does not change your adventure or your save. Growth, scarf and soft-motion
+        choices are in the pause menu.
+      </p>
+      <button class="secondary bookClose" id="closeWeightBook" autofocus>Close sketchbook</button>
+    </dialog>
+    <script src="vendor/phaser-3.90.0.min.js"></script>
+    <script src="shared-save.js?v=1"></script>
+    <script src="controls.js?v=13"></script>
+    <script src="game.js?v=13"></script>
+    <script src="pixel-art.js?v=7"></script>
+    <script src="assets/darren-isometric.js?v=7"></script>
+    <script src="darren-art.js?v=7"></script>
+    <script src="assets/storybook-scenery.js?v=7"></script>
+    <script src="storybook.js?v=7"></script>
+    <script src="isometric-world.js?v=7"></script>
+    <script src="firewood.js?v=9"></script>
+    <script src="phone.js?v=12"></script>
+    <script src="phaser-scene.js?v=12"></script>
+  </body>
+</html>

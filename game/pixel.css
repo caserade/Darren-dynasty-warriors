@@ -1,0 +1,392 @@
+/* Crisp illustrated pixels in the world; readable text above it. */
+#game {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: #54748e;
+}
+#game canvas {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+.portrait canvas,
+.card canvas,
+.poster canvas,
+#mini {
+  image-rendering: pixelated;
+}
+:root {
+  --display: 'Trebuchet MS', sans-serif;
+  --body: 'Trebuchet MS', sans-serif;
+  --scarf: #ffdf7b;
+  --ink: #233750;
+}
+.status,
+.portrait,
+.bar,
+.bar i,
+#obj,
+#ko,
+#mini,
+#bossBox,
+#rosterChip,
+#sizeChip,
+#abilityDock button,
+#cameraTools,
+#dialog,
+.pauseInfo,
+.card,
+.go,
+.secondary,
+.modelReference {
+  border-radius: 4px !important;
+}
+.status,
+#obj,
+#ko,
+#rosterChip,
+#sizeChip,
+#abilityDock button {
+  box-shadow:
+    3px 3px 0 #25395070,
+    inset 0 0 0 2px #fffbea;
+}
+.status {
+  border-width: 2px;
+  background: #fff6dfef;
+  padding: 12px 13px 10px;
+}
+.status:after {
+  left: 3px;
+  right: 3px;
+  border-radius: 0;
+  bottom: -7px;
+  height: 5px;
+  background: repeating-linear-gradient(
+    90deg,
+    #ffda6c 0 10px,
+    #ed80aa 10px 13px,
+    #ffda6c 13px 24px
+  );
+}
+.portrait {
+  background: #688dab;
+  border-color: #f5ca65;
+  width: 58px;
+  height: 64px;
+}
+.bar {
+  height: 12px;
+  box-shadow: none;
+  border-color: #324a66;
+}
+#hpFill {
+  background: repeating-linear-gradient(90deg, #69ba91 0 14px, #8cd3a3 14px 16px);
+}
+#muFill {
+  background: repeating-linear-gradient(90deg, #70bdd9 0 10px, #a5dbe8 10px 12px);
+}
+#sizeChip {
+  position: absolute;
+  left: 18px;
+  top: 160px;
+  padding: 7px 10px;
+  border: 1px solid #d1bc8c;
+  background: #fff6dfea;
+  color: #4a6073;
+  font-size: 10px;
+}
+#rosterChip {
+  top: 200px !important;
+  font-size: 10px;
+}
+#abilityDock button {
+  border-width: 2px;
+  width: 106px;
+  background: #fff7e9f5;
+}
+#abilityDock button > span {
+  font-size: 24px;
+  text-shadow: 1px 2px #afd6e0;
+}
+#abilityDock button.ready {
+  background: #ffde83;
+  box-shadow: 3px 3px #b96985;
+}
+#cameraTools {
+  padding: 6px;
+}
+#cameraTools button {
+  border-radius: 2px !important;
+}
+#cameraTools span {
+  font-size: 9px;
+}
+#dialog {
+  border-width: 3px;
+  box-shadow: 5px 5px #26395077;
+}
+#dialog .who {
+  border-radius: 3px;
+}
+.logo {
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  text-shadow: 4px 5px #192c46;
+}
+.chapterTag {
+  color: #ffe4a1;
+  letter-spacing: 0.16em;
+  font-weight: 900;
+  font-size: 11px;
+}
+.poster {
+  transform: rotate(2deg);
+  border-radius: 3px;
+  border: 3px solid #ffe4a1;
+  box-shadow: 6px 8px #11243e77;
+}
+.poster canvas {
+  border-radius: 0;
+}
+.poster h3 {
+  font-size: 32px;
+  letter-spacing: 0.22em;
+}
+.screen {
+  background: linear-gradient(100deg, #122b45f5, #243956ce 65%, #183047ba);
+}
+.card {
+  border-width: 3px;
+  padding: 16px;
+}
+.card canvas {
+  border-radius: 2px;
+}
+.card:hover {
+  border-color: #ffe5a0;
+}
+.go,
+.secondary {
+  border-width: 2px;
+}
+.smallButton {
+  font-size: 12px;
+  padding: 8px 12px;
+  margin-left: 15px;
+  box-shadow: none;
+}
+.pauseInfo {
+  padding: 13px 18px;
+}
+.pauseInfo p {
+  margin: 5px 0 10px;
+}
+.pauseInfo label {
+  font-size: 13px;
+}
+button:focus-visible {
+  outline: 3px solid #ef86b2;
+  outline-offset: 4px;
+}
+#sPause .panel {
+  gap: 16px;
+}
+#sPause .panel > h2 {
+  font-size: 42px;
+}
+#sPause .panel > p {
+  font-size: 14px;
+}
+@media (min-width: 1101px) {
+  #obj {
+    top: 18px;
+    width: 315px;
+    font-size: 12px;
+  }
+  #bossBox {
+    top: 130px;
+  }
+  #quickHelp {
+    font-size: 11px;
+    bottom: 124px;
+  }
+}
+@media (max-width: 680px) {
+  #sizeChip {
+    top: 206px;
+    left: 12px;
+    font-size: 9px;
+    padding: 5px 8px;
+  }
+  #rosterChip,
+  body.touch #rosterChip {
+    top: 237px !important;
+    left: 12px;
+    font-size: 9px;
+  }
+  #bossBox {
+    top: 274px;
+  }
+  #abilityDock button {
+    width: 73px;
+  }
+  .portrait {
+    width: 39px;
+    height: 51px;
+  }
+  .status {
+    padding: 9px;
+    gap: 8px;
+  }
+  .smallButton {
+    margin: 9px 0 0;
+    display: block;
+  }
+  #sPause .panel > h2 {
+    font-size: 32px;
+  }
+}
+@media (max-height: 520px) and (min-width: 681px) {
+  #sizeChip {
+    top: 143px;
+  }
+  #rosterChip,
+  body.touch #rosterChip {
+    top: 174px !important;
+  }
+  #abilityDock button {
+    width: 79px;
+  }
+  #bossBox {
+    top: 106px;
+  }
+  #obj {
+    top: 15px;
+  }
+  #hudBtns {
+    top: 96px;
+  }
+}
+
+.lookOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  margin: 12px 0;
+}
+.lookOptions label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.lookOptions input {
+  accent-color: #dcab46;
+}
+.controllerPanel {
+  width: min(100%, 650px);
+  box-sizing: border-box;
+}
+.controllerPanel summary {
+  font-weight: bold;
+  cursor: pointer;
+}
+.bindingGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 7px;
+}
+.binding {
+  border: 1px solid #c1a775;
+  background: #f9e8bd;
+  color: #354762;
+  padding: 9px;
+  font: 12px 'Trebuchet MS';
+  text-align: left;
+  border-radius: 3px;
+}
+#controllerStatus {
+  font-weight: bold;
+  color: #416c86;
+}
+body.usingGamepad #touch {
+  display: none !important;
+}
+body.touch.usingGamepad #quickHelp {
+  display: block;
+  bottom: 24px;
+  font-size: 9px;
+  max-width: 90%;
+  white-space: normal;
+  text-align: center;
+}
+.screen {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+.screen > .panel {
+  margin-block: auto;
+  flex: none;
+}
+@media (max-height: 520px) and (min-width: 681px) {
+  body.touch #tAtk {
+    right: 16px;
+    bottom: 18px;
+    width: 72px;
+    height: 72px;
+  }
+  body.touch #tDash {
+    right: 100px;
+    bottom: 22px;
+    width: 60px;
+    height: 60px;
+  }
+  body.touch #tBlock {
+    right: 166px;
+    bottom: 22px;
+    width: 60px;
+    height: 60px;
+  }
+  body.touch #tRoll {
+    right: 100px;
+    bottom: 94px;
+    width: 60px;
+    height: 60px;
+  }
+  body.touch #tMu {
+    right: 20px;
+    bottom: 104px;
+    width: 56px;
+    height: 56px;
+  }
+  body.touch #mini {
+    right: 192px;
+    bottom: 12px;
+    width: 90px;
+    height: 65px;
+  }
+  body.touch #cameraTools {
+    right: 192px;
+    bottom: 90px;
+  }
+  body.touch #bossBox {
+    top: 112px;
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+}
+
+#cameraTools #styleToggle {
+  width: auto;
+  min-width: 90px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: bold;
+  background: #ffe49d;
+  color: #314962;
+}

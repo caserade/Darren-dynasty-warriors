@@ -1,0 +1,698 @@
+/* A quiet play field: health, one objective, style and pause. Details live in Snowbreak. */
+#hud {
+  box-sizing: border-box;
+  padding: 0;
+}
+#hud .status {
+  position: absolute;
+  top: calc(14px + env(safe-area-inset-top, 0px));
+  left: calc(14px + env(safe-area-inset-left, 0px));
+  box-sizing: border-box;
+  width: 190px;
+  max-width: none;
+  gap: 0;
+  padding: 9px 11px;
+  border: 1px solid #d3be93;
+  background: #fff8e7eb;
+  transform: none;
+  box-shadow: 0 3px 10px #19344820;
+}
+#hud .status:after {
+  display: none;
+}
+#hud .bars {
+  gap: 3px;
+}
+#hud .meterLabel {
+  font:
+    700 9px 'Trebuchet MS',
+    sans-serif;
+  line-height: 12px;
+  letter-spacing: 0;
+}
+#hud .bar {
+  height: 8px;
+  border-width: 1px;
+  box-shadow: none;
+}
+#hud #muBar {
+  height: 5px;
+}
+#hud .snowLabel {
+  margin-top: 2px;
+}
+#hud #hudBtns {
+  top: calc(14px + env(safe-area-inset-top, 0px));
+  right: calc(14px + env(safe-area-inset-right, 0px));
+  gap: 7px;
+  align-items: center;
+}
+#hud #hudBtns button {
+  box-sizing: border-box;
+  height: 44px;
+  width: 44px;
+  border: 1px solid #d3be93;
+  border-radius: 12px;
+  background: #fff8e7ef;
+  box-shadow: 0 3px 10px #19344820;
+  color: #344557;
+  font:
+    700 15px 'Trebuchet MS',
+    sans-serif;
+}
+#hud #hudBtns #styleToggle {
+  width: 100px;
+  font-size: 11px;
+}
+#hud #obj {
+  box-sizing: border-box;
+  left: 50%;
+  right: auto;
+  top: calc(14px + env(safe-area-inset-top, 0px));
+  bottom: auto;
+  transform: translateX(-50%);
+  width: 280px;
+  max-width: calc(100vw - 450px);
+  padding: 8px 11px;
+  border: 0;
+  background: #fff8e7db;
+  box-shadow: none;
+  font:
+    600 12px/1.4 'Trebuchet MS',
+    sans-serif;
+  text-align: center;
+}
+#hud #obj small {
+  display: none;
+}
+#hud #bossBox {
+  box-sizing: border-box;
+  top: calc(14px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: 280px;
+  max-width: calc(100vw - 450px);
+  padding: 8px 10px;
+  background: #fff8e7ed;
+  color: #344557;
+  border: 1px solid #d3be93;
+}
+#hud #bossName {
+  font:
+    700 12px/1.3 Georgia,
+    serif;
+  text-shadow: none;
+  margin-bottom: 5px;
+}
+#hud #bossValue {
+  display: none;
+}
+#hud:has(#bossBox:not([hidden])) #obj {
+  visibility: hidden;
+}
+#hud #combo {
+  top: auto;
+  bottom: 83px;
+  right: 18px;
+  text-align: right;
+}
+#hud #combo b {
+  font-size: 25px;
+  -webkit-text-stroke: 1px #344557;
+}
+#hud #combo span {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+}
+#hud #abilityDock {
+  left: 50%;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  gap: 6px;
+  transform: translateX(-50%);
+}
+#hud #abilityDock button {
+  box-sizing: border-box;
+  min-height: 44px;
+  width: 98px;
+  padding: 6px 8px;
+  gap: 2px;
+  border: 1px solid #d3be93;
+  background: #fff8e7df;
+  box-shadow: 0 2px 7px #19344820;
+}
+#hud #abilityDock button > span {
+  display: none;
+}
+#hud #abilityDock b {
+  font:
+    700 11px 'Trebuchet MS',
+    sans-serif;
+}
+#hud #abilityDock small {
+  font-size: 9px;
+}
+#hud #abilityDock button.ready {
+  background: #f8d77b;
+}
+body.touch #hud #abilityDock,
+body.usingGamepad #hud #abilityDock {
+  display: none;
+}
+/* Pause owns map, camera, music and progress. Retain their original live IDs. */
+#sPause .panel {
+  width: min(760px, 100%);
+  gap: 14px;
+}
+#sPause .panel > h2 {
+  font-size: 36px;
+  margin: 0;
+}
+#sPause .panel > p {
+  margin: 0;
+}
+#sPause #resume {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  font-size: 18px;
+  min-height: 46px;
+}
+.pauseOverview {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 12px;
+  width: 100%;
+}
+#sPause .pauseInfo {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  padding: 14px 16px;
+  border-width: 1px;
+}
+#sPause details.pauseInfo > summary {
+  cursor: pointer;
+  font-weight: bold;
+  min-height: 24px;
+  line-height: 24px;
+}
+#sPause details.pauseInfo[open] > summary {
+  margin-bottom: 10px;
+}
+#sPause .pauseMap h3 {
+  font-size: 18px;
+}
+#sPause #mini {
+  position: static;
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+  aspect-ratio: 300/216;
+  border-width: 1px;
+  box-shadow: none;
+  margin: 0 auto 10px;
+}
+#sPause #cameraTools {
+  position: static;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: auto;
+  gap: 7px;
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+#sPause #cameraTools button {
+  width: 44px;
+  height: 44px;
+  border-radius: 9px !important;
+}
+#sPause #cameraTools span {
+  display: none;
+}
+#sPause #cluePips {
+  font-size: 11px;
+  white-space: normal;
+  margin-top: 8px;
+  text-align: center;
+}
+#sPause .pauseIdentity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+#sPause .portrait {
+  width: 52px;
+  height: 58px;
+}
+#sPause .nameRow {
+  font-size: 20px;
+}
+#sPause .nameRow small {
+  font-size: 10px;
+}
+#sPause #ko,
+#sPause #sizeChip,
+#sPause #rosterChip,
+#sPause #saveNote {
+  position: static;
+  display: block;
+  box-sizing: border-box;
+  padding: 8px 0;
+  margin: 0;
+  min-width: 0;
+  max-width: none;
+  background: none;
+  border: 0;
+  border-radius: 0 !important;
+  box-shadow: none;
+  text-shadow: none;
+  color: #344557;
+  text-align: left;
+  font:
+    12px/1.5 'Trebuchet MS',
+    sans-serif;
+}
+#sPause #ko b {
+  display: inline;
+  font-size: 18px;
+  margin-left: 8px;
+}
+#sPause #saveNote:empty {
+  display: none;
+}
+#sPause #quickHelp {
+  position: static;
+  transform: none;
+  display: block;
+  white-space: normal;
+  padding: 0;
+  background: none;
+  color: #344557;
+  font-size: 13px;
+  line-height: 1.6;
+}
+#sPause #muHint {
+  height: auto;
+  font-size: 12px;
+  color: #52677f;
+  margin-top: 10px;
+}
+.pauseAudio {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.pauseAudio #muteBtn {
+  width: 44px;
+  height: 44px;
+  border: 1px solid #d3be93;
+  border-radius: 10px;
+  background: #fff8e7;
+  color: #344557;
+  font-size: 20px;
+}
+.pauseAudio .volumeLabel {
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+.pauseAudio input {
+  max-width: 180px;
+}
+/* Thumb controls stay in the corners; Blizzard appears only when usable. */
+body.touch #touch #stick {
+  box-sizing: border-box;
+  left: calc(14px + env(safe-area-inset-left, 0px));
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  width: 108px;
+  height: 108px;
+  border-width: 1px;
+  background: #f8f4e52b;
+}
+body.touch #touch #knob {
+  width: 42px;
+  height: 42px;
+  margin: -22px 0 0 -22px;
+  border-width: 1px;
+  background: #f6d06fc9;
+}
+body.touch #touch .tb {
+  box-sizing: border-box;
+  border-width: 1px;
+  box-shadow: 0 3px 8px #19344825;
+  font:
+    700 10px 'Trebuchet MS',
+    sans-serif;
+  opacity: 0.92;
+}
+body.touch #touch #tAtk {
+  right: calc(14px + env(safe-area-inset-right, 0px));
+  bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+  width: 70px;
+  height: 70px;
+  font-size: 12px;
+}
+body.touch #touch #tDash {
+  right: calc(94px + env(safe-area-inset-right, 0px));
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  width: 54px;
+  height: 54px;
+}
+body.touch #touch #tBlock {
+  right: calc(154px + env(safe-area-inset-right, 0px));
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  width: 54px;
+  height: 54px;
+  background: #cfe9f7;
+}
+body.touch #touch #tRoll {
+  right: calc(94px + env(safe-area-inset-right, 0px));
+  bottom: calc(82px + env(safe-area-inset-bottom, 0px));
+  width: 54px;
+  height: 54px;
+}
+body.touch #touch #tMu {
+  right: calc(17px + env(safe-area-inset-right, 0px));
+  bottom: calc(102px + env(safe-area-inset-bottom, 0px));
+  width: 54px;
+  height: 54px;
+  background: #f5d47d;
+}
+body:has(.screen:not([hidden])) #hud,
+body:has(.screen:not([hidden])) #touch {
+  visibility: hidden;
+}
+body:has(#dialog:not([hidden])) #touch,
+body:has(#dialog:not([hidden])) #abilityDock,
+body:has(#dialog:not([hidden])) #styleToggle {
+  visibility: hidden;
+}
+#banner {
+  font-size: clamp(22px, 4vw, 38px);
+  -webkit-text-stroke: 1px #344557;
+  text-shadow: 0 3px 6px #243c5080;
+  top: 23%;
+}
+#banner small {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+@media (max-width: 760px) {
+  #hud .status {
+    left: calc(10px + env(safe-area-inset-left, 0px));
+    top: calc(10px + env(safe-area-inset-top, 0px));
+    width: 148px;
+    padding: 8px 9px;
+  }
+  #hud #hudBtns {
+    right: calc(10px + env(safe-area-inset-right, 0px));
+    top: calc(10px + env(safe-area-inset-top, 0px));
+    gap: 6px;
+  }
+  #hud #hudBtns #styleToggle {
+    width: 78px;
+    font-size: 10px;
+  }
+  #hud #obj,
+  #hud #bossBox {
+    top: calc(87px + env(safe-area-inset-top, 0px));
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    transform: translateX(-50%);
+    width: calc(100% - 24px);
+    max-width: 420px;
+    font-size: 11px;
+    padding: 6px 9px;
+  }
+  #hud #obj strong {
+    font-weight: 600;
+  }
+  #hud #bossName {
+    font-size: 11px;
+  }
+  #hud #combo {
+    bottom: 178px;
+    right: 12px;
+  }
+  #hud #combo b {
+    font-size: 23px;
+  }
+  #hud #abilityDock button {
+    width: 76px;
+    padding: 5px 3px;
+  }
+  #hud #abilityDock b {
+    font-size: 10px;
+  }
+  #hud #abilityDock small {
+    font-size: 8px;
+  }
+  #hud #abilityDock {
+    gap: 4px;
+  }
+  #sPause .pauseOverview {
+    grid-template-columns: 1fr;
+  }
+  #sPause .pauseStats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 12px;
+  }
+  #sPause .pauseIdentity,
+  #sPause #saveNote {
+    grid-column: 1/-1;
+  }
+  #sPause .panel > h2 {
+    font-size: 30px;
+  }
+}
+@media (max-height: 520px) and (min-width: 600px) {
+  #hud .status {
+    width: 148px;
+    top: calc(8px + env(safe-area-inset-top, 0px));
+    left: calc(10px + env(safe-area-inset-left, 0px));
+    padding: 6px 8px;
+  }
+  #hud #hudBtns {
+    top: calc(8px + env(safe-area-inset-top, 0px));
+    right: calc(10px + env(safe-area-inset-right, 0px));
+  }
+  #hud #hudBtns #styleToggle {
+    width: 78px;
+    font-size: 10px;
+  }
+  #hud #obj,
+  #hud #bossBox {
+    top: calc(8px + env(safe-area-inset-top, 0px));
+    left: 50%;
+    transform: translateX(-50%);
+    width: 240px;
+    max-width: calc(100vw - 340px);
+    padding: 6px 8px;
+    font-size: 10px;
+  }
+  body.touch #touch #stick {
+    width: 96px;
+    height: 96px;
+    bottom: 12px;
+  }
+  body.touch #touch #tAtk {
+    bottom: 14px;
+    width: 64px;
+    height: 64px;
+  }
+  body.touch #touch #tDash {
+    bottom: 12px;
+  }
+  body.touch #touch #tBlock {
+    bottom: 12px;
+  }
+  body.touch #touch #tRoll {
+    bottom: 76px;
+  }
+  body.touch #touch #tMu {
+    bottom: 94px;
+  }
+  #hud #combo {
+    bottom: 80px;
+    font-size: 20px;
+  }
+  #dialog {
+    bottom: 18px;
+    max-height: 55vh;
+  }
+  #banner {
+    top: 24%;
+    font-size: 24px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #hud #muBar.full {
+    animation: none;
+  }
+}
+
+.chapterButtons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.chapterButtons button {
+  font-size: 14px;
+  padding: 12px 16px;
+}
+.castStudy img {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 12px 0 22px;
+  border-radius: 12px;
+  background: #e5edf0;
+}
+.castStudy h3 {
+  margin-top: 20px !important;
+}
+
+/* Menus must permit a vertical touch gesture through every ancestor. */
+html,
+body {
+  touch-action: auto;
+  overscroll-behavior: none;
+}
+#game,
+#touch,
+#hud button {
+  touch-action: none;
+}
+.screen,
+#weightBook,
+#dialog {
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.screen {
+  padding-top: calc(20px + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  padding-left: calc(16px + env(safe-area-inset-left, 0px));
+  padding-right: calc(16px + env(safe-area-inset-right, 0px));
+}
+.phoneTip {
+  display: none;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #e2edf2;
+}
+body.touch .phoneTip {
+  display: block;
+}
+.fullscreenButton {
+  min-height: 44px;
+  font-size: 14px;
+}
+.fullscreenStatus {
+  font-size: 13px;
+  line-height: 1.4;
+}
+.fullscreenStatus:empty {
+  display: none;
+}
+body.touch button,
+body.touch summary {
+  min-height: 44px;
+}
+body.touch input[type='range'] {
+  min-height: 44px;
+}
+body.touch #touch #knob {
+  box-sizing: border-box;
+  margin: -21px 0 0 -21px;
+}
+@media (max-height: 520px) and (min-width: 600px) {
+  body.touch #touch #stick {
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+  body.touch #touch #tAtk {
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  }
+  body.touch #touch #tDash {
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+  body.touch #touch #tBlock {
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+  body.touch #touch #tRoll {
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  }
+  body.touch #touch #tMu {
+    bottom: calc(94px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Persistent focus ring for controller navigation, including native dialogs. */
+body.usingGamepad button:focus,
+body.usingGamepad input:focus,
+body.usingGamepad summary:focus {
+  outline: 3px solid #ffdb76;
+  outline-offset: 4px;
+  box-shadow: 0 0 0 6px #243955;
+}
+
+/* Match the available browser height as the address bar opens/closes. */
+@supports (height: 100dvh) {
+  #game,
+  #hud,
+  #touch,
+  .screen {
+    height: 100dvh;
+    bottom: auto;
+  }
+}
+.screenFitActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.screenFitActions button {
+  min-height: 44px;
+}
+#screenFitStatus {
+  font-size: 14px;
+  line-height: 1.5;
+}
+#hud #hudBtns #quickFullscreen {
+  width: 44px;
+  height: 44px;
+  font-size: 24px;
+}
+@media (max-width: 420px) {
+  #hud .status {
+    width: 132px;
+  }
+  #hud #hudBtns {
+    gap: 4px;
+  }
+  #hud #hudBtns #styleToggle {
+    width: 64px;
+  }
+}
+
+/* Shared with the 3D game: a line about its progress, and a tag on the difficulty picked last time. */
+.otherGameNote {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #ffe1a0;
+}
+.card.usualPick h3::after {
+  content: ' · last pick';
+  font-size: 0.7em;
+  opacity: 0.8;
+}
