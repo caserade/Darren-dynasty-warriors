@@ -365,6 +365,13 @@ body.touch #touch #tDash {
   width: 54px;
   height: 54px;
 }
+body.touch #touch #tBlock {
+  right: calc(154px + env(safe-area-inset-right, 0px));
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  width: 54px;
+  height: 54px;
+  background: #cfe9f7;
+}
 body.touch #touch #tRoll {
   right: calc(94px + env(safe-area-inset-right, 0px));
   bottom: calc(82px + env(safe-area-inset-bottom, 0px));
@@ -505,6 +512,9 @@ body:has(#dialog:not([hidden])) #styleToggle {
   body.touch #touch #tDash {
     bottom: 12px;
   }
+  body.touch #touch #tBlock {
+    bottom: 12px;
+  }
   body.touch #touch #tRoll {
     bottom: 76px;
   }
@@ -614,6 +624,9 @@ body.touch #touch #knob {
     bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   }
   body.touch #touch #tDash {
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+  body.touch #touch #tBlock {
     bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   }
   body.touch #touch #tRoll {

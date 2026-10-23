@@ -96,7 +96,9 @@ function clearInput() {
   chargePointer = null;
   $('stick').firstElementChild.style.transform = '';
   cameraDrag.id = null;
+  blockPointer = null;
   game?.cancelCharge();
+  game?.block(false);
 }
 // The controller-button settings live in the pause menu, and the front end's Options page borrows them.
 const padSettings = $('pad-settings'),
@@ -188,6 +190,7 @@ const gameKeys = [
   'KeyE',
   'KeyL',
   'KeyQ',
+  'KeyF',
   'KeyZ',
   'KeyX',
   'KeyC',
@@ -230,12 +233,14 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyE') game.interact();
   if (e.code === 'KeyL') game.special();
   if (e.code === 'KeyQ') swapStyle();
+  if (e.code === 'KeyF') game.block(true);
   if (e.code === 'KeyC') cameraYaw = game.player.yaw + Math.PI;
   if (e.code.startsWith('Digit')) requestSwitch(Number(e.code.slice(-1)) - 1);
 });
 window.addEventListener('keyup', (e) => {
   keys.delete(e.code);
   if (e.code === 'KeyK') game?.chargeRelease();
+  if (e.code === 'KeyF') game?.block(false);
 });
 function touchMode() {
   document.body.classList.add('touch-device');
@@ -282,7 +287,26 @@ for (const [id, method] of [
     e.preventDefault();
     if (!game?.paused) game[method]();
   };
-let chargePointer = null;
+let chargePointer = null,
+  blockPointer = null;
+// Block is held, like charge: down guards, letting go (or losing the finger) drops the guard.
+const blockButton = $('touch-block');
+blockButton.onpointerdown = (e) => {
+  e.preventDefault();
+  if (blockPointer !== null || game?.paused) return;
+  blockPointer = e.pointerId;
+  blockButton.setPointerCapture(e.pointerId);
+  game.block(true);
+};
+blockButton.onpointerup =
+  blockButton.onpointercancel =
+  blockButton.onlostpointercapture =
+    (e) => {
+      if (e.pointerId === blockPointer) {
+        blockPointer = null;
+        game.block(false);
+      }
+    };
 const chargeButton = $('touch-charge');
 chargeButton.onpointerdown = (e) => {
   e.preventDefault();
@@ -335,17 +359,19 @@ const PAD_SAVE = 'snowday-3d-controls-v1',
     dodge: 1,
     combo: 2,
     charge: 3,
-    switch: 4,
+    block: 4,
     interact: 5,
     style: 6,
     special: 7,
     pause: 9,
+    switch: 15,
   },
   PAD_LABELS = {
     combo: 'Combo',
     charge: 'Hold charge',
     jump: 'Jump',
     dodge: 'Dodge',
+    block: 'Hold block',
     interact: 'Talk / gather',
     switch: 'Next hero',
     special: 'Special',
@@ -365,6 +391,15 @@ try {
     )
   ) {
     padBindings = { ...PAD_DEFAULTS, ...saved };
+    // Saves from before Block (update 17) kept Next hero on LB, where Block now goes as in musou
+    // games: Next hero moves to D-pad right unless that button was already taken.
+    if (!('block' in saved) && saved.switch === 4) {
+      const taken = Object.values(saved);
+      if (!taken.includes(15)) {
+        padBindings.switch = 15;
+        padBindings.block = 4;
+      }
+    }
     // Saves from before Paws/Scarf and Special existed may already use LT/RT for something
     // else; give a newer action a free button instead of letting one button do two things.
     const FREE = [6, 7, 4, 5, 10, 11, 8, 3, 2, 1, 0, 12, 13, 14, 15];
@@ -421,7 +456,7 @@ function showBindings() {
   }
   const n = (k) => buttonName(padBindings[k]).split(' / ')[0];
   $('pad-help').textContent =
-    `Controller: ${n('combo')} combo · hold ${n('charge')} charge · ${n('jump')} jump · ${n('dodge')} dodge · ${n('interact')} interact · ${n('special')} special · ${n('style')} Darren's style · ${n('switch')} next hero`;
+    `Controller: ${n('combo')} combo · hold ${n('charge')} charge · ${n('jump')} jump · ${n('dodge')} dodge · hold ${n('block')} block · ${n('interact')} interact · ${n('special')} special · ${n('style')} Darren's style · ${n('switch')} next hero`;
 }
 function saveBindings() {
   try {
@@ -556,6 +591,7 @@ function padInput(dt) {
     if (!pressed[B.charge] && padPrevious[B.charge]) game.chargeRelease();
     if (edge(B.jump)) game.jump();
     if (edge(B.dodge)) game.dodge();
+    if (pressed[B.block] !== !!padPrevious[B.block]) game.block(!!pressed[B.block]);
     if (edge(B.interact)) game.interact();
     if (edge(B.special)) game.special();
     if (edge(B.style)) swapStyle();
@@ -932,6 +968,27 @@ function events() {
         shieldFlash(e);
         tone(1570, 0.18, 0.035);
       }
+    }
+    // A blocked blow (update 17): a cold blue ring and sparks where it landed, a dull knock, the
+    // smaller number with BLOCK beside it, and no red flash.
+    if (e.type === 'block') {
+      if (heroes[e.actor]) heroes[e.actor].hurt = e.angle ?? null;
+      ring({ x: e.x, z: e.z, y: e.y - 1.2, r: 1.3, strong: false, color: 0xbfe3ff });
+      if (e.actor === 1) shieldFlash(e);
+      else
+        steelSparks(
+          e.x - Math.sin(e.angle) * 0.5,
+          e.y,
+          e.z - Math.cos(e.angle) * 0.5,
+          -Math.sin(e.angle),
+          -Math.cos(e.angle),
+          $('quality').value !== 'high' ? 5 : 10,
+          2
+        );
+      tone(310, 0.1, 0.05);
+      tone(930, 0.08, 0.025);
+      shake = Math.max(shake, 0.12);
+      floater(e.x, e.y + 0.4, e.z, `-${e.damage} BLOCK`, 'block');
     }
     if (e.type === 'special') {
       banner(e.name, 'SPECIAL');
@@ -1646,6 +1703,13 @@ function heroPose(a, i, h) {
       snapYaw: true,
       noLook: act.name === 'Dodge',
     };
+  }
+  // Guarding (update 17): standing still the whole body takes the guard stance; on the move the
+  // legs keep walking and the Animator lays the guard over the upper body.
+  if (a.guarding && an.has('Guard')) {
+    if (a.speed < 0.4 && a.air <= 0.02)
+      return { ...d, key: 'guard', clip: 'Guard', loop: true, blend: 0.1, guard: 1, still: true };
+    return { ...d, key: 'loco', clip: 'Idle', blend: 0.16, guard: 1 };
   }
   if (a.charging) {
     const clip =

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { World, Game, CAST, GRUNTS, BOSSES, BELLY, MOVE_WIND } from '../dist/3d/sim.mjs';
+import { World, Game, CAST, GRUNTS, BOSSES, BELLY, MOVE_WIND, BLOCK_CUT } from '../dist/3d/sim.mjs';
 const data = JSON.parse(fs.readFileSync(new URL('../dist/3d/world.json', import.meta.url)));
 const world = new World(data);
 world.prepareNav();
@@ -1025,5 +1025,97 @@ test('Firewood started before the 3D rescue can switch back without losing rescu
   const back = new Game(world, saved, { seed: 1 });
   assert.equal(back.quest.chapter, 'firewood');
   assert.equal(back.quest.home, false);
+});
+// Block (update 17): held, it takes 25% off every blow and keeps the hero on their feet.
+test('Holding block cuts damage by 25%, prevents knockdowns and keeps the combo', () => {
+  assert.equal(BLOCK_CUT, 0.25);
+  for (const hero of [0, 1, 2]) {
+    const open = fresh(),
+      guard = fresh();
+    for (const g of [open, guard]) {
+      g.switchTo(hero);
+      tick(g, 0.5);
+      place(g, 30, 52);
+      g.player.inv = 0;
+    }
+    guard.block(true);
+    tick(guard, 0.1);
+    assert(guard.player.guarding, CAST[hero] + ' guards');
+    guard.combo = 7;
+    guard.comboTime = 2;
+    open.hurtHero(20, 0);
+    guard.hurtHero(20, 0);
+    assert.equal(100 - open.player.hp, 20);
+    assert.equal(100 - guard.player.hp, 15, CAST[hero] + ' takes 15 instead of 20');
+    assert.equal(open.player.action?.name, 'Knockdown');
+    assert.equal(guard.player.action, null, 'no knockdown through the guard');
+    assert.equal(guard.combo, 7, 'a blocked blow keeps the combo going');
+    assert(guard.events.some((e) => e.type === 'block' && e.damage === 15 && e.saved === 5));
+    assert(!guard.events.some((e) => e.type === 'hurt'));
+  }
+  // Rounds like every other hit and never drops below 1; cozy mode stacks with it.
+  const g = fresh();
+  place(g, 30, 52);
+  g.block(true);
+  tick(g, 0.1);
+  g.player.inv = 0;
+  g.hurtHero(2, 0);
+  assert.equal(g.player.hp, 98, 'a 2 damage hit still costs 2 after rounding (1.5 rounds up)');
+  g.player.inv = 0;
+  g.hurtHero(1, 0);
+  assert.equal(g.player.hp, 97, 'never less than 1');
+  const cozy = fresh();
+  cozy.setMode('cozy');
+  place(cozy, 30, 52);
+  cozy.block(true);
+  tick(cozy, 0.1);
+  cozy.player.inv = 0;
+  cozy.hurtHero(20, 0);
+  assert.equal(cozy.player.hp, 100 - Math.round(Math.round(20 * 0.55) * 0.75));
+});
+test('Block drops while attacking, in the air, on pause and on release; guarding walks slowly', () => {
+  const g = fresh();
+  place(g, 30, 52, Math.PI / 2);
+  g.block(true);
+  tick(g, 0.1);
+  assert(g.player.guarding);
+  const x0 = g.player.x;
+  tick(g, 1, { x: 1, z: 0 });
+  const guardSpeed = g.player.x - x0;
+  assert(g.player.guarding, 'still guarding on the move');
+  g.block(false);
+  tick(g, 0.1);
+  assert(!g.player.guarding);
+  const x1 = g.player.x;
+  tick(g, 1, { x: 1, z: 0 });
+  assert(guardSpeed < (g.player.x - x1) * 0.5, 'walking in guard is well under half speed');
+  g.block(true);
+  g.player.cooldown = 0;
+  assert(g.attack(), 'attacking straight out of the guard');
+  tick(g, 1 / 60);
+  assert(!g.player.guarding, 'no guard during a move');
+  tick(g, 2);
+  assert(g.player.guarding, 'guard comes back once the move ends while still held');
+  g.player.cooldown = 0;
+  g.jump();
+  tick(g, 0.1);
+  assert(!g.player.guarding, 'no guard in the air');
+  tick(g, 1.5);
+  g.setPause(true);
+  g.setPause(false);
+  tick(g, 0.1);
+  assert(!g.player.guarding, 'pausing lets go of the block');
+});
+test('A blocked blow that empties the bar still hands over to the next hero', () => {
+  const g = fresh();
+  place(g, 30, 52);
+  g.block(true);
+  tick(g, 0.1);
+  g.player.hp = 3;
+  g.player.inv = 0;
+  g.hurtHero(20, 0);
+  assert(g.actors[0].down);
+  assert.equal(g.selected, 1);
+  assert(!g.actors[0].guarding);
 });
 console.log(`${passes} 3D simulation checks passed.`);

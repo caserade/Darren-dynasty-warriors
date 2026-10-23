@@ -346,6 +346,12 @@ body.touch.usingGamepad #quickHelp {
     width: 60px;
     height: 60px;
   }
+  body.touch #tBlock {
+    right: 166px;
+    bottom: 22px;
+    width: 60px;
+    height: 60px;
+  }
   body.touch #tRoll {
     right: 100px;
     bottom: 94px;

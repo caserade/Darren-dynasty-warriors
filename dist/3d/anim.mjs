@@ -955,7 +955,40 @@ export class Animator {
     this.snap ??= new Float32Array(this.rig.bones.length * 4);
     this.rig.bones.forEach((b, i) => b.quaternion.toArray(this.snap, i * 4));
     if (hips) (this.snapHips ??= new THREE.Vector3()).copy(hips.position);
+    // Guard overlay (update 17): the Guard clip's spine, arms, wings and weapon are laid over
+    // whatever the legs are doing, so a guarding hero can walk without dropping the guard. It
+    // goes on after the snapshot above, so the snapshot stays exactly what the mixer wrote.
+    this.guardW = damp(this.guardW || 0, d.guard ? 1 : 0, 16, dt);
+    if (this.guardW > 0.002 && this.clips.Guard) this.overlay('Guard', this.idleT, this.guardW);
     this.procedural(dt, d, fwd, side, ax, yawVel, air);
+  }
+  // Blends the upper body (the spine bone and everything hanging from it) toward a clip's pose.
+  overlay(name, t, w) {
+    const spine = this.rig.role.spine;
+    if (!spine) return;
+    this.layers ??= {};
+    if (!this.layers[name]) {
+      const clip = this.clips[name],
+        upper = new Set();
+      spine.traverse((o) => o.isBone && upper.add(o.name));
+      this.layers[name] = {
+        dur: clip.duration,
+        tracks: clip.tracks
+          .filter((tr) => tr.name.endsWith('.quaternion') && upper.has(tr.name.split('.')[0]))
+          .map((tr) => ({
+            bone: this.rig.bones.find((b) => b.name === tr.name.split('.')[0]),
+            sample: tr.createInterpolant(),
+          }))
+          .filter((x) => x.bone),
+      };
+    }
+    const L = this.layers[name],
+      at = t % L.dur;
+    for (const { bone, sample } of L.tracks) {
+      const v = sample.evaluate(at);
+      QA.set(v[0], v[1], v[2], v[3]);
+      bone.quaternion.slerp(QA, w);
+    }
   }
   setW(name, w, t) {
     const a = this.actions[name];

@@ -837,6 +837,10 @@ h1 span {
 .float.heal {
   color: #9cf0a0;
 }
+.float.block {
+  color: #bfe3ff;
+  font-size: 16px;
+}
 #defeat h2 {
   font-size: 30px;
   margin: 14px 0 8px;
@@ -974,6 +978,10 @@ h1 span {
 .touch-actions #touch-special.ready {
   opacity: 1;
   box-shadow: 0 0 10px #f6d23a;
+}
+.touch-actions #touch-block {
+  background: #3c6f8fd9;
+  color: white;
 }
 .touch-actions #touch-style {
   background: #b94f7ad9;

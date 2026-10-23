@@ -88,7 +88,7 @@
     <div id="touch" hidden>
       <div id="stick"><div id="knob"></div></div>
       <button class="tb" id="tMu" hidden>BURST</button><button class="tb" id="tRoll">ROLL</button>
-      <button class="tb" id="tDash">DODGE</button>
+      <button class="tb" id="tDash">DODGE</button><button class="tb" id="tBlock">BLOCK</button>
       <button class="tb" id="tAtk">SNOW</button>
     </div>
 
@@ -219,7 +219,10 @@
         <div class="controls">
           <span><kbd>WASD</kbd> / <kbd>←↑↓→</kbd> move</span>
           <span><kbd>J</kbd> or <kbd>Z</kbd> attack (tap or hold)</span>
-          <span><kbd>Space</kbd> or <kbd>X</kbd> dodge</span>
+          <span
+            ><kbd>Space</kbd> or <kbd>X</kbd> dodge · hold <kbd>G</kbd> block (25% less
+            damage)</span
+          >
           <span
             ><kbd>F</kbd> style · <kbd>K</kbd> sweep / roll · <kbd>L</kbd> blizzard at 100
             snow</span
@@ -227,7 +230,7 @@
           <span><kbd>P</kbd> pause</span
           ><span
             >Controller: left stick move · right stick aim · X / RT attack · A dodge · B sweep /
-            roll · View style · Y blizzard · LB / RB camera</span
+            roll · View style · Y blizzard · hold LT block · LB / RB camera</span
           >
         </div>
       </div>
@@ -332,6 +335,7 @@
             ><button class="binding" data-bind="right">right</button
             ><button class="binding" data-bind="pause">pause</button
             ><button class="binding" data-bind="style">style</button
+            ><button class="binding" data-bind="block">block</button
             ><button id="resetBindings" class="binding">Restore defaults</button>
           </div>
         </details>

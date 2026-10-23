@@ -73,6 +73,9 @@ function seeded(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+// Blocking (update 17) takes this share off every blow, and slows the guarding hero to a walk.
+export const BLOCK_CUT = 0.25;
+const GUARD_SPEED = 0.38;
 const angleDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 export class World {
   constructor(data) {
@@ -264,6 +267,8 @@ export class Game {
     this.mode = 'adventure';
     this.style = 'paws';
     this.input = { x: 0, z: 0 };
+    // Held block button (update 17): the hero on screen guards whenever they are free to.
+    this.blocking = false;
     this.targets = [
       { x: 23, z: 50.5 },
       { x: 25, z: 52 },
@@ -302,6 +307,8 @@ export class Game {
         sprint: 0,
         buffer: null,
         airAttacked: false,
+        guarding: false,
+        guardT: 0,
       };
     });
     this.quest = {
@@ -430,6 +437,7 @@ export class Game {
   }
   setPause(value) {
     this.paused = value;
+    this.blocking = false;
     this.cancelCharge();
     this.emit('pause', { paused: value });
   }
@@ -839,6 +847,12 @@ export class Game {
     this.emit('jump', { actor: this.selected });
     return true;
   }
+  // Hold to block (update 17): while the button is down and the hero isn't busy, every blow they
+  // take does 25% less damage and can't knock them down or stagger them.
+  block(on = true) {
+    this.blocking = !!on;
+    return this.blocking;
+  }
   dodge() {
     const a = this.player,
       inp = this.input;
@@ -1226,6 +1240,31 @@ export class Game {
       return false;
     }
     damage = Math.max(1, Math.round(damage * (this.mode === 'cozy' ? 0.55 : 1)));
+    if (a.guarding) {
+      const full = damage;
+      damage = Math.max(1, Math.round(full * (1 - BLOCK_CUT)));
+      a.hp -= damage;
+      a.inv = 0.45;
+      a.guardT = 0;
+      a.kx += Math.sin(angle) * 3;
+      a.kz += Math.cos(angle) * 3;
+      // Turning to face the blow keeps the guard up the way the hero is being hit from.
+      a.yaw = angle + Math.PI;
+      a.yaw = Math.atan2(Math.sin(a.yaw), Math.cos(a.yaw));
+      this.stats.blocked = (this.stats.blocked || 0) + 1;
+      this.stats.saved = (this.stats.saved || 0) + full - damage;
+      this.emit('block', {
+        damage,
+        saved: full - damage,
+        actor: this.selected,
+        x: a.x,
+        z: a.z,
+        y: a.y + 1.3,
+        angle,
+      });
+      if (a.hp <= 0) this.heroDown(a);
+      return true;
+    }
     a.hp -= damage;
     a.inv = 0.7;
     a.kx += Math.sin(angle) * 6;
@@ -1247,21 +1286,24 @@ export class Game {
       a.charge = 0;
     }
     this.emit('hurt', { damage, actor: this.selected, x: a.x, z: a.z, y: a.y + 1.6, angle });
-    if (a.hp <= 0) {
-      a.hp = 0;
-      a.down = true;
-      const next = [1, 2].map((k) => (this.selected + k) % 3).find((i) => !this.actors[i].down);
-      if (next !== undefined) {
-        const name = a.name;
-        this.forceSwitch(next);
-        this.emit('down', { name, next: this.player.name });
-      } else {
-        this.defeated = true;
-        this.foeShots = [];
-        this.emit('defeat');
-      }
-    }
+    if (a.hp <= 0) this.heroDown(a);
     return true;
+  }
+  // The hero on screen is out of health: the next one able steps in, or the battle is lost.
+  heroDown(a) {
+    a.hp = 0;
+    a.down = true;
+    a.guarding = false;
+    const next = [1, 2].map((k) => (this.selected + k) % 3).find((i) => !this.actors[i].down);
+    if (next !== undefined) {
+      const name = a.name;
+      this.forceSwitch(next);
+      this.emit('down', { name, next: this.player.name });
+    } else {
+      this.defeated = true;
+      this.foeShots = [];
+      this.emit('defeat');
+    }
   }
   gainCookie() {
     const before = this.belly;
@@ -1457,7 +1499,11 @@ export class Game {
       a.yaw += clamp(diff, -rate * dt, rate * dt);
       a.yaw = Math.atan2(Math.sin(a.yaw), Math.cos(a.yaw));
     }
-    let speed = kit.speed * (a.charging ? 0.2 : a.action ? 0.12 : 1),
+    // Guarding: on the ground and not busy with a move, a charge or getting up.
+    a.guarding = this.blocking && a.air <= 0 && !a.action && !a.charging && !a.down;
+    for (const b of this.actors) if (b !== a) b.guarding = false;
+    a.guardT = a.guarding ? a.guardT + dt : 0;
+    let speed = kit.speed * (a.charging ? 0.2 : a.action ? 0.12 : a.guarding ? GUARD_SPEED : 1),
       tx = dx * speed,
       tz = dz * speed,
       accel = n > 0.05 ? (a.air > 0 ? 6 : 13) : a.air > 0 ? 2 : 16;

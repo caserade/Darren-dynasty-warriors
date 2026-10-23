@@ -539,6 +539,7 @@ addEventListener('keydown', (e) => {
     pressDash();
   else if (e.code === 'KeyK') pressRoll();
   else if (e.code === 'KeyL' || e.code === 'KeyC') pressMusou();
+  else if (e.code === 'KeyG') blockHeld = true;
   else if (e.code === 'KeyF') switchStyle();
   else if (e.code === 'KeyB') turnView(-1);
   else if (e.code === 'KeyN') turnView(1);
@@ -548,6 +549,7 @@ addEventListener('keydown', (e) => {
 addEventListener('keyup', (e) => {
   keys[e.code] = false;
   if (isAtk(e.code)) releaseAttack();
+  if (e.code === 'KeyG') blockHeld = false;
 });
 addEventListener('blur', () => {
   clearControls();
@@ -899,6 +901,27 @@ const sfx = {
     o.start(t);
     o.stop(t + 0.18);
   },
+  // A blocked blow: a short wooden knock with a bright tick on top.
+  block() {
+    if (!AC || muted) return;
+    const t = AC.currentTime;
+    for (const [f, len, vol] of [
+      [320, 0.09, 0.1],
+      [1240, 0.05, 0.04],
+    ]) {
+      const o = AC.createOscillator(),
+        gn = AC.createGain();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(f, t);
+      o.frequency.exponentialRampToValueAtTime(f * 0.6, t + len);
+      gn.gain.setValueAtTime(vol, t);
+      gn.gain.exponentialRampToValueAtTime(0.0001, t + len);
+      o.connect(gn);
+      gn.connect(sfxBus);
+      o.start(t);
+      o.stop(t + len + 0.02);
+    }
+  },
   hurt() {
     if (!AC || muted) return;
     const t = AC.currentTime;
@@ -1132,6 +1155,17 @@ if (isTouch) document.body.classList.add('touch');
   tap('#tDash', pressDash);
   tap('#tMu', pressMusou);
   tap('#tRoll', pressRoll);
+  // Block is held: it guards while a finger stays on it.
+  const block = $('#tBlock');
+  block.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    if (state === 'play' && !paused && !dialogOpen) {
+      blockHeld = true;
+      block.setPointerCapture(e.pointerId);
+    }
+  });
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture'])
+    block.addEventListener(type, () => (blockHeld = false));
 })();
 
 /* ---------------- player actions ---------------- */
@@ -1345,9 +1379,46 @@ function killEnemy(e, ang) {
   }
   if (e.officer) officerDown(e);
 }
+// Held block (update 17): 25% off each blow, same as the 3D game.
+const BLOCK_CUT = 0.25;
+function guarding() {
+  return blockHeld && canAct() && !P.musou && !P.atk && !P.roll && P.dash <= 0 && !chargeHeld;
+}
 function hurtPlayer(dmg, ang) {
   if (P.inv > 0 || P.musou || P.hp <= 0 || G.ending) return;
   dmg = Math.round(dmg * (G.mode === 'cozy' ? 0.55 : 1));
+  if (guarding()) {
+    // The guard holds: less damage, a short slide back, no lost combo or broken move.
+    const full = dmg;
+    dmg = Math.max(1, Math.round(full * (1 - BLOCK_CUT)));
+    P.hp -= dmg;
+    P.inv = 0.45;
+    P.kx += Math.cos(ang) * 120;
+    P.ky += Math.sin(ang) * 120;
+    P.blockT = 0.25;
+    P.blocked = (P.blocked || 0) + 1;
+    shake = Math.max(shake, 3);
+    padRumble(0.25, 70);
+    sfx.block();
+    for (let i = 0; i < 8; i++)
+      parts.push({
+        x: P.x - Math.cos(ang) * 26,
+        y: P.y - Math.sin(ang) * 26,
+        vx: rand(-90, 90) - Math.cos(ang) * 80,
+        vy: rand(-90, 40) - Math.sin(ang) * 80,
+        life: 0.35,
+        max: 0.35,
+        size: rand(3, 6),
+        color: '#cfeeff',
+        kind: 'puff',
+      });
+    floaters.push({ x: P.x, y: P.y, z: 86, v: '-' + dmg + ' BLOCK', life: 0.8, block: true });
+    if (P.hp <= 0) {
+      P.hp = 0;
+      loseGame();
+    }
+    return;
+  }
   P.hp -= dmg;
   P.inv = 0.7;
   P.hurtT = 0.3;
@@ -1523,6 +1594,7 @@ function update(dt) {
   P.inv = Math.max(0, P.inv - dt);
   P.hurtT = Math.max(0, P.hurtT - dt);
   P.dashCd = Math.max(0, P.dashCd - dt);
+  P.blockT = Math.max(0, (P.blockT || 0) - dt);
   if (
     brawlHeld &&
     P.weapon === 'paws' &&
@@ -1553,7 +1625,7 @@ function update(dt) {
       P.trail.push({ x: P.x, y: P.y, life: 0.25, face: P.face, anim: { ...darrenAnimation() } });
     }
   } else {
-    const sp = P.roll ? 0.72 : chargeHeld ? 0.8 : 1;
+    const sp = P.roll ? 0.72 : chargeHeld ? 0.8 : guarding() ? 0.4 : 1;
     const accel = v.m > 0.05 ? 32 : 44;
     P.vx += (v.x * 260 * sp - P.vx) * (1 - Math.exp(-accel * dt));
     P.vy += (v.y * 260 * sp - P.vy) * (1 - Math.exp(-accel * dt));
@@ -3358,6 +3430,7 @@ let attackPointer = null,
   shots = [],
   ally = null,
   chargeHeld = false,
+  blockHeld = false,
   chargeTime = 0,
   userZoom = 1,
   gameRun = 0,
@@ -3405,6 +3478,7 @@ function clearControls() {
   $('#knob').style.transform = '';
   chargeHeld = false;
   brawlHeld = false;
+  blockHeld = false;
   if (P) P.queued = false;
   chargeTime = 0;
 }
